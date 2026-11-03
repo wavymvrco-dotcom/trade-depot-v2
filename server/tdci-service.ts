@@ -16,6 +16,11 @@ import {
 export const TDCI_SYMBOLS = ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD", "USDCHF", "GBPJPY", "XAUUSD"];
 export const BUCKETS = [[10, 30], [30, 50], [50, 70], [70, 101]] as const;
 
+// Significance bar for learning a layer weight. Calibration tests ~200
+// layer/market/style combinations; at |t| ≥ 2 about 5% (~10) would pass by
+// chance alone. |t| ≥ 3 keeps expected false positives below one.
+const MIN_T = 3;
+
 export function isStyle(s: unknown): s is StyleKey {
   return typeof s === "string" && (STYLES as string[]).includes(s);
 }
@@ -232,14 +237,14 @@ function report(ctx: TdciContext, samples: BarSample[], weights: Weights, thresh
 
 /**
  * Learn weights from in-sample information coefficients. A layer earns a
- * learned weight only when |t| ≥ 2 (effective sample size accounts for
+ * learned weight only when |t| ≥ MIN_T (effective sample size accounts for
  * overlapping forward returns). Significant negative IC makes it contrarian.
  * If nothing is significant, the style's reasoned prior is kept.
  */
 function learnWeights(profile: Profile, ic: Record<string, number>, sampleSize: number) {
   const nEff = Math.max(1, sampleSize / profile.model.icHorizon);
   const tStat = Object.fromEntries(profile.layers.map(k => [k, round(ic[k] * Math.sqrt(nEff), 2)]));
-  const significant = profile.layers.filter(k => Math.abs(tStat[k]) >= 2);
+  const significant = profile.layers.filter(k => Math.abs(tStat[k]) >= MIN_T);
   if (!significant.length) return { weights: { ...profile.defaultWeights }, tStat, learned: false };
   const total = significant.reduce((s, k) => s + Math.abs(ic[k]), 0);
   const w: Weights = {};
@@ -296,7 +301,9 @@ export async function calibrate(symbol: string, style: StyleKey, onProgress?: (m
   const oosTrades = oosAbove.reduce((s, b) => s + b.trades, 0);
   const oosAvg = oosTrades ? oosAbove.reduce((s, b) => s + b.avgR * b.trades, 0) / oosTrades : 0;
   const strat = outOfSample.strategy;
-  const stratOk = !!strat && strat.trades >= 30 && strat.totalR > 0;
+  // Must also have made money in-sample — otherwise a profitable OOS run is just market drift
+  const isStrat = inSample.strategy;
+  const stratOk = !!strat && strat.trades >= 30 && strat.totalR > 0 && !!isStrat && isStrat.totalR > 0;
   const holds = chosen != null && oosTrades >= 30 && oosAvg > 0 && stratOk;
   const recommendedMin = holds ? chosen : null;
   const costShare = round(costSum / Math.max(1, samples.length), 3);

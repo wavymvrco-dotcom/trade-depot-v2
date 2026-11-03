@@ -347,7 +347,7 @@ export default function Tdci() {
                     </tbody>
                   </table>
                   <p className="text-[10px] text-muted-foreground mt-2">
-                    IC = rank correlation between the layer and the next {profile?.model.icHorizon ?? "few"} bars of price movement. A layer only earns a learned weight with |t| ≥ 2;
+                    IC = rank correlation between the layer and the next {profile?.model.icHorizon ?? "few"} bars of price movement. A layer only earns a learned weight with |t| ≥ 3 (strict, because ~200 combinations are tested);
                     {c.weightsLearned ? " significant negative layers are used contrarian." : " none were significant here, so the style's default weights are kept."}
                   </p>
                 </div>
