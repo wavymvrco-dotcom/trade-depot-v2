@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export interface LivePrice {
   bid: number;
@@ -16,53 +16,59 @@ export function useLivePrices(symbols: string[] = DEFAULT_SYMBOLS) {
   const [prices, setPrices] = useState<LivePrices>({});
   const [connected, setConnected] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
-  const reconnectRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-
-  const connect = useCallback(() => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) return;
-
-    const proto = window.location.protocol === "https:" ? "wss" : "ws";
-    const ws = new WebSocket(`${proto}://${window.location.host}/ws/prices`);
-    wsRef.current = ws;
-
-    ws.onopen = () => {
-      setConnected(true);
-      ws.send(JSON.stringify({ type: "subscribe", symbols }));
-    };
-
-    ws.onmessage = (e) => {
-      try {
-        const msg = JSON.parse(e.data);
-        if (msg.type === "prices" && msg.data) {
-          setPrices(prev => ({ ...prev, ...msg.data }));
-        }
-      } catch {}
-    };
-
-    ws.onclose = () => {
-      setConnected(false);
-      // Reconnect after 4 seconds
-      reconnectRef.current = setTimeout(connect, 4000);
-    };
-
-    ws.onerror = () => {
-      ws.close();
-    };
-  }, [symbols.join(",")]);
+  const key = symbols.join(",");
 
   useEffect(() => {
+    let disposed = false;
+    let retry: ReturnType<typeof setTimeout> | undefined;
+    let attempt = 0;
+
+    const connect = () => {
+      if (disposed) return;
+      const proto = window.location.protocol === "https:" ? "wss" : "ws";
+      const ws = new WebSocket(`${proto}://${window.location.host}/ws/prices`);
+      wsRef.current = ws;
+
+      // Events from a socket that has since been replaced (symbols changed,
+      // reconnect, unmount) must not touch state — otherwise a late "close"
+      // from the old socket flips the indicator red while the new one is live.
+      const current = () => !disposed && wsRef.current === ws;
+
+      ws.onopen = () => {
+        if (!current()) return;
+        attempt = 0;
+        setConnected(true);
+        ws.send(JSON.stringify({ type: "subscribe", symbols: key.split(",") }));
+      };
+      ws.onmessage = (e) => {
+        if (!current()) return;
+        try {
+          const msg = JSON.parse(e.data);
+          if (msg.type === "prices" && msg.data) setPrices(prev => ({ ...prev, ...msg.data }));
+        } catch {}
+      };
+      ws.onclose = () => {
+        if (!current()) return;
+        setConnected(false);
+        // Back off 2s, 4s, 8s … up to 30s (e.g. while a sleeping server wakes)
+        const delay = Math.min(30_000, 2000 * 2 ** attempt++);
+        retry = setTimeout(connect, delay);
+      };
+      ws.onerror = () => ws.close();
+    };
+
     connect();
     return () => {
-      clearTimeout(reconnectRef.current);
+      disposed = true;
+      clearTimeout(retry);
       wsRef.current?.close();
+      wsRef.current = null;
     };
-  }, [connect]);
+  }, [key]);
 
-  const sendPing = useCallback(() => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ type: "ping" }));
-    }
-  }, []);
+  const sendPing = () => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) wsRef.current.send(JSON.stringify({ type: "ping" }));
+  };
 
   return { prices, connected, sendPing };
 }
