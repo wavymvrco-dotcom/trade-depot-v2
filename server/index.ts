@@ -1,7 +1,8 @@
+import "./env"; // must stay first: loads .env.local/.env before other modules read process.env
 import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
-import { Pool } from "pg";
+import { pool as pgPool } from "./db";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
@@ -21,13 +22,6 @@ declare module "http" {
 
 const PgSession = connectPgSimple(session);
 const isProduction = process.env.NODE_ENV === "production";
-const pgPool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: isProduction ? { rejectUnauthorized: false } : false,
-  max: 5,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 10000,
-});
 
 if (isProduction && !process.env.SESSION_SECRET) {
   throw new Error("SESSION_SECRET must be set in production — refusing to start with a default secret.");
@@ -114,7 +108,7 @@ app.use((req, res, next) => {
 
   const port = parseInt(process.env.PORT || "5000", 10);
   httpServer.listen(
-    { port, host: "0.0.0.0", reusePort: true },
+    { port, host: "0.0.0.0", ...(process.platform === "linux" ? { reusePort: true } : {}) }, // reusePort is Linux-only
     () => { log(`serving on port ${port}`); },
   );
 })();
