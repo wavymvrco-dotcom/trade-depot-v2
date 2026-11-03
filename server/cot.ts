@@ -64,7 +64,7 @@ export async function getCot(ccy: string): Promise<CotPoint[]> {
   const hit = cache.get(ccy);
   if (hit && Date.now() - hit.at < 12 * 3600_000) return hit.data;
 
-  const since = new Date(Date.now() - 6 * 365 * 24 * 3600_000).toISOString().slice(0, 10);
+  const since = new Date(Date.now() - 16 * 365 * 24 * 3600_000).toISOString().slice(0, 10); // position style needs ~12y
   const params = new URLSearchParams({
     cftc_contract_market_code: code,
     $where: `report_date_as_yyyy_mm_dd >= '${since}'`,

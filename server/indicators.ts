@@ -75,3 +75,51 @@ export function swingPoints(candles: Candle[], wing = 2, max = 3) {
 export function last<T>(arr: T[]): T | undefined {
   return arr[arr.length - 1];
 }
+
+/**
+ * Wilder's ADX with +DI/−DI. Returns arrays aligned with the input; values are
+ * NaN until enough bars exist (about 2× period).
+ */
+export function adx(candles: Candle[], period = 14) {
+  const n = candles.length;
+  const plusDI = new Array<number>(n).fill(NaN), minusDI = new Array<number>(n).fill(NaN), adxOut = new Array<number>(n).fill(NaN);
+  if (n <= period * 2) return { adx: adxOut, plusDI, minusDI };
+  let trS = 0, pS = 0, mS = 0;
+  const dx: number[] = new Array(n).fill(NaN);
+  for (let i = 1; i < n; i++) {
+    const c = candles[i], p = candles[i - 1];
+    const up = c.high - p.high, down = p.low - c.low;
+    const pdm = up > down && up > 0 ? up : 0, mdm = down > up && down > 0 ? down : 0;
+    const tr = Math.max(c.high - c.low, Math.abs(c.high - p.close), Math.abs(c.low - p.close));
+    if (i <= period) {
+      trS += tr; pS += pdm; mS += mdm;
+      if (i < period) continue;
+    } else {
+      trS = trS - trS / period + tr; pS = pS - pS / period + pdm; mS = mS - mS / period + mdm;
+    }
+    const pdi = trS ? (100 * pS) / trS : 0, mdi = trS ? (100 * mS) / trS : 0;
+    plusDI[i] = pdi; minusDI[i] = mdi;
+    dx[i] = pdi + mdi ? (100 * Math.abs(pdi - mdi)) / (pdi + mdi) : 0;
+  }
+  const first = period * 2 - 1;
+  let a = dx.slice(period, first + 1).reduce((s, v) => s + v, 0) / period;
+  adxOut[first] = a;
+  for (let i = first + 1; i < n; i++) { a = (a * (period - 1) + dx[i]) / period; adxOut[i] = a; }
+  return { adx: adxOut, plusDI, minusDI };
+}
+
+/** Aggregate daily candles into weeks starting Monday (UTC). */
+export function toWeekly(daily: Candle[]): Candle[] {
+  const out: Candle[] = [];
+  for (const c of daily) {
+    const d = new Date(c.time.slice(0, 10) + "T00:00:00Z");
+    const monday = new Date(d.getTime() - ((d.getUTCDay() + 6) % 7) * 86400e3).toISOString().slice(0, 10);
+    const w = out[out.length - 1];
+    if (w && w.time === monday) {
+      w.high = Math.max(w.high, c.high); w.low = Math.min(w.low, c.low); w.close = c.close;
+    } else {
+      out.push({ time: monday, open: c.open, high: c.high, low: c.low, close: c.close });
+    }
+  }
+  return out;
+}

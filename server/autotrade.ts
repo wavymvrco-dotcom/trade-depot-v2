@@ -8,17 +8,19 @@ import { getRiskLimits } from "./risk";
 import { openTrade, closeTrade, normalizeSide, sizeForRisk } from "./execution";
 import { recordLessonOutcome } from "./ai-knowledge";
 import type { Position, AiSignal } from "@shared/schema";
-import { latestCalibration, type CalibrationResult } from "./tdci-service";
+import { latestCalibration, styleFor, type CalibrationResult } from "./tdci-service";
 
 let running = false;
 const SIGNAL_INTERVAL_MS = 15 * 60_000;
 
 /** Reason a generated signal may not be auto-executed, or null if it may. */
 async function tdciGate(signal: AiSignal, userMin: number): Promise<string | null> {
-  const cal = await latestCalibration(signal.symbol, "4h").catch(() => null);
+  // Judge against the calibration for the style this signal was scored with
+  const style = styleFor((signal.tdciLayers as any)?.style);
+  const cal = await latestCalibration(signal.symbol, style).catch(() => null);
   const recommended = (cal?.result as CalibrationResult | undefined)?.recommendedMin ?? null;
-  if (!cal) return "TDCI not calibrated for this market";
-  if (recommended == null) return "no proven TDCI edge on this market";
+  if (!cal) return `TDCI not calibrated for ${signal.symbol} ${style}`;
+  if (recommended == null) return `no proven TDCI edge on ${signal.symbol} ${style}`;
   if (signal.tdciScore == null || !signal.tdciDirection) return "signal has no TDCI reading";
   const wantDir = signal.action.includes("BUY") ? "LONG" : "SHORT";
   if (signal.tdciDirection !== wantDir) return `TDCI points ${signal.tdciDirection}, signal is ${signal.action}`;

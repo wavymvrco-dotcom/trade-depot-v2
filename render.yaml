@@ -1,0 +1,27 @@
+# Render Blueprint — https://render.com/docs/blueprint-spec
+# In Render: New → Blueprint → pick this repo. You'll be asked for the values
+# marked `sync: false`; the rest are set or generated automatically.
+services:
+  - type: web
+    name: trade-depot
+    runtime: node
+    plan: free            # sleeps after 15 min idle; background workers pause while asleep
+    region: oregon        # same AWS region as the Neon database (us-west-2)
+    branch: main
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: node dist/index.cjs
+    healthCheckPath: /api/version
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "22"
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: ENCRYPTION_KEY   # encrypts saved API keys/passwords — never change it once set
+        generateValue: true
+      - key: DATABASE_URL     # Neon pooled connection string (from .env.local)
+        sync: false
+      - key: TWELVE_DATA_API_KEY
+        sync: false

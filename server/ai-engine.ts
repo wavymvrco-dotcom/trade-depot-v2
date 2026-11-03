@@ -4,7 +4,8 @@ import { getSymbolConfig, priceDecimals } from "@shared/pips";
 import { fetchCandlesForAI } from "./backtest";
 import { ema, rsi, atr, swingPoints, last, type Candle } from "./indicators";
 import { getRelevantKnowledge } from "./ai-knowledge";
-import { getLiveTdci, TDCI_SYMBOLS, type LiveTdci } from "./tdci-service";
+import { getLiveTdci, styleFor, TDCI_SYMBOLS, type LiveTdci } from "./tdci-service";
+import { PROFILES } from "./tdci";
 
 const SYMBOLS = ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD", "XAUUSD", "GBPJPY"];
 
@@ -250,7 +251,9 @@ function tdciSignal(symbol: string, tdci: LiveTdci, quote: LivePrice): ValidSign
   if (tdci.direction === "NEUTRAL" || tdci.score < TDCI_SIGNAL_MIN) return null;
   const action = tdci.direction === "LONG" ? "BUY" : "SELL";
   const entry = action === "BUY" ? quote.ask : quote.bid;
-  const slDist = 1.5 * tdci.atr;
+  // Same trade model the calibration measured for this style
+  const { stopAtr, rr } = PROFILES[tdci.style].model;
+  const slDist = stopAtr * tdci.atr;
   const dp = priceDecimals(symbol);
   const top = [...tdci.layers].filter(l => l.key !== "regime").sort((a, b) => Math.abs(b.value * b.weight) - Math.abs(a.value * a.weight)).slice(0, 2);
   const hist = tdci.historical && tdci.historical.trades >= 20
@@ -259,10 +262,10 @@ function tdciSignal(symbol: string, tdci: LiveTdci, quote: LivePrice): ValidSign
   return {
     action,
     confidence: 0, // the TDCI score is reported separately; it is not a win probability
-    reasoning: `TDCI ${tdci.score}/100 ${tdci.direction} on ${tdci.interval}. Strongest layers: ${top.map(l => `${l.label} — ${l.detail}`).join(" ")}${hist} Stop 1.5× ATR, target 2R.`,
+    reasoning: `TDCI ${tdci.score}/100 ${tdci.direction} (${PROFILES[tdci.style].label}, ${tdci.interval}). Strongest layers: ${top.map(l => `${l.label} — ${l.detail}`).join(" ")}${hist} Stop ${stopAtr}× ATR, target ${rr}R.`,
     entryPrice: parseFloat(entry.toFixed(dp)),
     stopLoss: parseFloat((action === "BUY" ? entry - slDist : entry + slDist).toFixed(dp)),
-    takeProfit: parseFloat((action === "BUY" ? entry + 2 * slDist : entry - 2 * slDist).toFixed(dp)),
+    takeProfit: parseFloat((action === "BUY" ? entry + rr * slDist : entry - rr * slDist).toFixed(dp)),
   };
 }
 
@@ -309,11 +312,13 @@ export async function generateAiSignal(userId: string, symbol?: string) {
   const quote = (await fetchLivePrices().catch(() => ({} as Record<string, LivePrice>)))[targetSymbol];
   if (!isTradablePrice(quote)) throw new Error(`No live price for ${targetSymbol} — signals are paused until data returns.`);
 
+  // The TDCI read uses the layers curated for the trader's own style
+  const strategy = await storage.getActiveStrategy(userId).catch(() => undefined);
+  const style = styleFor(strategy?.style);
   const [tfs, tdci] = await Promise.all([
     getMarketContext(targetSymbol),
-    TDCI_SYMBOLS.includes(targetSymbol) ? getLiveTdci(targetSymbol, "4h").catch(e => { console.warn(`[TDCI] ${targetSymbol}: ${e.message}`); return null; }) : Promise.resolve(null),
+    TDCI_SYMBOLS.includes(targetSymbol) ? getLiveTdci(targetSymbol, style).catch(e => { console.warn(`[TDCI] ${targetSymbol}: ${e.message}`); return null; }) : Promise.resolve(null),
   ]);
-  const strategy = await storage.getActiveStrategy(userId).catch(() => undefined);
   const provider = settings?.selectedAiProvider;
   const hasProvider = !!provider && provider !== "none";
 
@@ -364,6 +369,6 @@ export async function generateAiSignal(userId: string, symbol?: string) {
     knowledgeIds: knowledgeIds.length ? knowledgeIds : null,
     tdciScore: tdci?.score ?? null,
     tdciDirection: tdci?.direction ?? null,
-    tdciLayers: tdci ? { interval: tdci.interval, weightsSource: tdci.weightsSource, recommendedMin: tdci.recommendedMin, layers: tdci.layers } : null,
+    tdciLayers: tdci ? { style: tdci.style, interval: tdci.interval, weightsSource: tdci.weightsSource, recommendedMin: tdci.recommendedMin, layers: tdci.layers } : null,
   });
 }

@@ -104,6 +104,36 @@ function ttlFor(interval: string) {
 const candleCache = new Map<string, { at: number; size: number; data: Candle[] }>();
 const inflight = new Map<string, Promise<Candle[]>>();
 
+const PAGE = 5000; // Twelve Data's per-request maximum
+
+/** One request: up to 5000 bars ending at `endDate` (exclusive of nothing; inclusive end). */
+async function fetchPage(symbol: string, interval: string, outputsize: number, apiKey: string, endDate?: string): Promise<Candle[]> {
+  await rateSlot();
+  const end = endDate ? `&end_date=${encodeURIComponent(endDate)}` : "";
+  const url = `${TWELVE_BASE}/time_series?symbol=${encodeURIComponent(toTwelveSymbol(symbol))}&interval=${encodeURIComponent(interval)}&outputsize=${outputsize}&timezone=UTC&apikey=${encodeURIComponent(apiKey)}&order=ASC${end}`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(30_000) });
+  if (!res.ok) throw new Error(`Candle fetch failed: HTTP ${res.status}`);
+  const data = await res.json() as any;
+  if (data.status === "error") {
+    // "No data" before the start of available history ends paging cleanly
+    if (/no data/i.test(String(data.message))) return [];
+    throw new Error(`Candle fetch failed: ${data.message || "Twelve Data error"}`);
+  }
+  const values = (data.values as any[]) ?? [];
+  return values.map((v: any) => ({
+    time: v.datetime,
+    open: parseFloat(v.open),
+    high: parseFloat(v.high),
+    low: parseFloat(v.low),
+    close: parseFloat(v.close),
+    volume: v.volume ? parseFloat(v.volume) : undefined,
+  }));
+}
+
+/**
+ * Fetch `outputsize` bars, paging backward in 5000-bar requests when more
+ * history is needed than one request returns. Shared cache and rate limit.
+ */
 export async function fetchCandles(symbol: string, interval: string, outputsize: number, apiKey: string): Promise<Candle[]> {
   const key = `${symbol}:${interval}`;
   const cached = candleCache.get(key);
@@ -116,22 +146,16 @@ export async function fetchCandles(symbol: string, interval: string, outputsize:
   if (pending) return pending;
 
   const p = (async () => {
-    await rateSlot();
-    const url = `${TWELVE_BASE}/time_series?symbol=${encodeURIComponent(toTwelveSymbol(symbol))}&interval=${encodeURIComponent(interval)}&outputsize=${outputsize}&timezone=UTC&apikey=${encodeURIComponent(apiKey)}&order=ASC`;
-    const res = await fetch(url, { signal: AbortSignal.timeout(20_000) });
-    if (!res.ok) throw new Error(`Candle fetch failed: HTTP ${res.status}`);
-    const data = await res.json() as any;
-    if (data.status === "error") throw new Error(`Candle fetch failed: ${data.message || "Twelve Data error"}`);
-    const values = data.values as any[];
-    if (!values?.length) throw new Error("Candle fetch failed: no data returned");
-    const candles: Candle[] = values.map((v: any) => ({
-      time: v.datetime,
-      open: parseFloat(v.open),
-      high: parseFloat(v.high),
-      low: parseFloat(v.low),
-      close: parseFloat(v.close),
-      volume: v.volume ? parseFloat(v.volume) : undefined,
-    }));
+    let candles = await fetchPage(symbol, interval, Math.min(PAGE, outputsize), apiKey);
+    if (!candles.length) throw new Error("Candle fetch failed: no data returned");
+    while (candles.length < outputsize) {
+      // Next page ends just before the oldest bar we have
+      const oldest = candles[0].time;
+      const older = await fetchPage(symbol, interval, Math.min(PAGE, outputsize - candles.length + 1), apiKey, oldest);
+      const fresh = older.filter(c => c.time < oldest);
+      if (!fresh.length) break; // reached the start of available history
+      candles = [...fresh, ...candles];
+    }
     candleCache.set(key, { at: Date.now(), size: outputsize, data: candles });
     return candles;
   })();

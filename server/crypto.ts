@@ -9,9 +9,12 @@ const PREFIX = "enc:v1:";
 function loadKey(): Buffer {
   const raw = process.env.ENCRYPTION_KEY;
   if (raw) {
-    const key = /^[0-9a-f]{64}$/i.test(raw) ? Buffer.from(raw, "hex") : Buffer.from(raw, "base64");
-    if (key.length !== 32) throw new Error("ENCRYPTION_KEY must be 32 bytes (64 hex chars or base64).");
-    return key;
+    if (/^[0-9a-f]{64}$/i.test(raw)) return Buffer.from(raw, "hex");
+    const b64 = Buffer.from(raw, "base64");
+    if (b64.length === 32) return b64;
+    // Any other strong random string (e.g. a host-generated secret) is hashed to 32 bytes
+    if (raw.length < 32) throw new Error("ENCRYPTION_KEY is too short — use at least 32 random characters.");
+    return crypto.createHash("sha256").update(raw).digest();
   }
   if (process.env.NODE_ENV === "production") {
     throw new Error("ENCRYPTION_KEY must be set in production — refusing to store secrets unencrypted.");

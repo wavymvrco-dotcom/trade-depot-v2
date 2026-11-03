@@ -6,6 +6,18 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
       "port": 5000
+    },
+    {
+      "name": "trade-depot-prod",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["dist/index.cjs"],
+      "port": 5055,
+      "env": {
+        "NODE_ENV": "production",
+        "PORT": "5055",
+        "SESSION_SECRET": "local-production-smoke-test-only-not-a-real-secret",
+        "ENCRYPTION_KEY": "local-production-smoke-test-only-not-a-real-key-0001"
+      }
     }
   ]
 }

@@ -7,7 +7,8 @@ import { priceDecimals } from "@shared/pips";
 import { openTrade, closeTrade, normalizeSide } from "./execution";
 import { fetchLivePrices, verifyPolygonConnection, getMarketDataStatus, isTradablePrice, type LivePrice } from "./marketdata";
 import { checkCanOpenTrade } from "./trade-guard";
-import { getLiveTdci, calibrate, latestCalibration, listCalibrations, TDCI_SYMBOLS, TDCI_INTERVALS, type CalibrationResult } from "./tdci-service";
+import { getLiveTdci, latestCalibration, listCalibrations, enqueueCalibrations, jobStatus, isStyle, TDCI_SYMBOLS, type CalibrationResult } from "./tdci-service";
+import { PROFILES, STYLES, LAYER_INFO, type StyleKey } from "./tdci";
 import { SECRET_SETTING_FIELDS, randomToken } from "./crypto";
 import { calcProfit } from "./pips";
 import { fetchEconomicCalendar } from "./calendar";
@@ -165,7 +166,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         const settings = await storage.getUserSettings(user.id);
         const appUrl = process.env.REPLIT_DEV_DOMAIN
           ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-          : process.env.APP_URL || "http://localhost:5000";
+          : process.env.APP_URL || process.env.RENDER_EXTERNAL_URL || "http://localhost:5000";
         const verifyUrl = `${appUrl}/verify-email?token=${verifyToken}`;
         const html = `
 <!DOCTYPE html><html><body style="margin:0;padding:0;background:#0a0a0f;font-family:Inter,sans-serif;color:#e2e8f0">
@@ -213,7 +214,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         const settings = await storage.getUserSettings(user.id);
         const appUrl = process.env.REPLIT_DEV_DOMAIN
           ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-          : process.env.APP_URL || "http://localhost:5000";
+          : process.env.APP_URL || process.env.RENDER_EXTERNAL_URL || "http://localhost:5000";
         const resetUrl = `${appUrl}/reset-password?token=${token}`;
         const html = `
 <!DOCTYPE html><html><body style="margin:0;padding:0;background:#0a0a0f;font-family:Inter,sans-serif;color:#e2e8f0">
@@ -559,11 +560,22 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // ── Trade Depot Confluence Index ──────────────────────────────────────────
   const tdciParams = z.object({
     symbol: z.string().transform(s => s.toUpperCase()).refine(s => TDCI_SYMBOLS.includes(s), "Unsupported symbol"),
-    interval: z.enum(TDCI_INTERVALS).default("4h"),
+    style: z.enum(STYLES as [StyleKey, ...StyleKey[]]).default("swing"),
   });
+  const tdciError = (e: any) => e.issues?.[0]?.message ?? e.message;
 
-  app.get("/api/tdci/symbols", (_req: Request, res: Response) => {
-    res.json({ symbols: TDCI_SYMBOLS, intervals: TDCI_INTERVALS });
+  app.get("/api/tdci/profiles", (_req: Request, res: Response) => {
+    res.json({
+      symbols: TDCI_SYMBOLS,
+      profiles: STYLES.map(k => {
+        const p = PROFILES[k];
+        return {
+          key: p.key, label: p.label, description: p.description, interval: p.interval, htf: p.htf,
+          model: p.model, sessionHours: p.sessionHours ?? null,
+          layers: [...p.layers, "regime"].map(l => ({ key: l, ...LAYER_INFO[l as keyof typeof LAYER_INFO], weight: (p.defaultWeights as any)[l] ?? null })),
+        };
+      }),
+    });
   });
 
   app.get("/api/tdci/calibrations", async (_req: Request, res: Response) => {
@@ -571,47 +583,50 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json(rows.map(r => {
       const x = r.result as CalibrationResult;
       return {
-        symbol: r.symbol, interval: r.interval, createdAt: r.createdAt,
-        recommendedMin: x.recommendedMin, verdict: x.verdict,
+        symbol: r.symbol, style: r.interval, createdAt: r.createdAt,
+        recommendedMin: x.recommendedMin, verdict: x.verdict, weightsLearned: x.weightsLearned,
         oosAnySignalAvgR: x.outOfSample.anySignal.avgR, oosMonotonic: x.outOfSample.monotonic,
+        costShareOfRisk: x.costShareOfRisk,
       };
     }));
   });
 
-  app.get("/api/tdci/calibration/:symbol/:interval", async (req: Request, res: Response) => {
+  app.get("/api/tdci/calibration/:symbol/:style", async (req: Request, res: Response) => {
     try {
       const p = tdciParams.parse(req.params);
-      const row = await latestCalibration(p.symbol, p.interval);
+      const row = await latestCalibration(p.symbol, p.style);
       if (!row) return res.status(404).json({ message: "Not calibrated yet" });
       res.json({ ...(row.result as object), createdAt: row.createdAt });
     } catch (e: any) {
-      res.status(400).json({ message: e.issues?.[0]?.message ?? e.message });
+      res.status(400).json({ message: tdciError(e) });
     }
   });
 
-  // One calibration at a time: each pulls years of history through the rate-limited feed
-  let calibrating: string | null = null;
-  app.post("/api/tdci/calibrate", async (req: Request, res: Response) => {
+  // Calibrations run in a background queue; the UI polls /api/tdci/job
+  app.get("/api/tdci/job", (_req: Request, res: Response) => res.json(jobStatus()));
+
+  app.post("/api/tdci/calibrate", (req: Request, res: Response) => {
     try {
       const p = tdciParams.parse(req.body ?? {});
-      if (calibrating) return res.status(409).json({ message: `Calibration for ${calibrating} is already running — try again shortly.` });
-      calibrating = `${p.symbol} ${p.interval}`;
-      try {
-        res.json(await calibrate(p.symbol, p.interval));
-      } finally {
-        calibrating = null;
-      }
+      res.status(202).json(enqueueCalibrations([{ symbol: p.symbol, style: p.style }]));
     } catch (e: any) {
-      res.status(400).json({ message: e.issues?.[0]?.message ?? e.message });
+      res.status(400).json({ message: tdciError(e) });
     }
+  });
+
+  app.post("/api/tdci/calibrate-all", (req: Request, res: Response) => {
+    const styles = (Array.isArray(req.body?.styles) ? req.body.styles : STYLES).filter(isStyle);
+    const symbols = (Array.isArray(req.body?.symbols) ? req.body.symbols : TDCI_SYMBOLS).map((s: string) => String(s).toUpperCase()).filter((s: string) => TDCI_SYMBOLS.includes(s));
+    const pairs = styles.flatMap((style: StyleKey) => symbols.map((symbol: string) => ({ symbol, style })));
+    res.status(202).json(enqueueCalibrations(pairs));
   });
 
   app.get("/api/tdci/:symbol", async (req: Request, res: Response) => {
     try {
-      const p = tdciParams.parse({ symbol: req.params.symbol, interval: req.query.interval ?? "4h" });
-      res.json(await getLiveTdci(p.symbol, p.interval));
+      const p = tdciParams.parse({ symbol: req.params.symbol, style: req.query.style ?? "swing" });
+      res.json(await getLiveTdci(p.symbol, p.style));
     } catch (e: any) {
-      res.status(400).json({ message: e.issues?.[0]?.message ?? e.message });
+      res.status(400).json({ message: tdciError(e) });
     }
   });
 
