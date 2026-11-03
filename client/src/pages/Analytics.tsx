@@ -123,65 +123,6 @@ function StatCard({ label, value, sub, color = "text-foreground", icon: Icon }: 
   );
 }
 
-// Correlation matrix for major forex pairs
-function CorrelationMatrix() {
-  const PAIRS = ["EURUSD","GBPUSD","USDJPY","AUDUSD","USDCAD","XAUUSD","USDCHF","GBPJPY"];
-  // Static well-known real correlations (annual avg)
-  const CORR: number[][] = [
-    [ 1.00,  0.88, -0.72,  0.78, -0.65,  0.72, -0.84,  0.74],
-    [ 0.88,  1.00, -0.58,  0.71, -0.59,  0.65, -0.76,  0.95],
-    [-0.72, -0.58,  1.00, -0.55,  0.48, -0.60,  0.64, -0.42],
-    [ 0.78,  0.71, -0.55,  1.00, -0.70,  0.60, -0.68,  0.64],
-    [-0.65, -0.59,  0.48, -0.70,  1.00, -0.45,  0.68, -0.52],
-    [ 0.72,  0.65, -0.60,  0.60, -0.45,  1.00, -0.68,  0.58],
-    [-0.84, -0.76,  0.64, -0.68,  0.68, -0.68,  1.00, -0.70],
-    [ 0.74,  0.95, -0.42,  0.64, -0.52,  0.58, -0.70,  1.00],
-  ];
-  const getCellStyle = (v: number): React.CSSProperties => {
-    const abs = Math.abs(v);
-    const opacity = v === 1 ? 0.15 : abs > 0.8 ? 0.85 : abs > 0.6 ? 0.65 : abs > 0.4 ? 0.45 : abs > 0.2 ? 0.25 : 0.12;
-    if (v === 1) return { background: `hsl(var(--primary) / ${opacity})`, color: "hsl(var(--primary))" };
-    const rgb = v > 0 ? "34,197,94" : "239,68,68";
-    return { background: `rgba(${rgb},${opacity})`, color: abs > 0.4 ? (v > 0 ? "#16a34a" : "#dc2626") : "hsl(var(--foreground))" };
-  };
-
-  return (
-    <div className="bg-card/50 border border-border rounded-xl p-5">
-      <h3 className="font-semibold text-sm mb-1 flex items-center gap-2"><Grid3x3 className="w-4 h-4 text-primary" /> Correlation Matrix</h3>
-      <p className="text-xs text-muted-foreground mb-4">Pair correlation coefficients. Strong negative = hedge opportunity.</p>
-      <div className="overflow-x-auto">
-        <table className="text-[10px] text-center border-separate border-spacing-0.5">
-          <thead>
-            <tr>
-              <th className="w-14 text-left text-muted-foreground" />
-              {PAIRS.map(p => <th key={p} className="w-14 text-[9px] text-muted-foreground px-0.5 pb-1">{p.slice(0, 3)}<br/>{p.slice(3)}</th>)}
-            </tr>
-          </thead>
-          <tbody>
-            {PAIRS.map((rowP, ri) => (
-              <tr key={rowP}>
-                <td className="text-[9px] text-muted-foreground text-left pr-2 font-mono whitespace-nowrap">{rowP}</td>
-                {PAIRS.map((_, ci) => {
-                  const v = CORR[ri][ci];
-                  return (
-                    <td key={ci} style={getCellStyle(v)} className="w-14 h-8 rounded text-[10px] font-bold transition-all">
-                      {v.toFixed(2)}
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <div className="flex items-center gap-4 mt-3 text-[10px] text-muted-foreground">
-        <div className="flex items-center gap-1"><div className="w-4 h-3 rounded bg-green-500/80" /> Positive</div>
-        <div className="flex items-center gap-1"><div className="w-4 h-3 rounded bg-red-500/80" /> Negative</div>
-        <div className="ml-auto">Annual average correlations</div>
-      </div>
-    </div>
-  );
-}
 
 // Live market session clock
 function MarketSessionClock() {
@@ -465,55 +406,18 @@ function TradeStreaks({ history }: { history: Position[] }) {
   );
 }
 
-// ─── Dynamic Correlation Matrix ────────────────────────────────────────────────
+// ─── Correlation Matrix (computed from real daily returns) ─────────────────────
 function LiveCorrelationMatrix() {
-  const { data: priceData } = useQuery<any>({
-    queryKey: ["/api/market/prices"],
-    refetchInterval: 30_000,
+  const { data } = useQuery<any>({
+    queryKey: ["/api/market/correlation"],
+    staleTime: 30 * 60_000,
   });
 
-  const PAIRS = ["EURUSD","GBPUSD","USDJPY","AUDUSD","USDCAD","XAUUSD","USDCHF","GBPJPY"];
+  const PAIRS: string[] = data?.pairs?.length ? data.pairs : ["EURUSD","GBPUSD","USDJPY","AUDUSD","USDCAD","XAUUSD","USDCHF","GBPJPY"];
+  const CORR: (number | null)[][] = data?.matrix ?? [];
 
-  // Build live correlation proxy from daily % changes
-  // (True rolling correlation requires historical series — we approximate from current change alignment)
-  const changes: number[] = PAIRS.map(p => {
-    const d = priceData?.[p];
-    return d ? d.change : 0;
-  });
-
-  // Approximate correlation: sign agreement + magnitude ratio
-  const liveCorr = PAIRS.map((_, i) => PAIRS.map((_, j) => {
-    if (i === j) return 1.0;
-    const ci = changes[i];
-    const cj = changes[j];
-    if (Math.abs(ci) < 0.01 && Math.abs(cj) < 0.01) return 0;
-    const sameSign = Math.sign(ci) === Math.sign(cj);
-    const magnitudeRatio = Math.min(Math.abs(ci), Math.abs(cj)) / Math.max(Math.abs(ci), Math.abs(cj), 0.001);
-    const raw = sameSign ? magnitudeRatio : -magnitudeRatio;
-    return parseFloat(raw.toFixed(2));
-  }));
-
-  // Fallback to static well-known correlations when prices not loaded
-  const STATIC_CORR: number[][] = [
-    [ 1.00,  0.88, -0.72,  0.78, -0.65,  0.72, -0.84,  0.74],
-    [ 0.88,  1.00, -0.58,  0.71, -0.59,  0.65, -0.76,  0.95],
-    [-0.72, -0.58,  1.00, -0.55,  0.48, -0.60,  0.64, -0.42],
-    [ 0.78,  0.71, -0.55,  1.00, -0.70,  0.60, -0.68,  0.64],
-    [-0.65, -0.59,  0.48, -0.70,  1.00, -0.45,  0.68, -0.52],
-    [ 0.72,  0.65, -0.60,  0.60, -0.45,  1.00, -0.68,  0.58],
-    [-0.84, -0.76,  0.64, -0.68,  0.68, -0.68,  1.00, -0.70],
-    [ 0.74,  0.95, -0.42,  0.64, -0.52,  0.58, -0.70,  1.00],
-  ];
-
-  // Blend: 60% static (baseline) + 40% live intraday signal
-  const CORR = priceData
-    ? liveCorr.map((row, i) => row.map((v, j) => {
-        if (i === j) return 1.0;
-        return parseFloat((STATIC_CORR[i][j] * 0.6 + v * 0.4).toFixed(2));
-      }))
-    : STATIC_CORR;
-
-  const getCellStyle = (v: number): React.CSSProperties => {
+  const getCellStyle = (v: number | null): React.CSSProperties => {
+    if (v == null) return { color: "hsl(var(--muted-foreground))" };
     const abs = Math.abs(v);
     const opacity = v === 1 ? 0.15 : abs > 0.8 ? 0.85 : abs > 0.6 ? 0.65 : abs > 0.4 ? 0.45 : abs > 0.2 ? 0.25 : 0.12;
     if (v === 1) return { background: `hsl(var(--primary) / ${opacity})`, color: "hsl(var(--primary))" };
@@ -524,10 +428,13 @@ function LiveCorrelationMatrix() {
   return (
     <div className="bg-card/50 border border-border rounded-xl p-5">
       <div className="flex items-center justify-between mb-1">
-        <h3 className="font-semibold text-sm flex items-center gap-2"><Grid3x3 className="w-4 h-4 text-primary" /> Live Correlation Matrix</h3>
-        {priceData && <span className="text-[10px] text-green-400 font-mono">● Live (30s refresh)</span>}
+        <h3 className="font-semibold text-sm flex items-center gap-2"><Grid3x3 className="w-4 h-4 text-primary" /> Correlation Matrix</h3>
+        {data?.live && <span className="text-[10px] text-muted-foreground font-mono">{data.window} · {new Date(data.asOf).toLocaleDateString()}</span>}
       </div>
-      <p className="text-xs text-muted-foreground mb-4">Blended live intraday + historical baseline correlations. Identifies hedge opportunities and compounded risk.</p>
+      <p className="text-xs text-muted-foreground mb-4">Pearson correlation of daily returns. High positive = the positions are effectively one bet; negative = they offset.</p>
+      {!CORR.length ? (
+        <p className="text-xs text-muted-foreground py-6 text-center">{data?.message || "Loading market history…"}</p>
+      ) : (
       <div className="overflow-x-auto">
         <table className="text-[10px] border-collapse w-full">
           <thead>
@@ -540,9 +447,9 @@ function LiveCorrelationMatrix() {
             {PAIRS.map((row, i) => (
               <tr key={row}>
                 <td className="font-mono text-muted-foreground pr-2 py-0.5 whitespace-nowrap text-[9px]">{row}</td>
-                {CORR[i].map((v, j) => (
+                {(CORR[i] ?? []).map((v, j) => (
                   <td key={j} className="text-center font-mono font-semibold py-1 px-0.5 rounded-sm" style={getCellStyle(v)}>
-                    {v === 1 ? "—" : v.toFixed(2)}
+                    {v === 1 ? "—" : v == null ? "n/a" : v.toFixed(2)}
                   </td>
                 ))}
               </tr>
@@ -550,10 +457,10 @@ function LiveCorrelationMatrix() {
           </tbody>
         </table>
       </div>
+      )}
       <div className="flex items-center gap-4 mt-3 text-[10px] text-muted-foreground">
         <div className="flex items-center gap-1"><div className="w-6 h-3 rounded" style={{background:"rgba(34,197,94,0.6)"}} /> Positive correlation</div>
-        <div className="flex items-center gap-1"><div className="w-6 h-3 rounded" style={{background:"rgba(239,68,68,0.6)"}} /> Negative / hedge</div>
-        {priceData && <span className="ml-auto">Intraday: 40% · Historical: 60%</span>}
+        <div className="flex items-center gap-1"><div className="w-6 h-3 rounded" style={{background:"rgba(239,68,68,0.6)"}} /> Negative / offsetting</div>
       </div>
     </div>
   );
@@ -622,6 +529,90 @@ function SessionHeatmap({ history }: { history: Position[] }) {
   );
 }
 
+// ─── Historical backtest on real candles (with costs and out-of-sample split) ──
+function HistoricalBacktestPanel({ strategy }: { strategy: Strategy | null | undefined }) {
+  const [p, setP] = useState({
+    symbol: "EURUSD", timeframe: "1h", periods: 2000,
+    strategy: "trend_follow", riskPercent: strategy?.riskPercent || 1, rrRatio: strategy?.rrRatio || 2,
+  });
+  const [result, setResult] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const run = async () => {
+    setLoading(true); setError(null);
+    try {
+      const r = await apiRequest("POST", "/api/backtest/historical", p);
+      setResult(await r.json());
+    } catch (e: any) {
+      setError(e.message.replace(/^\d+:\s*/, ""));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const Stat = ({ label, value, good }: { label: string; value: string; good?: boolean }) => (
+    <div className="bg-muted/20 rounded-lg p-2.5">
+      <p className="text-[9px] text-muted-foreground uppercase">{label}</p>
+      <p className={cn("font-mono font-bold text-sm", good === undefined ? "" : good ? "text-green-500" : "text-red-500")}>{value}</p>
+    </div>
+  );
+  const sel = "bg-background border border-border rounded px-2 py-1 text-xs font-mono";
+
+  return (
+    <div className="bg-card/40 border border-border rounded-xl overflow-hidden">
+      <div className="bg-card/60 px-5 py-4 border-b border-border flex items-center gap-2">
+        <BarChart2 className="w-4 h-4 text-primary" />
+        <h3 className="font-bold">Historical Backtest</h3>
+        <span className="text-[10px] text-muted-foreground ml-auto">Real candles · spread, slippage & commission included</span>
+      </div>
+      <div className="p-5 space-y-4">
+        <div className="flex flex-wrap gap-2 items-end">
+          <select className={sel} value={p.symbol} onChange={e => setP({ ...p, symbol: e.target.value })}>
+            {["EURUSD","GBPUSD","USDJPY","AUDUSD","USDCAD","XAUUSD","GBPJPY"].map(s => <option key={s}>{s}</option>)}
+          </select>
+          <select className={sel} value={p.timeframe} onChange={e => setP({ ...p, timeframe: e.target.value })}>
+            {[["15min","M15"],["1h","H1"],["4h","H4"],["1day","D1"]].map(([v,l]) => <option key={v} value={v}>{l}</option>)}
+          </select>
+          <select className={sel} value={p.strategy} onChange={e => setP({ ...p, strategy: e.target.value })}>
+            <option value="trend_follow">Trend follow (EMA + RSI)</option>
+            <option value="mean_revert">Mean revert (RSI 30/70)</option>
+            <option value="breakout">20-bar breakout</option>
+          </select>
+          <label className="text-[10px] text-muted-foreground">Risk %<input type="number" step="0.25" min="0.1" max="5" className={cn(sel, "w-16 ml-1")} value={p.riskPercent} onChange={e => setP({ ...p, riskPercent: parseFloat(e.target.value) || 1 })} /></label>
+          <label className="text-[10px] text-muted-foreground">R:R<input type="number" step="0.5" min="0.5" max="10" className={cn(sel, "w-16 ml-1")} value={p.rrRatio} onChange={e => setP({ ...p, rrRatio: parseFloat(e.target.value) || 2 })} /></label>
+          <Button size="sm" onClick={run} disabled={loading} className="h-8">{loading ? "Running…" : "Run on history"}</Button>
+        </div>
+        {error && <p className="text-xs text-red-500">{error}</p>}
+        {result && (
+          <div className="space-y-3">
+            <p className="text-[11px] text-muted-foreground">{result.startDate} → {result.endDate} · {result.totalTrades} trades · costs assumed: {result.assumptions.spreadPips} pip spread, {result.assumptions.slippagePips} pip slippage, ${result.assumptions.commissionPerLot}/lot</p>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              <Stat label="Net profit" value={`$${result.netProfit.toFixed(2)}`} good={result.netProfit > 0} />
+              <Stat label="Profit factor" value={String(result.profitFactor)} good={result.profitFactor > 1} />
+              <Stat label="Win rate" value={`${result.winRate}%`} />
+              <Stat label="Max drawdown" value={`${result.maxDrawdownPct}%`} good={result.maxDrawdownPct < 20} />
+              <Stat label="Expectancy / trade" value={`$${result.expectancy}`} good={result.expectancy > 0} />
+              <Stat label="Costs paid" value={`$${result.totalCosts.toFixed(2)}`} />
+              <Stat label="In-sample PF (first 70%)" value={`${result.inSample.profitFactor} · ${result.inSample.trades} tr`} good={result.inSample.profitFactor > 1} />
+              <Stat label="Out-of-sample PF (last 30%)" value={`${result.outOfSample.profitFactor} · ${result.outOfSample.trades} tr`} good={result.outOfSample.profitFactor > 1} />
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              {result.totalTrades < 100
+                ? "Fewer than 100 trades — too few to conclude anything. Use a longer history or lower timeframe."
+                : result.outOfSample.profitFactor < 1 && result.inSample.profitFactor > 1
+                ? "Profitable in-sample but not out-of-sample: a classic sign of overfitting. Don't trade this as-is."
+                : result.outOfSample.profitFactor > 1
+                ? "Held up out-of-sample. Next step: paper-trade it for several weeks before risking money."
+                : "Not profitable after costs on this history."}
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function BacktestPanel({ strategy }: { strategy: Strategy | null | undefined }) {
   const { data: settings } = useSettings();
   const liveBalance = parseFloat(String((settings as any)?.brokerBalance ?? 0)) || (strategy as any)?.accountSize || 10000;
@@ -647,7 +638,8 @@ function BacktestPanel({ strategy }: { strategy: Strategy | null | undefined }) 
     <div className="bg-card/40 border border-border rounded-xl overflow-hidden">
       <div className="bg-card/60 px-5 py-4 border-b border-border flex items-center gap-2">
         <Activity className="w-4 h-4 text-accent" />
-        <h3 className="font-bold">Monte Carlo Backtest</h3>
+        <h3 className="font-bold">Risk-of-Ruin Simulator</h3>
+        <span className="text-[10px] text-muted-foreground ml-auto">Uses the win rate you enter — not market data</span>
       </div>
       <div className="p-5 space-y-5">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -1293,6 +1285,7 @@ export default function Analytics() {
 
             {activeTab === "backtest" && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                <HistoricalBacktestPanel strategy={strategy} />
                 <BacktestPanel strategy={strategy} />
               </motion.div>
             )}

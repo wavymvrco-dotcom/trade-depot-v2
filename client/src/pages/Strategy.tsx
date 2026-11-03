@@ -10,6 +10,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useActiveStrategy, useSaveStrategy, usePositions, usePositionHistory, useSettings } from "@/hooks/useApi";
 import { apiRequest } from "@/lib/queryClient";
+import { getSymbolConfig } from "@shared/pips";
 import type { Position, Strategy as StrategyType } from "@shared/schema";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -39,7 +40,7 @@ const STYLE_META: Record<string, { horizon: string; bars: string; holdTime: stri
 
 function calcPositionSize(accountSize: number, riskPercent: number, stopPips: number, symbol: string) {
   const riskDollars = accountSize * (riskPercent / 100);
-  const pipValuePerLot = symbol === "XAUUSD" ? 10 : symbol.includes("JPY") ? 6.5 : 10;
+  const pipValuePerLot = getSymbolConfig(symbol).pipValue; // USD per pip per lot, shared with the server
   const lotsRaw = riskDollars / (stopPips * pipValuePerLot);
   const lots = Math.max(0.01, Math.round(lotsRaw * 100) / 100);
   const category = lots >= 1 ? "Standard" : lots >= 0.1 ? "Mini" : "Micro";

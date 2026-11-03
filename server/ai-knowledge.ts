@@ -1,8 +1,9 @@
 import { db } from "./db";
 import { aiKnowledge, tradeReviews } from "@shared/schema";
-import { eq, desc, and } from "drizzle-orm";
-import { callAiProvider } from "./ai-engine";
+import { eq, desc, asc, and, or, isNull, inArray, gte } from "drizzle-orm";
+import { callAiProvider, callAiProviderMarkdown } from "./ai-engine";
 import { storage } from "./storage";
+import { calcProfit, calcPips } from "@shared/pips";
 
 // ─── Expert Seed Knowledge ────────────────────────────────────────────────────
 // Compact, high-signal lessons derived from years of institutional trading research.
@@ -34,7 +35,7 @@ const EXPERT_KNOWLEDGE: Array<{
   {
     category: "entry_pattern", confidence: 80,
     title: "Gold Safe-Haven Surge",
-    content: "During risk-off events (equity sell-offs, geopolitical news), gold spikes. Do NOT chase the first 30 minutes. Wait for a pullback to the previous resistance (now support) level. Enter long with stop below the pre-news low. Target +$15–20 from entry (1500–2000 pips). Avoid if USD is also strengthening — conflicting forces cancel the move.",
+    content: "During risk-off events (equity sell-offs, geopolitical news), gold spikes. Do NOT chase the first 30 minutes. Wait for a pullback to the previous resistance (now support) level. Enter long with stop below the pre-news low. Target at least 1.5× the stop distance. Avoid if USD is also strengthening — conflicting forces cancel the move.",
     pairs: ["XAUUSD"],
   },
   {
@@ -46,7 +47,7 @@ const EXPERT_KNOWLEDGE: Array<{
   {
     category: "entry_pattern", confidence: 76,
     title: "USDJPY Yield-Price Correlation",
-    content: "USDJPY tracks US 10-year Treasury yield very closely (correlation ~0.85). When 10yr yield rises strongly → USDJPY likely to follow. When yield drops but USDJPY hasn't moved yet → short opportunity. Check bond markets before entering JPY trades. BoJ intervention risk: extreme caution above 150.00 (past intervention zone).",
+    content: "USDJPY is often closely linked to US Treasury yields (the strength of the link varies). When 10yr yield rises strongly → USDJPY likely to follow. When yield drops but USDJPY hasn't moved yet → short opportunity. Check bond markets before entering JPY trades. BoJ intervention risk: extreme caution above 150.00 (past intervention zone).",
     pairs: ["USDJPY", "GBPJPY"],
   },
   {
@@ -109,7 +110,7 @@ const EXPERT_KNOWLEDGE: Array<{
   {
     category: "pair_behavior", confidence: 82,
     title: "USDCAD Oil Inverse Correlation",
-    content: "USDCAD moves inversely to oil prices ~70% of the time. When WTI crude rises strongly → USDCAD tends to fall (CAD strengthens). Before entering USDCAD, check oil direction. If oil and USDCAD are moving the same direction (both rising or both falling) — it's an anomaly likely to revert. Fade the anomaly for a mean-reversion trade.",
+    content: "USDCAD often moves inversely to oil prices, though the relationship breaks down at times. When WTI crude rises strongly → USDCAD tends to fall (CAD strengthens). Before entering USDCAD, check oil direction. If oil and USDCAD are moving the same direction (both rising or both falling) — it's an anomaly likely to revert. Fade the anomaly for a mean-reversion trade.",
     pairs: ["USDCAD"],
   },
 
@@ -169,12 +170,12 @@ const INSTITUTIONAL_KNOWLEDGE: Array<{
   {
     category: "ict_smc", confidence: 93,
     title: "Liquidity Sweep Reversal",
-    content: "When price sweeps above equal highs (buyside liquidity) or below equal lows (sellside liquidity) with a sharp wick then immediately closes back inside the prior range — this is a stop hunt by institutions filling orders. The reversal entry: enter in the OPPOSITE direction on the candle close back inside the range. SL: 5–10 pips beyond the wick extreme. Target: the opposing liquidity pool (equal highs if you went short after SSL sweep; equal lows if you went long after BSL sweep). Win rate on clean sweeps: ~68–72%.",
+    content: "When price sweeps above equal highs (buyside liquidity) or below equal lows (sellside liquidity) with a sharp wick then immediately closes back inside the prior range — this is a stop hunt by institutions filling orders. The reversal entry: enter in the OPPOSITE direction on the candle close back inside the range. SL: 5–10 pips beyond the wick extreme. Target: the opposing liquidity pool (equal highs if you went short after SSL sweep; equal lows if you went long after BSL sweep).",
   },
   {
     category: "ict_smc", confidence: 91,
     title: "Fair Value Gap Fill Probability",
-    content: "FVGs (Fair Value Gaps / imbalances) fill with 83% statistical probability within 5 sessions across forex majors (based on historical ICT backtests on 4H charts). A bullish FVG: gap between candle 1 high and candle 3 low — acts as a magnet when price retraces. Use the 50% of the FVG as the precise entry, SL below the full FVG, TP at the next structural high. Stacked FVGs (two consecutive gaps same direction) have 91% fill probability. An FVG inside an order block = premium entry zone.",
+    content: "FVGs (Fair Value Gaps / imbalances) are often revisited — treat that as a hypothesis to test on your own data, not a known probability. A bullish FVG: gap between candle 1 high and candle 3 low — acts as a magnet when price retraces. Use the 50% of the FVG as the precise entry, SL below the full FVG, TP at the next structural high. An FVG inside an order block = premium entry zone.",
     pairs: ["EURUSD", "GBPUSD", "GBPJPY", "XAUUSD"],
   },
   {
@@ -197,17 +198,17 @@ const INSTITUTIONAL_KNOWLEDGE: Array<{
   {
     category: "quant_method", confidence: 92,
     title: "Cross-Sectional Momentum Ranking",
-    content: "Rank all tradeable pairs by their % change over the current session. Go LONG the top 1–2 performers and SHORT the bottom 1–2 performers. This cross-sectional momentum strategy has a documented Sharpe ratio of 1.2–1.8 in forex (higher than most directional strategies). The key: pairs in the top quartile continue outperforming in the next session with 62% probability. Pairs showing divergence from their correlated pairs (e.g., EURUSD up but GBPUSD flat) — the laggard is the higher-probability trade (mean reversion to correlation).",
+    content: "Rank all tradeable pairs by their % change over the current session. Go LONG the top 1–2 performers and SHORT the bottom 1–2 performers. Cross-sectional FX momentum is a documented academic effect, but its strength varies by period and it is weak at intraday horizons — verify before relying on it. Pairs showing divergence from their correlated pairs (e.g., EURUSD up but GBPUSD flat) — the laggard is the higher-probability trade (mean reversion to correlation).",
   },
   {
     category: "quant_method", confidence: 90,
     title: "Statistical Mean Reversion Trigger",
-    content: "When a pair moves > 1.5% in a single session WITHOUT a scheduled fundamental catalyst (NFP, CPI, central bank decision), it has a 74% probability of retracing 38.2%–61.8% within the next 1–2 sessions. This is a z-score > 2.0 move versus the pair's historical daily ATR distribution. Entry: wait for momentum to slow (2–3 small-body candles at the extreme), then enter counter-trend. SL: 10 pips beyond the session extreme. TP: 50% retracement of the session move. Only valid with NO scheduled high-impact news.",
+    content: "When a pair moves > 1.5% in a single session WITHOUT a scheduled fundamental catalyst (NFP, CPI, central bank decision), it is stretched relative to its normal daily range (roughly > 2× ATR) and partial retracements are common — but trends can also extend; size accordingly. Entry: wait for momentum to slow (2–3 small-body candles at the extreme), then enter counter-trend. SL: 10 pips beyond the session extreme. TP: 50% retracement of the session move. Only valid with NO scheduled high-impact news.",
   },
   {
     category: "quant_method", confidence: 88,
     title: "Correlation Divergence Pair Trade",
-    content: "EURUSD and GBPUSD have 0.87 historical correlation. When their % moves diverge by > 0.4% in the same session (e.g., EURUSD +0.6% but GBPUSD +0.1%), the laggard (GBPUSD) has a 71% probability of closing the gap within 1 session. Trade: long the laggard, short the leader, dollar-neutral. This eliminates directional USD risk and captures the pure mean-reversion of the spread. Stop: the spread widens further by 0.3%. Target: spread narrows to < 0.1% (full convergence). Similarly applies: AUDUSD vs NZDUSD (0.91 correlation), EURUSD vs XAUUSD (0.72 correlation).",
+    content: "EURUSD and GBPUSD are usually strongly positively correlated (the level shifts over time). When their % moves diverge by > 0.4% in the same session (e.g., EURUSD +0.6% but GBPUSD +0.1%), the laggard (GBPUSD) may close part of the gap — test this on your own history before trading it. Trade: long the laggard, short the leader, dollar-neutral. This eliminates directional USD risk and captures the pure mean-reversion of the spread. Stop: the spread widens further by 0.3%. Target: spread narrows to < 0.1% (full convergence). Similarly applies: AUDUSD vs NZDUSD (usually highly correlated), EURUSD vs XAUUSD (moderately correlated).",
     pairs: ["EURUSD", "GBPUSD", "AUDUSD"],
   },
   {
@@ -220,7 +221,7 @@ const INSTITUTIONAL_KNOWLEDGE: Array<{
   {
     category: "macro_analysis", confidence: 94,
     title: "DXY Dollar Index as Macro Compass",
-    content: "The US Dollar Index (DXY) is the single most important macro tool for forex traders. DXY composition: EUR 57.6%, JPY 13.6%, GBP 11.9%, CAD 9.1%, SEK 4.2%, CHF 3.6%. A 0.5% DXY move implies: EURUSD moves ~0.45%, GBPUSD ~0.35%, USDJPY ~0.35%, AUDUSD ~0.3%, XAUUSD ~$8–12. Before any trade on a USD pair, determine DXY momentum. If DXY is in a clear uptrend, only take USD-long setups (short EURUSD, short GBPUSD, long USDJPY). Fighting DXY momentum is the most common institutional mistake avoided by pros.",
+    content: "The US Dollar Index (DXY) is the single most important macro tool for forex traders. DXY composition: EUR 57.6%, JPY 13.6%, GBP 11.9%, CAD 9.1%, SEK 4.2%, CHF 3.6%. USD pairs and gold usually move with (or against) DXY, each to a different degree. Before any trade on a USD pair, determine DXY momentum. If DXY is in a clear uptrend, only take USD-long setups (short EURUSD, short GBPUSD, long USDJPY). Trading against strong DXY momentum needs a clear pair-specific reason.",
   },
   {
     category: "macro_analysis", confidence: 92,
@@ -254,93 +255,102 @@ const INSTITUTIONAL_KNOWLEDGE: Array<{
   },
 ];
 
-// ─── Seed expert knowledge base ───────────────────────────────────────────────
-export async function seedExpertKnowledge(): Promise<void> {
-  try {
-    const existing = await db.select({ id: aiKnowledge.id }).from(aiKnowledge).limit(1);
-    if (existing.length > 0) return; // Already seeded
+// ─── Seeding ──────────────────────────────────────────────────────────────────
+// Seed lessons are shared (userId null). They start at a neutral 50% confidence:
+// they're hypotheses until outcomes say otherwise. Re-seeding updates the text
+// of existing seed rows in place (keeping their outcome counts).
 
-    for (const k of EXPERT_KNOWLEDGE) {
+async function upsertSeeds(seeds: typeof EXPERT_KNOWLEDGE, source: "expert" | "institutional") {
+  const existing = await db.select({ id: aiKnowledge.id, title: aiKnowledge.title })
+    .from(aiKnowledge).where(and(eq(aiKnowledge.source, source), isNull(aiKnowledge.userId)));
+  const byTitle = new Map(existing.map(e => [e.title, e.id]));
+  for (const k of seeds) {
+    const id = byTitle.get(k.title);
+    if (id) {
+      await db.update(aiKnowledge).set({ content: k.content, category: k.category, pairs: k.pairs ?? null }).where(eq(aiKnowledge.id, id));
+    } else {
       await db.insert(aiKnowledge).values({
-        category: k.category,
-        title: k.title,
-        content: k.content,
-        source: "expert",
-        confidence: k.confidence,
-        successCount: 0,
-        failureCount: 0,
-        pairs: k.pairs ?? null,
-        isActive: true,
+        category: k.category, title: k.title, content: k.content, source,
+        confidence: 50, successCount: 0, failureCount: 0, pairs: k.pairs ?? null, isActive: true,
       });
     }
-    console.log(`[AI Knowledge] Seeded ${EXPERT_KNOWLEDGE.length} expert lessons`);
+  }
+}
+
+export async function seedExpertKnowledge(): Promise<void> {
+  try {
+    await upsertSeeds(EXPERT_KNOWLEDGE, "expert");
   } catch (e: any) {
     console.error("[AI Knowledge] Seed error:", e.message);
   }
 }
 
-// ─── Seed institutional / hedge-fund knowledge ────────────────────────────────
 export async function seedInstitutionalKnowledge(): Promise<void> {
   try {
-    const existing = await db.select({ id: aiKnowledge.id })
-      .from(aiKnowledge)
-      .where(eq(aiKnowledge.source, "institutional"))
-      .limit(1);
-    if (existing.length > 0) return; // Already seeded
-
-    for (const k of INSTITUTIONAL_KNOWLEDGE) {
-      await db.insert(aiKnowledge).values({
-        category: k.category,
-        title: k.title,
-        content: k.content,
-        source: "institutional",
-        confidence: k.confidence,
-        successCount: 0,
-        failureCount: 0,
-        pairs: k.pairs ?? null,
-        isActive: true,
-      });
-    }
-    console.log(`[AI Knowledge] Seeded ${INSTITUTIONAL_KNOWLEDGE.length} institutional lessons (ICT/SMC, quant, macro, microstructure)`);
+    await upsertSeeds(INSTITUTIONAL_KNOWLEDGE, "institutional");
   } catch (e: any) {
     console.error("[AI Knowledge] Institutional seed error:", e.message);
   }
 }
 
-// ─── Get relevant knowledge for a symbol ─────────────────────────────────────
-export async function getRelevantKnowledge(symbol: string): Promise<string> {
-  try {
-    const all = await db.select().from(aiKnowledge)
-      .where(eq(aiKnowledge.isActive, true))
-      .orderBy(desc(aiKnowledge.confidence));
+// ─── Confidence from outcomes ─────────────────────────────────────────────────
+// Laplace-smoothed hit rate: (wins + 1) / (trials + 2). A lesson with no
+// outcomes sits at 50%; one lucky win moves it to 67%, not 96%.
 
-    const relevant = all.filter(k =>
-      !k.pairs || k.pairs.length === 0 || k.pairs.includes(symbol)
-    );
+function smoothedConfidence(wins: number, losses: number) {
+  return Math.round(((wins + 1) / (wins + losses + 2)) * 100);
+}
 
-    // Prioritise: institutional first, then expert, then learned — cap at 15
-    const institutional = relevant.filter(k => k.source === "institutional").slice(0, 6);
-    const expert       = relevant.filter(k => k.source === "expert").slice(0, 6);
-    const learned      = relevant.filter(k => k.source === "trade_review").slice(0, 3);
-    const selected     = [...institutional, ...expert, ...learned].slice(0, 15);
-
-    if (selected.length === 0) return "";
-
-    const sourceLabel: Record<string, string> = {
-      institutional: "INSTITUTIONAL",
-      expert: "EXPERT",
-      trade_review: "LEARNED",
-    };
-
-    return selected.map(k =>
-      `[${sourceLabel[k.source ?? ""] ?? k.category.toUpperCase()} — "${k.title}" | confidence ${k.confidence}%]\n${k.content}`
-    ).join("\n\n");
-  } catch {
-    return "";
+/** Credit or blame only the lessons that were actually in the prompt for a signal. */
+export async function recordLessonOutcome(ids: string[], isWin: boolean): Promise<void> {
+  if (!ids.length) return;
+  const rows = await db.select().from(aiKnowledge).where(inArray(aiKnowledge.id, ids));
+  for (const l of rows) {
+    const s = l.successCount + (isWin ? 1 : 0);
+    const f = l.failureCount + (isWin ? 0 : 1);
+    const confidence = smoothedConfidence(s, f);
+    // Retire a learned lesson that has clearly underperformed over a fair sample
+    const retire = l.source === "trade_review" && s + f >= 20 && confidence < 35;
+    await db.update(aiKnowledge).set({
+      successCount: s, failureCount: f, confidence, updatedAt: new Date(),
+      ...(retire ? { isActive: false } : {}),
+    }).where(eq(aiKnowledge.id, l.id));
   }
 }
 
-// ─── Generate AI Trade Review ─────────────────────────────────────────────────
+// ─── Retrieval ────────────────────────────────────────────────────────────────
+
+/**
+ * Lessons to put in a signal prompt: shared seeds plus this user's own learned
+ * lessons, ranked by measured confidence. Returns the ids so the outcome can be
+ * attributed to exactly these lessons later.
+ */
+export async function getRelevantKnowledge(userId: string, symbol: string): Promise<{ text: string; ids: string[] }> {
+  try {
+    const rows = await db.select().from(aiKnowledge)
+      .where(and(eq(aiKnowledge.isActive, true), or(isNull(aiKnowledge.userId), eq(aiKnowledge.userId, userId))))
+      .orderBy(desc(aiKnowledge.confidence));
+
+    const relevant = rows.filter(k => !k.pairs || k.pairs.length === 0 || k.pairs.includes(symbol));
+    const learned = relevant.filter(k => k.source === "trade_review").slice(0, 3);
+    const seeds = relevant.filter(k => k.source !== "trade_review" && k.category !== "psychology").slice(0, 5);
+    const selected = [...learned, ...seeds];
+    if (selected.length === 0) return { text: "", ids: [] };
+
+    const text = selected.map(k => {
+      const n = k.successCount + k.failureCount;
+      const record = n > 0 ? `${k.successCount}/${n} signals hit target` : "untested";
+      const label = k.source === "trade_review" ? "YOUR LESSON" : "PRINCIPLE";
+      return `[${label} — "${k.title}" | ${record}]\n${k.content}`;
+    }).join("\n\n");
+    return { text, ids: selected.map(k => k.id) };
+  } catch {
+    return { text: "", ids: [] };
+  }
+}
+
+// ─── Trade Review ─────────────────────────────────────────────────────────────
+
 export async function generateTradeReview(params: {
   userId: string;
   positionId: string;
@@ -351,81 +361,63 @@ export async function generateTradeReview(params: {
   stopLoss?: number | null;
   takeProfit?: number | null;
   profit: number;
+  lots: number;
   openedAt: Date;
   closedAt: Date;
   aiSignal: boolean;
+  exitReason: string;
 }): Promise<void> {
   try {
     const settings = await storage.getUserSettings(params.userId);
     if (!settings?.selectedAiProvider || settings.selectedAiProvider === "none") return;
 
-    // Get relevant knowledge for context
-    const knowledge = await getRelevantKnowledge(params.symbol);
+    const side = params.direction === "long" ? "BUY" : "SELL";
+    const pips = calcPips(side, params.entryPrice, params.exitPrice, params.symbol);
+    const mins = Math.max(0, Math.round((params.closedAt.getTime() - params.openedAt.getTime()) / 60000));
+    const duration = mins < 60 ? `${mins} min` : `${(mins / 60).toFixed(1)} h`;
 
-    // Calculate trade duration and pips
-    const durationMs = params.closedAt.getTime() - params.openedAt.getTime();
-    const durationMins = Math.round(durationMs / 60000);
-    const durationLabel = durationMins < 60
-      ? `${durationMins} minutes`
-      : `${Math.round(durationMins / 60)} hours`;
+    // Facts the model needs to judge process, computed here rather than guessed
+    const riskUSD = params.stopLoss != null ? Math.abs(calcProfit(side, params.entryPrice, params.stopLoss, params.symbol, params.lots)) : null;
+    const rMultiple = riskUSD ? (params.profit / riskUSD).toFixed(2) : "n/a (no stop)";
+    const balance = Number(settings.brokerBalance) || 10000;
+    const riskPct = riskUSD ? ((riskUSD / balance) * 100).toFixed(2) : "unknown";
 
-    const pipMultiplier = params.symbol.includes("JPY") ? 100
-      : params.symbol === "XAUUSD" ? 10 : 10000;
-    const pips = parseFloat(
-      ((params.direction === "long"
-        ? params.exitPrice - params.entryPrice
-        : params.entryPrice - params.exitPrice) * pipMultiplier).toFixed(1)
-    );
+    const closed = await storage.getClosedPositions(params.userId);
+    const before = closed.filter(p => p.id !== params.positionId && p.closedAt && new Date(p.closedAt) <= params.openedAt);
+    const lastLoss = before.find(p => p.profit < 0);
+    const minsSinceLoss = lastLoss?.closedAt ? Math.round((params.openedAt.getTime() - new Date(lastLoss.closedAt).getTime()) / 60000) : null;
+    const dayStart = new Date(params.openedAt); dayStart.setUTCHours(0, 0, 0, 0);
+    const tradesToday = before.filter(p => p.closedAt && new Date(p.closedAt) >= dayStart).length;
 
-    const hasSL = !!params.stopLoss;
-    const hasTP = !!params.takeProfit;
-    const rrActual = hasSL && hasTP
-      ? Math.abs((params.exitPrice - params.entryPrice) / (params.entryPrice - (params.stopLoss || params.entryPrice))).toFixed(2)
-      : "unknown";
+    const knowledge = await getRelevantKnowledge(params.userId, params.symbol);
 
-    const prompt = `You are an expert trading coach reviewing a closed forex/commodities trade. Be concise but insightful.
+    const prompt = `Review this closed trade. Grade the PROCESS, not the outcome: a disciplined loss can earn an A, a lucky win with no stop earns a D.
 
-TRADE DETAILS:
-- Pair: ${params.symbol}
-- Direction: ${params.direction.toUpperCase()}
-- Entry: ${params.entryPrice} | Exit: ${params.exitPrice}
-- Stop Loss: ${params.stopLoss ?? "NOT SET"}
-- Take Profit: ${params.takeProfit ?? "NOT SET"}
-- P&L: ${params.profit >= 0 ? "+" : ""}$${params.profit.toFixed(2)}
-- Pips: ${pips >= 0 ? "+" : ""}${pips}
-- Duration: ${durationLabel}
-- AI Signal: ${params.aiSignal ? "Yes (AI-generated)" : "No (manual)"}
-- Actual R:R achieved: ${rrActual}
+TRADE
+- ${params.symbol} ${side} ${params.lots} lots | entry ${params.entryPrice} → exit ${params.exitPrice} (${params.exitReason})
+- Stop: ${params.stopLoss ?? "NONE"} | Target: ${params.takeProfit ?? "NONE"}
+- Result: ${params.profit >= 0 ? "+" : ""}$${params.profit.toFixed(2)} (${pips} pips, ${rMultiple}R) | held ${duration}
+- Risk at entry: ${riskPct}% of a $${balance.toLocaleString()} account
+- Source: ${params.aiSignal ? "AI signal" : "manual"}
 
-EXPERT KNOWLEDGE CONTEXT (use these principles in your review):
-${knowledge}
+CONTEXT
+- Minutes since previous losing trade: ${minsSinceLoss ?? "no prior loss"}
+- Trades already closed that day before this one: ${tradesToday}
+${knowledge.text ? `\nPRINCIPLES\n${knowledge.text}` : ""}
 
-Respond with ONLY valid JSON (no markdown, no code blocks):
-{
-  "grade": "A+" | "A" | "B" | "C" | "D" | "F",
-  "gradeScore": number (0-100),
-  "review": "2-3 sentence narrative summary of this trade",
-  "strengths": ["up to 2 specific things done well"],
-  "improvements": ["up to 2 specific things to improve"],
-  "mistakeType": "early_exit" | "oversize" | "no_sl" | "revenge" | "fomo" | "overtrading" | null,
-  "lessonLearned": "one clear, actionable lesson from this specific trade (or null if no lesson)"
-}
+Return JSON:
+{"grade":"A+"|"A"|"B"|"C"|"D"|"F","gradeScore":<0-100>,"review":"<2-3 sentences>","strengths":["<=2 items"],"improvements":["<=2 items"],"mistakeType":"early_exit"|"oversize"|"no_sl"|"revenge"|"fomo"|"overtrading"|null,"lessonLearned":"<one specific, testable rule for THIS trader, or null>"}
 
-Grade rubric: A+ = profitable + disciplined process. A = profitable but minor issue. B = break-even or small loss with good process. C = loss with acceptable process. D = loss with process errors. F = large loss with multiple process violations (no SL, oversized, revenge).`;
+Only flag "revenge" if minutes since previous loss is small; only "oversize" if risk > 2%; only "no_sl" if the stop is NONE.`;
 
-    const rawResponse = await callAiProvider(settings.selectedAiProvider!, settings, prompt);
-    if (!rawResponse) return;
+    const parsed = await callAiProvider(settings.selectedAiProvider, settings as any, prompt);
+    if (!parsed || typeof parsed !== "object") return;
 
-    let parsed: any;
-    try {
-      const jsonMatch = rawResponse.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) return;
-      parsed = JSON.parse(jsonMatch[0]);
-    } catch {
-      return;
-    }
+    const grades = ["A+", "A", "B", "C", "D", "F"];
+    const grade = grades.includes(parsed.grade) ? parsed.grade : "C";
+    const gradeScore = Math.min(100, Math.max(0, Math.round(Number(parsed.gradeScore) || 60)));
+    const mistakes = ["early_exit", "oversize", "no_sl", "revenge", "fomo", "overtrading"];
 
-    // Save the review
     await db.insert(tradeReviews).values({
       userId: params.userId,
       positionId: params.positionId,
@@ -435,95 +427,82 @@ Grade rubric: A+ = profitable + disciplined process. A = profitable but minor is
       exitPrice: params.exitPrice,
       profit: params.profit,
       pips,
-      grade: parsed.grade ?? "C",
-      gradeScore: parsed.gradeScore ?? 70,
-      review: parsed.review ?? "",
-      strengths: parsed.strengths ?? [],
-      improvements: parsed.improvements ?? [],
-      mistakeType: parsed.mistakeType ?? null,
-      lessonLearned: parsed.lessonLearned ?? null,
+      grade,
+      gradeScore,
+      review: String(parsed.review ?? "").slice(0, 1000),
+      strengths: Array.isArray(parsed.strengths) ? parsed.strengths.slice(0, 2).map(String) : [],
+      improvements: Array.isArray(parsed.improvements) ? parsed.improvements.slice(0, 2).map(String) : [],
+      mistakeType: mistakes.includes(parsed.mistakeType) ? parsed.mistakeType : null,
+      lessonLearned: parsed.lessonLearned ? String(parsed.lessonLearned).slice(0, 500) : null,
       aiProvider: settings.selectedAiProvider,
     }).onConflictDoNothing();
 
-    // If a lesson was learned, store it in the knowledge base
-    if (parsed.lessonLearned && parsed.lessonLearned.length > 20) {
-      await db.insert(aiKnowledge).values({
-        category: "learned",
-        title: `Learned: ${params.symbol} ${params.direction} pattern`,
-        content: parsed.lessonLearned,
-        source: "trade_review",
-        confidence: Math.min(parsed.gradeScore ?? 70, 85),
-        pairs: [params.symbol],
-        isActive: true,
-      });
+    // Store the lesson for THIS user only, skipping near-duplicates
+    const lesson = typeof parsed.lessonLearned === "string" ? parsed.lessonLearned.trim() : "";
+    if (lesson.length > 20) {
+      const mine = await db.select({ id: aiKnowledge.id, content: aiKnowledge.content })
+        .from(aiKnowledge).where(and(eq(aiKnowledge.userId, params.userId), eq(aiKnowledge.isActive, true)));
+      const key = lesson.toLowerCase().slice(0, 60);
+      if (!mine.some(m => m.content.toLowerCase().slice(0, 60) === key)) {
+        await db.insert(aiKnowledge).values({
+          userId: params.userId,
+          category: "learned",
+          title: `${params.symbol} ${params.direction}: ${lesson.slice(0, 60)}`,
+          content: lesson,
+          source: "trade_review",
+          confidence: 50,
+          pairs: [params.symbol],
+          isActive: true,
+        });
+        // Keep the active set small: retire the weakest beyond 30
+        if (mine.length >= 30) {
+          const weakest = await db.select({ id: aiKnowledge.id }).from(aiKnowledge)
+            .where(and(eq(aiKnowledge.userId, params.userId), eq(aiKnowledge.isActive, true)))
+            .orderBy(asc(aiKnowledge.confidence), asc(aiKnowledge.createdAt)).limit(1);
+          if (weakest[0]) await db.update(aiKnowledge).set({ isActive: false }).where(eq(aiKnowledge.id, weakest[0].id));
+        }
+      }
     }
-
-    // Update confidence scores on existing knowledge
-    if (parsed.grade && ["A+", "A"].includes(parsed.grade)) {
-      // Successful trade — boost confidence on relevant lessons
-      await db.update(aiKnowledge)
-        .set({ successCount: aiKnowledge.successCount })
-        .where(and(eq(aiKnowledge.category, "entry_pattern"), eq(aiKnowledge.isActive, true)));
-    }
-
-    console.log(`[AI Knowledge] Trade review generated for position ${params.positionId} — grade ${parsed.grade}`);
+    console.log(`[AI Knowledge] Review saved for position ${params.positionId} — grade ${grade}`);
   } catch (e: any) {
     console.error("[AI Knowledge] Review error:", e.message);
   }
 }
 
-// ─── Generate Weekly Performance Report ──────────────────────────────────────
+// ─── Weekly Report ────────────────────────────────────────────────────────────
+
 export async function generateWeeklyReport(userId: string): Promise<string | null> {
   try {
     const settings = await storage.getUserSettings(userId);
     if (!settings?.selectedAiProvider || settings.selectedAiProvider === "none") return null;
 
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-    const reviews = await db.select().from(tradeReviews)
-      .where(eq(tradeReviews.userId, userId))
+    const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const weekReviews = await db.select().from(tradeReviews)
+      .where(and(eq(tradeReviews.userId, userId), gte(tradeReviews.createdAt, since)))
       .orderBy(desc(tradeReviews.createdAt));
-
-    const weekReviews = reviews.filter(r =>
-      new Date(r.createdAt!).getTime() > sevenDaysAgo.getTime()
-    );
-
-    if (weekReviews.length === 0) return "No trades to review this week.";
+    if (weekReviews.length === 0) return "No reviewed trades this week.";
 
     const totalPL = weekReviews.reduce((s, r) => s + r.profit, 0);
     const wins = weekReviews.filter(r => r.profit > 0).length;
     const avgGrade = weekReviews.reduce((s, r) => s + r.gradeScore, 0) / weekReviews.length;
-    const commonMistakes = weekReviews
-      .map(r => r.mistakeType)
-      .filter(Boolean)
-      .reduce((acc: Record<string, number>, m) => {
-        acc[m!] = (acc[m!] || 0) + 1;
-        return acc;
-      }, {});
+    const mistakes = weekReviews.map(r => r.mistakeType).filter(Boolean)
+      .reduce((acc: Record<string, number>, m) => { acc[m!] = (acc[m!] || 0) + 1; return acc; }, {});
 
-    const prompt = `You are an expert trading coach writing a weekly performance report. Be specific, actionable, and encouraging but honest.
+    const prompt = `Write a weekly coaching report for this trader.
 
-WEEKLY STATS:
-- Trades: ${weekReviews.length} (${wins}W / ${weekReviews.length - wins}L)
-- Total P&L: ${totalPL >= 0 ? "+" : ""}$${totalPL.toFixed(2)}
-- Win rate: ${Math.round((wins / weekReviews.length) * 100)}%
-- Average trade grade: ${avgGrade.toFixed(0)}/100
-- Common mistakes: ${Object.entries(commonMistakes).map(([k, v]) => `${k} (${v}x)`).join(", ") || "none"}
+WEEK
+- Trades: ${weekReviews.length} (${wins} winners)
+- Net P&L: ${totalPL >= 0 ? "+" : ""}$${totalPL.toFixed(2)}
+- Average process grade: ${avgGrade.toFixed(0)}/100
+- Mistakes flagged: ${Object.entries(mistakes).map(([k, v]) => `${k} ×${v}`).join(", ") || "none"}
 
-INDIVIDUAL TRADES:
-${weekReviews.slice(0, 10).map(r =>
-  `${r.symbol} ${r.direction} → ${r.grade} (${r.profit >= 0 ? "+" : ""}$${r.profit.toFixed(2)}): ${r.review}`
-).join("\n")}
+TRADES
+${weekReviews.slice(0, 15).map(r => `- ${r.symbol} ${r.direction} ${r.grade} (${r.profit >= 0 ? "+" : ""}$${r.profit.toFixed(2)}): ${r.review}`).join("\n")}
 
-Write a 3–4 paragraph weekly report covering:
-1. Overall performance assessment
-2. Biggest strengths demonstrated this week
-3. The #1 area to improve next week with a specific action plan
-4. Motivational close (honest but encouraging)
+Cover, in 3–4 short paragraphs of plain text: how the week went, what they did well, the single most important thing to change next week with a concrete rule, and an honest closing line. With fewer than 20 trades, say the sample is too small to judge the strategy itself.`;
 
-Plain text only, no markdown, no bullet points.`;
-
-    const report = await callAiProvider(settings.selectedAiProvider!, settings, prompt);
-    return report;
+    return await callAiProviderMarkdown(settings.selectedAiProvider, settings as any, prompt,
+      "You are a direct, supportive trading coach. Plain text, no markdown, no bullet points. Use only the data provided.");
   } catch (e: any) {
     console.error("[AI Knowledge] Weekly report error:", e.message);
     return null;
@@ -531,9 +510,11 @@ Plain text only, no markdown, no bullet points.`;
 }
 
 // ─── Storage helpers ──────────────────────────────────────────────────────────
-export async function getAllKnowledge() {
+
+/** Shared principles plus this user's own lessons. */
+export async function getAllKnowledge(userId: string) {
   return db.select().from(aiKnowledge)
-    .where(eq(aiKnowledge.isActive, true))
+    .where(and(eq(aiKnowledge.isActive, true), or(isNull(aiKnowledge.userId), eq(aiKnowledge.userId, userId))))
     .orderBy(desc(aiKnowledge.confidence));
 }
 

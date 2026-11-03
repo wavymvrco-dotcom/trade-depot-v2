@@ -2,6 +2,11 @@
 import Stripe from "stripe";
 
 async function getCredentials() {
+  // Standard hosting: keys from environment variables
+  if (process.env.STRIPE_SECRET_KEY && process.env.STRIPE_PUBLISHABLE_KEY) {
+    return { publishableKey: process.env.STRIPE_PUBLISHABLE_KEY, secretKey: process.env.STRIPE_SECRET_KEY };
+  }
+  // Legacy: Replit connector
   const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
   const xReplitToken = process.env.REPL_IDENTITY
     ? "repl " + process.env.REPL_IDENTITY

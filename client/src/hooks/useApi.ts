@@ -35,8 +35,8 @@ export function usePositionHistory() {
 export function useClosePosition() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, closePrice, profit }: { id: string; closePrice: number; profit: number }) =>
-      apiRequest("POST", `/api/positions/${id}/close`, { closePrice, profit }).then(r => r.json()),
+    mutationFn: ({ id }: { id: string }) =>
+      apiRequest("POST", `/api/positions/${id}/close`, {}).then(r => r.json()),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/positions"] });
       qc.invalidateQueries({ queryKey: ["/api/positions/history"] });

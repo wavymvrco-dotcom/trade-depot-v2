@@ -225,6 +225,35 @@ function ChangelogSection() {
   );
 }
 
+function WebhookTokenField() {
+  const { toast } = useToast();
+  const [token, setToken] = useState<string | null>(null);
+  const [shown, setShown] = useState(false);
+  useEffect(() => {
+    apiRequest("GET", "/api/settings/webhook").then(r => r.json()).then(d => setToken(d.token)).catch(() => {});
+  }, []);
+  const rotate = async () => {
+    const d = await apiRequest("POST", "/api/settings/webhook/rotate").then(r => r.json());
+    setToken(d.token);
+    toast({ title: "Token rotated", description: "Update your TradingView alerts with the new token." });
+  };
+  return (
+    <div>
+      <Label className="text-xs text-muted-foreground mb-1 block">Webhook Token (private)</Label>
+      <div className="flex gap-2">
+        <Input value={token ? (shown ? token : "•".repeat(24)) : "Loading…"} readOnly className="font-mono text-xs bg-muted/20" onFocus={() => setShown(true)} />
+        <Button variant="outline" size="icon" className="shrink-0" disabled={!token}
+          onClick={() => { navigator.clipboard.writeText(token!); toast({ title: "Token copied" }); }}>
+          <Copy className="w-3.5 h-3.5" />
+        </Button>
+        <Button variant="outline" size="icon" className="shrink-0" title="Rotate token" onClick={rotate}>
+          <RefreshCw className="w-3.5 h-3.5" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export default function Settings() {
   const { toast } = useToast();
   const { user, logout } = useAuth();
@@ -511,9 +540,8 @@ export default function Settings() {
 
   const brokerMeta: Record<string, { label: string; Icon: any }> = {
     demo: { label: "Demo / Paper Trading", Icon: Monitor },
-    mql5: { label: "MetaTrader 5", Icon: CandlestickChart },
+    mql5: { label: "MetaTrader 5 (bridge)", Icon: CandlestickChart },
     oanda: { label: "OANDA", Icon: Building2 },
-    interactive: { label: "Interactive Brokers", Icon: Server },
   };
 
   return (
@@ -851,8 +879,8 @@ export default function Settings() {
                             <Input placeholder="12345678" value={mql5Account} onChange={(e) => { setMql5Account(e.target.value); setBkStatus("idle"); }} className="h-10 bg-background/60 text-sm" data-testid="input-mql5-account" />
                           </div>
                           <div className="space-y-1">
-                            <Label className="text-xs font-semibold text-muted-foreground">Broker Server</Label>
-                            <Input placeholder="ICMarkets-Demo" value={mql5Server} onChange={(e) => { setMql5Server(e.target.value); setBkStatus("idle"); }} className="h-10 bg-background/60 text-sm" data-testid="input-mql5-server" />
+                            <Label className="text-xs font-semibold text-muted-foreground">Bridge URL</Label>
+                            <Input placeholder="https://your-mt5-bridge.example.com" value={mql5Server} onChange={(e) => { setMql5Server(e.target.value); setBkStatus("idle"); }} className="h-10 bg-background/60 text-sm" data-testid="input-mql5-server" />
                           </div>
                         </div>
                         <div className="space-y-1">
@@ -1228,7 +1256,7 @@ export default function Settings() {
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3 px-1">TradingView Webhook</p>
               <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.24 }}
                 className="bg-card/50 border border-border rounded-xl p-5 space-y-3">
-                <p className="text-xs text-muted-foreground">Send TradingView alerts directly to your account. Use your TradingView username as the webhook token.</p>
+                <p className="text-xs text-muted-foreground">Send TradingView alerts to your account. Your token is a private secret — anyone with it can send you signals, so rotate it if it leaks.</p>
                 <div>
                   <Label className="text-xs text-muted-foreground mb-1 block">Webhook URL</Label>
                   <div className="flex gap-2">
@@ -1238,13 +1266,11 @@ export default function Settings() {
                     </Button>
                   </div>
                 </div>
-                <div>
-                  <Label className="text-xs text-muted-foreground mb-1 block">Webhook Token (use your TradingView username)</Label>
-                  <Input value={tvUsername} readOnly className="font-mono text-xs bg-muted/20" />
-                </div>
+                <WebhookTokenField />
                 <div className="text-xs text-muted-foreground bg-muted/20 rounded-lg p-3 space-y-1">
                   <p className="font-semibold">Alert message format:</p>
-                  <code className="text-primary block">{'{"token":"YOUR_TV_USERNAME","action":"BUY","symbol":"EURUSD","price":"{{close}}"}'}</code>
+                  <code className="text-primary block break-all">{'{"token":"YOUR_WEBHOOK_TOKEN","action":"BUY","symbol":"EURUSD","price":"{{close}}","sl":"","tp":""}'}</code>
+                  <p>Alerts arrive as pending signals. Auto-trade executes them only if they include a stop loss.</p>
                 </div>
               </motion.div>
             </div>

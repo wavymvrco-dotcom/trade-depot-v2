@@ -110,16 +110,23 @@ function SignalsTab() {
                   <>
                     <div className={cn(
                       "px-2.5 py-0.5 rounded-md text-xs font-bold border shrink-0",
-                      sig.action === "BUY"
+                      sig.action.includes("BUY")
                         ? "bg-green-500/15 text-green-400 border-green-500/30"
-                        : sig.action === "SELL"
+                        : sig.action.includes("SELL")
                         ? "bg-red-500/15 text-red-400 border-red-500/30"
                         : "bg-muted text-muted-foreground border-border"
                     )}>
-                      {sig.action === "BUY" ? <><ArrowUpRight className="w-3 h-3 inline mr-0.5" />BUY</> : sig.action === "SELL" ? <><ArrowDownRight className="w-3 h-3 inline mr-0.5" />SELL</> : <><Minus className="w-3 h-3 inline mr-0.5" />HOLD</>}
+                      {sig.action.includes("BUY") ? <><ArrowUpRight className="w-3 h-3 inline mr-0.5" />{sig.action}</> : sig.action.includes("SELL") ? <><ArrowDownRight className="w-3 h-3 inline mr-0.5" />{sig.action}</> : <><Minus className="w-3 h-3 inline mr-0.5" />HOLD</>}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <ConfidenceBar value={sig.confidence} />
+                      {sig.confidence > 0
+                        ? <ConfidenceBar value={sig.confidence} />
+                        : <span className="text-[10px] text-muted-foreground">{sig.source === "rules" ? "Rule-based (advisory)" : sig.source === "tradingview" ? "TradingView alert" : "—"}</span>}
+                      {sig.outcome && (
+                        <span className={cn("text-[9px] font-semibold", sig.outcome === "TP_HIT" ? "text-green-400" : sig.outcome === "SL_HIT" ? "text-red-400" : "text-muted-foreground")}>
+                          {sig.outcome.replace("_", " ")}
+                        </span>
+                      )}
                     </div>
                     <div className="text-[10px] text-muted-foreground shrink-0">
                       {new Date(sig.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
@@ -204,7 +211,7 @@ function BrainTab() {
   const categories = ["all", ...Array.from(new Set(knowledge.map((k: any) => k.category)))];
   const filtered = filter === "all" ? knowledge : knowledge.filter((k: any) => k.category === filter);
 
-  const expertCount = knowledge.filter((k: any) => k.source === "expert").length;
+  const expertCount = knowledge.filter((k: any) => k.source !== "trade_review").length;
   const learnedCount = knowledge.filter((k: any) => k.source === "trade_review").length;
 
   return (
@@ -214,7 +221,7 @@ function BrainTab() {
           <Brain className="w-5 h-5 text-primary" /> AI Knowledge Base
         </h2>
         <p className="text-xs text-muted-foreground mt-0.5">
-          {expertCount} expert lessons seeded · {learnedCount} learned from your trades
+          {expertCount} shared principles · {learnedCount} learned from your trades. Confidence starts at 50% and moves only with real signal outcomes.
         </p>
       </div>
 
@@ -297,6 +304,11 @@ function BrainTab() {
                   </div>
                 </div>
                 <ConfidenceBar value={k.confidence} />
+                <p className="text-[9px] text-muted-foreground">
+                  {k.successCount + k.failureCount > 0
+                    ? `${k.successCount} of ${k.successCount + k.failureCount} signals using this hit target`
+                    : "Untested — no signal outcomes yet"}
+                </p>
               </motion.div>
             );
           })}

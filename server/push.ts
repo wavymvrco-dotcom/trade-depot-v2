@@ -3,11 +3,17 @@ import { db } from "./db";
 import { pushSubscriptions, positions, userSettings } from "@shared/schema";
 import { eq, and, gte, desc } from "drizzle-orm";
 
-webpush.setVapidDetails(
-  process.env.VAPID_EMAIL || "mailto:admin@tradeai.app",
-  process.env.VAPID_PUBLIC_KEY!,
-  process.env.VAPID_PRIVATE_KEY!
-);
+// Push is optional: without VAPID keys the server still starts and push is a no-op
+const pushEnabled = !!(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY);
+if (pushEnabled) {
+  webpush.setVapidDetails(
+    process.env.VAPID_EMAIL || "mailto:admin@tradeai.app",
+    process.env.VAPID_PUBLIC_KEY!,
+    process.env.VAPID_PRIVATE_KEY!
+  );
+} else {
+  console.warn("[Push] VAPID keys not set — push notifications disabled");
+}
 
 export interface PushPayload {
   title: string;
@@ -56,6 +62,7 @@ async function deliverToEndpoint(sub: { endpoint: string; p256dh: string; auth: 
 }
 
 export async function sendPushToUser(userId: string, payload: PushPayload) {
+  if (!pushEnabled) return 0;
   const subs = await getUserSubscriptions(userId);
   if (subs.length === 0) return 0;
 
@@ -123,9 +130,6 @@ async function runDigest() {
       const netEmoji = unrealizedPL >= 0 ? "📈" : "📉";
       const symbols  = Array.from(new Set(openPos.map(p => p.symbol))).slice(0, 4).join(" · ");
 
-      // Simple projection: at this trajectory for 24h
-      const projectedDaily = unrealizedPL * (24 * 6); // every 10 min
-      const projSign = projectedDaily >= 0 ? "+" : "";
 
       // Closed in window
       const closedLine = recentClosed.length > 0

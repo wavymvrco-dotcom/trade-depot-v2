@@ -1,13 +1,18 @@
-import type { Express, Request, Response } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import bcrypt from "bcrypt";
 import { storage } from "./storage";
-import { generateAiSignal, getMarketPrices } from "./ai-engine";
-import { fetchLivePrices, verifyPolygonConnection, getMarketDataStatus } from "./marketdata";
+import { generateAiSignal, getMarketContext, callAiProviderMarkdown } from "./ai-engine";
+import { priceDecimals } from "@shared/pips";
+import { openTrade, closeTrade, normalizeSide } from "./execution";
+import { fetchLivePrices, verifyPolygonConnection, getMarketDataStatus, isTradablePrice, type LivePrice } from "./marketdata";
+import { checkCanOpenTrade } from "./trade-guard";
+import { SECRET_SETTING_FIELDS, randomToken } from "./crypto";
+import { calcProfit } from "./pips";
 import { fetchEconomicCalendar } from "./calendar";
 import { getOandaAccountId, placeOandaOrder, closeOandaTrade } from "./brokers/oanda";
-import { testMT5Bridge, placeMT5Order, closeMT5Trade } from "./brokers/mt5";
-import { fetchCandlesForAI } from "./backtest";
+import { testMT5Bridge, placeMT5Order, closeMT5Trade, getMT5AccountInfo } from "./brokers/mt5";
+import { fetchCandlesForAI, fetchCandles, runBacktest } from "./backtest";
 import { sendEmail, verifySmtp, tradeAlertHtml } from "./email";
 import { insertStrategySchema, insertPositionSchema, insertUserSchema, insertPriceAlertSchema, insertNotificationSchema, insertTradeJournalSchema, insertMarketplaceSchema } from "@shared/schema";
 import { generateTradeReview, getAllKnowledge, getTradeReviews, getTradeReviewByPosition, generateWeeklyReport } from "./ai-knowledge";
@@ -25,22 +30,86 @@ import {
 
 const BCRYPT_ROUNDS = 12;
 
-const DEMO_USER_ID = "demo-user-001";
+/** Settings as sent to the browser: credentials replaced with has* flags. */
+function redactSettings(s: Record<string, any>) {
+  const out: Record<string, any> = { ...s };
+  for (const f of SECRET_SETTING_FIELDS) {
+    out[`has${f[0].toUpperCase()}${f.slice(1)}`] = !!out[f];
+    delete out[f];
+  }
+  delete out.webhookToken;
+  return out;
+}
 
-async function ensureDemoUser() {
-  try {
-    const existing = await storage.getUserByUsername("demo");
-    if (!existing) {
-      const hashed = await bcrypt.hash("demo123", BCRYPT_ROUNDS);
-      await storage.createUser({ username: "demo", password: hashed });
-    }
-  } catch {}
+/**
+ * Blocks server-side requests to loopback, private and cloud-metadata
+ * addresses (SSRF). Hostnames are checked as written; DNS rebinding is out of
+ * scope for user-supplied SMTP/bridge hosts.
+ */
+export function isSafeOutboundHost(hostOrUrl: unknown): boolean {
+  if (typeof hostOrUrl !== "string" || !hostOrUrl.trim()) return false;
+  let host = hostOrUrl.trim();
+  try { if (/^[a-z]+:\/\//i.test(host)) host = new URL(host).hostname; } catch { return false; }
+  host = host.toLowerCase().replace(/^\[|\]$/g, "");
+  if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".internal") || host === "metadata.google.internal") return false;
+  if (/^(127\.|10\.|0\.|169\.254\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host)) return false;
+  if (host === "::1" || host.startsWith("fc") || host.startsWith("fd") || host.startsWith("fe80")) return false;
+  return true;
+}
+
+/** New session id on login/register to prevent session fixation. */
+function startSession(req: Request, userId: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    req.session.regenerate(err => {
+      if (err) return reject(err);
+      (req.session as any).userId = userId;
+      req.session.save(e => (e ? reject(e) : resolve()));
+    });
+  });
+}
+
+/** Authenticated user id — only valid on routes behind requireAuth. */
+function uid(req: Request): string {
+  return (req.session as any).userId as string;
+}
+
+// Endpoints reachable without a session. Everything else under /api requires login.
+const PUBLIC_API = [
+  /^\/api\/version$/,
+  /^\/api\/auth\/(login|register|logout|forgot-password|reset-password|verify-email|me)$/,
+  /^\/api\/webhook\/tradingview$/,
+  /^\/api\/profile\/[^/]+$/,
+  /^\/api\/market\/(prices|status)$/,
+  /^\/api\/push\/vapid-public-key$/,
+  /^\/api\/billing\/publishable-key$/,
+];
+
+// Simple fixed-window limiter for auth endpoints (per IP)
+const authHits = new Map<string, { count: number; resetAt: number }>();
+function authRateLimit(req: Request, res: Response, next: NextFunction) {
+  const key = `${req.ip}:${req.path}`;
+  const now = Date.now();
+  const hit = authHits.get(key);
+  if (!hit || hit.resetAt < now) { authHits.set(key, { count: 1, resetAt: now + 15 * 60_000 }); return next(); }
+  if (++hit.count > 20) return res.status(429).json({ message: "Too many attempts. Try again in 15 minutes." });
+  next();
 }
 
 const SERVER_START_VERSION = Date.now().toString();
 
 export async function registerRoutes(httpServer: Server, app: Express): Promise<Server> {
-  await ensureDemoUser().catch(() => {});
+  app.use(["/api/auth/login", "/api/auth/register", "/api/auth/forgot-password", "/api/auth/reset-password"], authRateLimit);
+
+  app.use("/api", async (req: Request, res: Response, next: NextFunction) => {
+    const path = req.originalUrl.split("?")[0];
+    if (PUBLIC_API.some(re => re.test(path))) return next();
+    const userId = (req.session as any)?.userId;
+    if (!userId) return res.status(401).json({ message: "Not authenticated" });
+    const user = await storage.getUser(userId).catch(() => undefined);
+    if (!user) return res.status(401).json({ message: "Not authenticated" });
+    if (user.isBanned) return res.status(403).json({ message: `Account suspended${user.banReason ? `: ${user.banReason}` : ""}` });
+    next();
+  });
 
   // Version endpoint — clients poll this to detect new deployments
   app.get("/api/version", (_req, res) => {
@@ -66,7 +135,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         }
       }
       if (!valid) return res.status(401).json({ message: "Invalid credentials" });
-      (req.session as any).userId = user.id;
+      if (user.isBanned) return res.status(403).json({ message: "Account suspended" });
+      await startSession(req, user.id);
       res.json({ id: user.id, username: user.username });
     } catch (e: any) {
       res.status(500).json({ message: e.message });
@@ -77,6 +147,10 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     try {
       const { username, password, email } = req.body;
       const data = insertUserSchema.parse({ username, password });
+      if (!/^[A-Za-z0-9_.-]{3,32}$/.test(data.username.trim())) {
+        return res.status(400).json({ message: "Username must be 3–32 characters: letters, numbers, _ . -" });
+      }
+      if (data.password.length < 8) return res.status(400).json({ message: "Password must be at least 8 characters" });
       const existing = await storage.getUserByUsername(data.username.trim());
       if (existing) return res.status(409).json({ message: "Username already taken" });
       const hashed = await bcrypt.hash(data.password, BCRYPT_ROUNDS);
@@ -113,7 +187,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           if (customerId) await storage.upsertSubscription({ userId: user.id, stripeCustomerId: customerId, plan: "free", status: "active" });
         })
         .catch(() => {});
-      (req.session as any).userId = user.id;
+      await startSession(req, user.id);
       res.json({ id: user.id, username: user.username });
     } catch (e: any) {
       res.status(400).json({ message: e.message });
@@ -195,9 +269,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   app.get("/api/auth/me", async (req: Request, res: Response) => {
-    const userId = (req.session as any)?.userId || DEMO_USER_ID;
-    const user = await storage.getUser(userId);
-    if (!user) return res.json({ id: DEMO_USER_ID, username: "demo", isAdmin: false, isBanned: false });
+    const userId = (req.session as any)?.userId;
+    const user = userId ? await storage.getUser(userId) : undefined;
+    if (!user) return res.status(401).json({ message: "Not authenticated" });
     res.json({
       id: user.id,
       username: user.username,
@@ -289,7 +363,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           stripeSubscriptionId: activeSub.id,
           plan,
           status: activeSub.status,
-          currentPeriodEnd: activeSub.current_period_end ? new Date(activeSub.current_period_end * 1000) : undefined,
+          currentPeriodEnd: activeSub.items.data[0]?.current_period_end ? new Date(activeSub.items.data[0].current_period_end * 1000) : undefined,
         });
         return res.json({ ok: true, plan });
       }
@@ -379,7 +453,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.post("/api/admin/users/:id/reset-password", requireAdmin as any, async (req: Request, res: Response) => {
     try {
       const { newPassword } = req.body;
-      if (!newPassword || newPassword.length < 4) return res.status(400).json({ message: "Password must be at least 4 characters" });
+      if (!newPassword || newPassword.length < 8) return res.status(400).json({ message: "Password must be at least 8 characters" });
       const hashed = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
       await storage.updateUserPassword(req.params.id, hashed);
       res.json({ ok: true });
@@ -466,14 +540,14 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const status = getMarketDataStatus();
       res.json({ prices, meta: { source: status.status, provider: status.provider, hasApiKey: status.hasApiKey, cacheAge: status.cacheAge } });
     } catch {
-      res.json({ prices: {}, meta: { source: "failed", provider: "Twelve Data", hasApiKey: false } });
+      res.json({ prices: {}, meta: { source: "failed", provider: "Yahoo Finance", hasApiKey: false } });
     }
   });
 
   // --- Verify Twelve Data connection ---
   app.post("/api/market/verify", async (_req: Request, res: Response) => {
     const result = await verifyPolygonConnection();
-    res.json({ ...result, provider: "Twelve Data" });
+    res.json({ ...result, provider: "Yahoo Finance" });
   });
 
   // --- Market data status ---
@@ -481,25 +555,58 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json(getMarketDataStatus());
   });
 
+  // Real correlation: Pearson on 60 daily log returns, cached 6h
+  let corrCache: { at: number; data: any } | null = null;
+  app.get("/api/market/correlation", async (_req: Request, res: Response) => {
+    try {
+      if (corrCache && Date.now() - corrCache.at < 6 * 3600_000) return res.json(corrCache.data);
+      const key = process.env.TWELVE_DATA_API_KEY;
+      if (!key) return res.json({ pairs: [], matrix: [], live: false, message: "Market data not configured" });
+      const pairs = ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD", "XAUUSD", "USDCHF", "GBPJPY"];
+      const series = await Promise.all(pairs.map(p => fetchCandles(p, "1day", 61, key).catch(() => [] as any[])));
+      const returns = series.map(c => {
+        const byDate = new Map<string, number>();
+        for (let i = 1; i < c.length; i++) byDate.set(c[i].time.slice(0, 10), Math.log(c[i].close / c[i - 1].close));
+        return byDate;
+      });
+      const pearson = (a: Map<string, number>, b: Map<string, number>) => {
+        const dates = Array.from(a.keys()).filter(d => b.has(d));
+        if (dates.length < 20) return null;
+        const x = dates.map(d => a.get(d)!), y = dates.map(d => b.get(d)!);
+        const mx = x.reduce((s, v) => s + v, 0) / x.length, my = y.reduce((s, v) => s + v, 0) / y.length;
+        let num = 0, dx = 0, dy = 0;
+        for (let i = 0; i < x.length; i++) { num += (x[i] - mx) * (y[i] - my); dx += (x[i] - mx) ** 2; dy += (y[i] - my) ** 2; }
+        return dx && dy ? parseFloat((num / Math.sqrt(dx * dy)).toFixed(2)) : null;
+      };
+      const matrix = returns.map((a, i) => returns.map((b, j) => (i === j ? 1 : pearson(a, b))));
+      const data = { pairs, matrix, live: true, window: "60 daily returns", asOf: new Date().toISOString() };
+      corrCache = { at: Date.now(), data };
+      res.json(data);
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
   // --- AI Signals ---
   app.get("/api/signals", async (req: Request, res: Response) => {
-    const userId = (req.session as any)?.userId || DEMO_USER_ID;
+    const userId = uid(req);
     const signals = await storage.getRecentSignals(userId, 20);
     res.json(signals);
   });
 
   app.get("/api/signals/pending", async (req: Request, res: Response) => {
-    const userId = (req.session as any)?.userId || DEMO_USER_ID;
+    const userId = uid(req);
     const signal = await storage.getPendingSignal(userId);
     res.json(signal || null);
   });
 
   app.post("/api/signals/generate", async (req: Request, res: Response) => {
     try {
-      const userId = (req.session as any)?.userId || DEMO_USER_ID;
+      const userId = uid(req);
       const { symbol } = req.body;
       const signal = await generateAiSignal(userId, symbol);
-      res.json(signal);
+      // "No trade" is a normal answer, not an error
+      res.json(signal ?? { noTrade: true, message: `No clear setup on ${String(symbol || "this pair").toUpperCase()} right now.` });
     } catch (e: any) {
       res.status(500).json({ message: e.message || "Signal generation failed" });
     }
@@ -508,7 +615,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // ── Strategy momentum forecast ──────────────────────────────────────────────
   app.post("/api/strategy/forecast", async (req: Request, res: Response) => {
     try {
-      const userId = (req.session as any)?.userId || DEMO_USER_ID;
+      const userId = uid(req);
       const { style = "swing", goal = "balanced", symbols = ["EURUSD", "GBPUSD", "XAUUSD"] } = req.body;
 
       const prices = await fetchLivePrices().catch(() => ({})) as Record<string, { bid: number; change: number }>;
@@ -570,34 +677,20 @@ Respond ONLY with this JSON:
         }
       }
 
-      // Heuristic fallback for any missing symbols
+      // Without an AI provider (or for symbols it skipped), report today's move
+      // factually — this is not a forecast, and it says so.
       const covered = new Set(forecasts.map(f => f.symbol));
       for (const sym of ["EURUSD", "GBPUSD", "XAUUSD"]) {
         if (covered.has(sym)) continue;
         const q = prices[sym];
         const change = q?.change || 0;
-        const price = q?.bid || 1.0;
-        const bias = change > 0.15 ? "BULLISH" : change < -0.15 ? "BEARISH" : (Math.random() > 0.5 ? "BULLISH" : "BEARISH");
-        const summaries: Record<string, Record<string, string>> = {
-          EURUSD: {
-            BULLISH: `EUR/USD is showing positive momentum on the ${tf.label.toLowerCase()} timeframe with buyers defending key intraday levels. The ${change > 0 ? "continued upside" : "recovery"} suggests scope for further gains toward resistance over the ${tf.horizon}.`,
-            BEARISH: `EUR/USD faces selling pressure on the ${tf.label.toLowerCase()} timeframe as the pair struggles near recent highs. A sustained move lower would target support levels over the ${tf.horizon}.`,
-          },
-          GBPUSD: {
-            BULLISH: `GBP/USD maintains a constructive tone on the ${tf.label.toLowerCase()} chart, with the pair holding above recent consolidation. Look for bullish continuation signals over the ${tf.horizon}.`,
-            BEARISH: `GBP/USD is under pressure on the ${tf.label.toLowerCase()} timeframe. The pair is testing key support and a break lower would accelerate selling over the ${tf.horizon}.`,
-          },
-          XAUUSD: {
-            BULLISH: `Gold is in a bullish posture on the ${tf.label.toLowerCase()} timeframe, supported by safe-haven flows. Current price action favors longs with momentum building over the ${tf.horizon}.`,
-            BEARISH: `Gold is pulling back on the ${tf.label.toLowerCase()} timeframe after recent highs. Risk sentiment is weighing on prices; watch key support levels over the ${tf.horizon}.`,
-          },
-        };
+        const bias = change > 0.15 ? "BULLISH" : change < -0.15 ? "BEARISH" : "NEUTRAL";
         forecasts.push({
           symbol: sym,
           bias,
-          confidence: Math.floor(Math.random() * 15) + 65,
-          summary: summaries[sym]?.[bias] || `${sym} showing ${bias.toLowerCase()} momentum over the ${tf.horizon}.`,
-          keyLevel: parseFloat((price + (bias === "BULLISH" ? -0.005 : 0.005) * price).toFixed(sym === "XAUUSD" ? 1 : 5)),
+          confidence: 0,
+          summary: `${sym} is ${change >= 0 ? "up" : "down"} ${Math.abs(change).toFixed(2)}% today. This is today's move, not a forecast — connect an AI provider for a ${tf.label.toLowerCase()} outlook.`,
+          keyLevel: q?.bid ?? 0,
           change,
         });
       }
@@ -618,7 +711,7 @@ Respond ONLY with this JSON:
   // ── Strategy AI Analysis (section-by-section scorecard) ────────────────────
   app.post("/api/strategy/analyze", async (req: Request, res: Response) => {
     try {
-      const userId = (req.session as any)?.userId || DEMO_USER_ID;
+      const userId = uid(req);
       const { style, goal, riskPercent, maxPositions, rrRatio, accountSize, description } = req.body;
 
       const userSettings = await storage.getUserSettings(userId).catch(() => null);
@@ -704,7 +797,7 @@ Respond ONLY with this JSON:
           "Track expected value: (win rate × avg win $) − (loss rate × avg loss $). Risk sizing should be driven by this number.",
         ] : riskPercent <= 3 ? [
           `Reduce to 2% risk per trade immediately. At ${riskPercent}%, a normal 3-trade losing streak costs ${(riskPercent * 3).toFixed(1)}% of capital.`,
-          "Prop firm data shows 94% of funded traders who fail do so from oversizing, not from a bad strategy.",
+          "Oversizing is one of the most common ways traders break prop-firm drawdown rules — size to the rule, not the setup.",
           "Use a position-size calculator and stick to it — emotional sizing after wins is the #1 account killer.",
         ] : [
           `CRITICAL: ${riskPercent}% per trade is account-threatening. Reduce to 1–2% before placing another trade.`,
@@ -900,7 +993,7 @@ Respond ONLY with this JSON:
             rrRatio: 2.5,
             description: "Focus on EURUSD and XAUUSD swing setups using London Open Breakout and 4H OTE entries. Avoid NFP and FOMC weeks.",
             rationale: "Optimized for smaller accounts — low drawdown, high edge per trade, and compounding potential without excessive leverage.",
-            historicalEdge: "Backtested on EURUSD 2018–2024: 62% win rate at 1:2.5 R:R = 55% annual return on risk capital at 1% risk per trade.",
+            historicalEdge: "Not backtested here — run it in Analytics → Backtest on your pairs before trading it live.",
           });
         }
         if (style !== "swing" || riskPercent > 2) {
@@ -913,7 +1006,7 @@ Respond ONLY with this JSON:
             rrRatio: 2.5,
             description: "Swing trade EURUSD, GBPUSD, and XAUUSD on 4H/Daily charts using ICT OTE zones and momentum confluence. Avoid 30min before high-impact news.",
             rationale: "The most statistically reliable approach for retail traders. Mimics what CTA funds do at smaller scale — patient, high R:R setups with disciplined risk.",
-            historicalEdge: "CTAs using trend-following + momentum averaging 15–20% annual returns with <15% max drawdown. Your edge comes from quality over quantity.",
+            historicalEdge: "Not backtested here — run it in Analytics → Backtest on your pairs before trading it live.",
           });
         }
         if (goal === "income" || style === "day") {
@@ -926,7 +1019,7 @@ Respond ONLY with this JSON:
             rrRatio: 2.0,
             description: "Day trade EURUSD and GBPUSD exclusively during the London session (07:00–13:00 UTC) using Asian range breakouts and NY continuation setups. No overnight holds.",
             rationale: "London session provides the highest liquidity and tightest spreads — the only session where day trading edge is statistically proven for retail traders.",
-            historicalEdge: "London breakout strategies have shown 58–65% win rates in peer-reviewed FX research (Harris, 2021) when filtered to high-impact catalyst days only.",
+            historicalEdge: "Not backtested here — run it in Analytics → Backtest on your pairs before trading it live.",
           });
         }
         if (accountSize >= 5000 && style !== "position") {
@@ -939,7 +1032,7 @@ Respond ONLY with this JSON:
             rrRatio: 3.5,
             description: "Position trade using weekly macro bias (DXY, yields, risk sentiment). Hold for 2–4 weeks targeting major structural levels. XAUUSD and USDCAD focus.",
             rationale: "Position trading with macro alignment produces the highest per-trade R:R. Institutional desks use this approach — fewer decisions, larger moves captured.",
-            historicalEdge: "Position strategies aligned with macro regime (2020–2024) averaged 3.8:1 R:R realized on closed trades, with only 8 trades per year needed for 30%+ returns.",
+            historicalEdge: "Not backtested here — run it in Analytics → Backtest on your pairs before trading it live.",
           });
         }
       }
@@ -988,102 +1081,53 @@ Respond ONLY with this JSON:
   app.post("/api/signals/:id/execute", async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const userId = (req.session as any)?.userId || DEMO_USER_ID;
-      const signal = await storage.updateSignalStatus(id, "executed");
+      const userId = uid(req);
+      const signal = await storage.getSignalForUser(id, userId);
       if (!signal) return res.status(404).json({ message: "Signal not found" });
+      if (signal.status !== "pending") return res.status(409).json({ message: `Signal already ${signal.status}` });
 
-      const isBuy = signal.action.includes("BUY");
-      const tradeType = isBuy ? "BUY" : "SELL";
-
-      // ── Attempt real broker execution ─────────────────────────────────────
-      let brokerTradeId: string | null = null;
-      let brokerNote = "demo";
-      try {
-        const userSettings = await storage.getUserSettings(userId).catch(() => null);
-        const brokerType = userSettings?.brokerType ?? "demo";
-
-        if (brokerType === "oanda" && userSettings?.brokerApiKey && userSettings?.brokerAccountId) {
-          brokerTradeId = await placeOandaOrder(
-            userSettings.brokerApiKey,
-            userSettings.brokerAccountId,
-            signal.symbol,
-            tradeType,
-            signal.size ?? 0.1,
-            signal.stopLoss ?? null,
-            signal.takeProfit ?? null
-          );
-          brokerNote = brokerTradeId ? `oanda:${brokerTradeId}` : "oanda_failed";
-          if (brokerTradeId) console.log(`[Execution] OANDA trade placed successfully`);
-          else console.warn(`[Execution] OANDA order failed — position saved locally only`);
-
-        } else if (brokerType === "mql5" && userSettings?.brokerServer) {
-          brokerTradeId = await placeMT5Order(
-            userSettings.brokerServer,
-            signal.symbol,
-            tradeType,
-            signal.size ?? 0.1,
-            signal.stopLoss ?? null,
-            signal.takeProfit ?? null
-          );
-          brokerNote = brokerTradeId ? `mt5:${brokerTradeId}` : "mt5_failed";
-          if (brokerTradeId) console.log(`[Execution] MT5 trade placed successfully`);
-          else console.warn(`[Execution] MT5 order failed — position saved locally only`);
-        }
-      } catch (brokerErr: any) {
-        console.error(`[Execution] Broker error: ${brokerErr.message}`);
-      }
-
-      // ── Always save position locally for tracking ─────────────────────────
-      const position = await storage.createPosition({
-        userId,
-        symbol: signal.symbol,
-        type: isBuy ? "buy" : "sell",
-        size: signal.size,
-        entryPrice: signal.entryPrice || 0,
-        currentPrice: signal.entryPrice,
-        stopLoss: signal.stopLoss,
-        takeProfit: signal.takeProfit,
-        profit: 0,
-        status: "open",
-        aiSignal: true,
-        brokerTradeId,
+      const result = await openTrade({
+        userId, symbol: signal.symbol, side: normalizeSide(signal.action), lots: signal.size ?? 0.1,
+        stopLoss: signal.stopLoss, takeProfit: signal.takeProfit, aiSignal: true, signalId: signal.id,
       });
+      if (!result.ok) return res.status(403).json({ message: result.reason });
 
-      res.json({ signal, position, brokerNote });
+      const executed = await storage.updateSignalStatus(id, "executed");
+      res.json({ signal: executed, position: result.position, brokerNote: result.brokerNote });
     } catch (e: any) {
       res.status(500).json({ message: e.message });
     }
   });
 
   app.post("/api/signals/:id/dismiss", async (req: Request, res: Response) => {
-    const { id } = req.params;
-    const signal = await storage.updateSignalStatus(id, "dismissed");
-    res.json(signal);
+    const signal = await storage.getSignalForUser(req.params.id, uid(req));
+    if (!signal) return res.status(404).json({ message: "Signal not found" });
+    res.json(await storage.updateSignalStatus(signal.id, "dismissed"));
   });
 
   // Signal accuracy stats (win rate per provider)
   app.get("/api/signals/stats", async (req: Request, res: Response) => {
-    const userId = (req.session as any)?.userId || DEMO_USER_ID;
+    const userId = uid(req);
     const stats = await storage.getSignalStats(userId);
     res.json(stats);
   });
 
   // --- Positions ---
   app.get("/api/positions", async (req: Request, res: Response) => {
-    const userId = (req.session as any)?.userId || DEMO_USER_ID;
+    const userId = uid(req);
     const open = await storage.getOpenPositions(userId);
     res.json(open);
   });
 
   app.get("/api/positions/history", async (req: Request, res: Response) => {
-    const userId = (req.session as any)?.userId || DEMO_USER_ID;
+    const userId = uid(req);
     const closed = await storage.getClosedPositions(userId);
     res.json(closed);
   });
 
   // Correlation exposure: detect open positions in correlated pairs
   app.get("/api/positions/exposure", async (req: Request, res: Response) => {
-    const userId = (req.session as any)?.userId || DEMO_USER_ID;
+    const userId = uid(req);
     const open = await storage.getOpenPositions(userId);
     if (open.length < 2) return res.json({ warnings: [], totalUsdExposure: 0 });
 
@@ -1120,29 +1164,44 @@ Respond ONLY with this JSON:
     res.json({ warnings, totalUsdExposure: parseFloat(totalLots.toFixed(2)), openCount: open.length });
   });
 
-  // Close all open positions at market
-  app.post("/api/positions/close-all", async (req: Request, res: Response) => {
-    const userId = (req.session as any)?.userId || DEMO_USER_ID;
-    const { prices } = req.body; // { EURUSD: 1.0852, ... }
+  // Close all open positions at market (also used by the emergency "flatten" button)
+  async function closeAllFor(userId: string) {
     const open = await storage.getOpenPositions(userId);
-    const results = [];
+    const closed: string[] = [];
+    const failed: { symbol: string; reason: string }[] = [];
     for (const pos of open) {
-      const closePrice = prices?.[pos.symbol] || pos.currentPrice || pos.entryPrice;
-      const profit = closePrice && pos.entryPrice
-        ? (pos.type === "BUY" ? 1 : -1) * (closePrice - pos.entryPrice) * (pos.size || 0.1) * 100000
-        : 0;
-      const closed = await storage.closePosition(pos.id, closePrice, profit);
-      if (closed) results.push(closed);
+      try {
+        const r = await closeTrade(pos, { reason: "close_all" });
+        if (r) closed.push(pos.symbol);
+        else failed.push({ symbol: pos.symbol, reason: "No live price available" });
+      } catch (e: any) {
+        failed.push({ symbol: pos.symbol, reason: e.message });
+      }
     }
-    res.json({ closed: results.length });
+    return { closed: closed.length, failed };
+  }
+
+  app.post("/api/positions/close-all", async (req: Request, res: Response) => {
+    res.json(await closeAllFor(uid(req)));
+  });
+
+  const manualOrderSchema = z.object({
+    symbol: z.string().regex(/^[A-Z0-9]{3,10}$/),
+    type: z.string(),
+    size: z.number().positive().max(50),
+    stopLoss: z.number().positive().nullable().optional(),
+    takeProfit: z.number().positive().nullable().optional(),
   });
 
   app.post("/api/positions", async (req: Request, res: Response) => {
     try {
-      const userId = (req.session as any)?.userId || DEMO_USER_ID;
-      const data = insertPositionSchema.parse({ ...req.body, userId });
-      const position = await storage.createPosition(data);
-      res.json(position);
+      const order = manualOrderSchema.parse({ ...req.body, symbol: String(req.body?.symbol ?? "").toUpperCase() });
+      const result = await openTrade({
+        userId: uid(req), symbol: order.symbol, side: normalizeSide(order.type), lots: order.size,
+        stopLoss: order.stopLoss ?? null, takeProfit: order.takeProfit ?? null, aiSignal: false,
+      });
+      if (!result.ok) return res.status(403).json({ message: result.reason });
+      res.json(result.position);
     } catch (e: any) {
       res.status(400).json({ message: e.message });
     }
@@ -1150,70 +1209,34 @@ Respond ONLY with this JSON:
 
   app.post("/api/positions/:id/close", async (req: Request, res: Response) => {
     try {
-      const { id } = req.params;
-      const { closePrice, profit } = req.body;
-      const userId = (req.session as any)?.userId || DEMO_USER_ID;
-
-      // ── Attempt real broker close if trade ID is stored ───────────────────
-      try {
-        const openPositions = await storage.getOpenPositions(userId);
-        const openPos = openPositions.find((p: any) => p.id === id);
-        if (openPos?.brokerTradeId) {
-          const userSettings = await storage.getUserSettings(userId).catch(() => null);
-          const brokerType = userSettings?.brokerType ?? "demo";
-          if (brokerType === "oanda" && userSettings?.brokerApiKey && userSettings?.brokerAccountId && openPos.brokerTradeId.startsWith("")) {
-            const tid = openPos.brokerTradeId.replace(/^oanda:/, "");
-            await closeOandaTrade(userSettings.brokerApiKey, userSettings.brokerAccountId, tid);
-          } else if (brokerType === "mql5" && userSettings?.brokerServer) {
-            const ticket = openPos.brokerTradeId.replace(/^mt5:/, "");
-            await closeMT5Trade(userSettings.brokerServer, ticket);
-          }
-        }
-      } catch (brokerErr: any) {
-        console.error(`[Close] Broker close error: ${brokerErr.message}`);
-      }
-
-      const position = await storage.closePosition(id, closePrice, profit);
-      if (!position) return res.status(404).json({ message: "Position not found" });
+      // Only the owner can close, and only an open position. Price and P&L are
+      // computed server-side; anything the client sends is ignored.
+      const openPos = (await storage.getOpenPositions(uid(req))).find(p => p.id === req.params.id);
+      if (!openPos) return res.status(404).json({ message: "Position not found" });
+      const position = await closeTrade(openPos, { reason: "manual" });
+      if (!position) return res.status(503).json({ message: "No live price right now — try again in a moment." });
       res.json(position);
-      // Fire AI trade review asynchronously (non-blocking)
-      if (position) {
-        generateTradeReview({
-          userId,
-          positionId: position.id,
-          symbol: position.symbol,
-          direction: position.type === "buy" ? "long" : "short",
-          entryPrice: position.entryPrice,
-          exitPrice: closePrice,
-          stopLoss: position.stopLoss,
-          takeProfit: position.takeProfit,
-          profit: position.profit,
-          openedAt: position.openedAt ? new Date(position.openedAt) : new Date(),
-          closedAt: new Date(),
-          aiSignal: position.aiSignal,
-        }).catch(() => {});
-      }
     } catch (e: any) {
-      res.status(500).json({ message: e.message });
+      res.status(502).json({ message: e.message });
     }
   });
 
   // --- Strategies ---
   app.get("/api/strategies", async (req: Request, res: Response) => {
-    const userId = (req.session as any)?.userId || DEMO_USER_ID;
+    const userId = uid(req);
     const strats = await storage.getStrategiesByUser(userId);
     res.json(strats);
   });
 
   app.get("/api/strategies/active", async (req: Request, res: Response) => {
-    const userId = (req.session as any)?.userId || DEMO_USER_ID;
+    const userId = uid(req);
     const strategy = await storage.getActiveStrategy(userId);
     res.json(strategy || null);
   });
 
   app.post("/api/strategies", async (req: Request, res: Response) => {
     try {
-      const userId = (req.session as any)?.userId || DEMO_USER_ID;
+      const userId = uid(req);
       await storage.deactivateAllStrategies(userId);
       const data = insertStrategySchema.parse({ ...req.body, userId, isActive: true });
       const strategy = await storage.createStrategy(data);
@@ -1226,7 +1249,11 @@ Respond ONLY with this JSON:
   app.patch("/api/strategies/:id", async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const strategy = await storage.updateStrategy(id, req.body);
+      const owned = (await storage.getStrategiesByUser(uid(req))).some(s => s.id === id);
+      if (!owned) return res.status(404).json({ message: "Strategy not found" });
+      const { userId: _ignore, id: _id, ...updates } = req.body ?? {};
+      if (updates.riskPercent != null) updates.riskPercent = Math.min(10, Math.max(0.01, Number(updates.riskPercent) || 1));
+      const strategy = await storage.updateStrategy(id, insertStrategySchema.partial().parse(updates));
       if (!strategy) return res.status(404).json({ message: "Strategy not found" });
       res.json(strategy);
     } catch (e: any) {
@@ -1237,7 +1264,7 @@ Respond ONLY with this JSON:
   // ─── App Health Score ───────────────────────────────────────────────────────
   app.get("/api/app/health-score", async (req: Request, res: Response) => {
     try {
-      const userId = (req.session as any)?.userId || DEMO_USER_ID;
+      const userId = uid(req);
 
       const [settings, strategy, openPositions, closedPositions, signals, alerts, journal, watchlist] = await Promise.all([
         storage.getUserSettings(userId),
@@ -1568,24 +1595,55 @@ Respond ONLY with this JSON:
   });
 
   app.get("/api/settings", async (req: Request, res: Response) => {
-    const userId = (req.session as any)?.userId || DEMO_USER_ID;
+    const userId = uid(req);
     const settings = await storage.getUserSettings(userId);
-    res.json(settings || { userId, autoTrade: false, notifications: true, riskMode: "moderate", brokerType: "demo" });
+    res.json(settings ? redactSettings(settings) : { userId, autoTrade: false, notifications: true, riskMode: "moderate", brokerType: "demo" });
   });
+
+  // Only preference fields can be written here. Credentials go through the
+  // test-* endpoints, which verify them before saving.
+  const WRITABLE_SETTINGS = [
+    "notifications", "autoTrade", "riskMode", "theme", "tradingInstruments", "tradingTimezone",
+    "activeSessions", "offHoursBehavior", "offHoursRiskReduction", "selectedAiProvider",
+    "emailAddress", "emailNotifications", "smtpHost", "smtpPort", "smtpUser", "smtpPass",
+  ] as const;
 
   app.post("/api/settings", async (req: Request, res: Response) => {
     try {
-      const userId = (req.session as any)?.userId || DEMO_USER_ID;
-      const settings = await storage.upsertUserSettings({ ...req.body, userId });
-      res.json(settings);
+      const userId = uid(req);
+      const patch: Record<string, any> = { userId };
+      for (const f of WRITABLE_SETTINGS) {
+        if (!(f in req.body)) continue;
+        // Blank secret means "keep the saved one" — the UI never receives it back
+        if (f === "smtpPass" && !req.body[f]) continue;
+        patch[f] = req.body[f];
+      }
+      if (patch.offHoursRiskReduction != null) {
+        patch.offHoursRiskReduction = Math.min(100, Math.max(0, parseInt(patch.offHoursRiskReduction) || 0));
+      }
+      const settings = await storage.upsertUserSettings(patch as any);
+      res.json(redactSettings(settings));
     } catch (e: any) {
       res.status(400).json({ message: e.message });
     }
   });
 
+  // TradingView webhook secret — shown only to its owner, rotatable
+  app.get("/api/settings/webhook", async (req: Request, res: Response) => {
+    const userId = uid(req);
+    let s = await storage.getUserSettings(userId);
+    if (!s?.webhookToken) s = await storage.upsertUserSettings({ userId, webhookToken: randomToken() } as any);
+    res.json({ token: s.webhookToken, url: "/api/webhook/tradingview" });
+  });
+
+  app.post("/api/settings/webhook/rotate", async (req: Request, res: Response) => {
+    const s = await storage.upsertUserSettings({ userId: uid(req), webhookToken: randomToken() } as any);
+    res.json({ token: s.webhookToken, url: "/api/webhook/tradingview" });
+  });
+
   // --- Integration Status (all integrations at once) ---
   app.get("/api/settings/status", async (req: Request, res: Response) => {
-    const userId = (req.session as any)?.userId || DEMO_USER_ID;
+    const userId = uid(req);
     const s = await storage.getUserSettings(userId);
     res.json({
       broker: {
@@ -1635,7 +1693,7 @@ Respond ONLY with this JSON:
 
   // --- Test TradingView Username ---
   app.post("/api/settings/test-tradingview", async (req: Request, res: Response) => {
-    const userId = (req.session as any)?.userId || DEMO_USER_ID;
+    const userId = uid(req);
     const { username } = req.body;
     const uname = username || (await storage.getUserSettings(userId))?.tradingViewUser;
 
@@ -1674,7 +1732,7 @@ Respond ONLY with this JSON:
 
   // --- Test AI Provider (unified — real HTTPS calls to each provider) ---
   app.post("/api/settings/test-ai", async (req: Request, res: Response) => {
-    const userId = (req.session as any)?.userId || DEMO_USER_ID;
+    const userId = uid(req);
     const { provider, apiKey } = req.body;
 
     if (!provider || !apiKey?.trim()) {
@@ -1800,7 +1858,7 @@ Respond ONLY with this JSON:
 
   // --- Update Account Balance Only ---
   app.post("/api/settings/balance", async (req: Request, res: Response) => {
-    const userId = (req.session as any)?.userId || DEMO_USER_ID;
+    const userId = uid(req);
     const { brokerBalance } = req.body;
     const parsed = brokerBalance ? parseFloat(brokerBalance) : null;
     if (!parsed || parsed <= 0) return res.status(400).json({ message: "Enter a valid balance greater than 0." });
@@ -1810,7 +1868,7 @@ Respond ONLY with this JSON:
 
   // --- Test Broker Connection ---
   app.post("/api/settings/test-broker", async (req: Request, res: Response) => {
-    const userId = (req.session as any)?.userId || DEMO_USER_ID;
+    const userId = uid(req);
     const { brokerType, mql5Account, mql5Password, brokerServer, brokerApiKey, brokerBalance } = req.body;
     const parsedBalance = brokerBalance ? parseFloat(brokerBalance) : null;
 
@@ -1826,61 +1884,53 @@ Respond ONLY with this JSON:
       return res.json({ connected: true, message: `Demo account active. $${bal} virtual balance ready.`, mode: "demo" });
     }
 
-    // For real brokers — validate credentials are provided
+    const existing = await storage.getUserSettings(userId);
+
+    // MT5 trades go through a user-run REST bridge; "connected" only if it answers
     if (brokerType === "mql5") {
-      if (!mql5Account || !mql5Password) {
-        return res.json({ connected: false, message: "Please enter your MT5 account number and investor password." });
+      const bridgeUrl = String(brokerServer || existing?.brokerServer || "").trim();
+      if (!/^https?:\/\//i.test(bridgeUrl) || !isSafeOutboundHost(bridgeUrl)) {
+        return res.json({ connected: false, message: "Enter your MT5 bridge URL (e.g. https://your-bridge.example.com). MT5 has no direct cloud API — orders go through a bridge running next to your terminal." });
       }
-      // Simulate MT5 connection check (real MQL5 bridge would connect here)
-      const isValid = mql5Account.length >= 5 && mql5Password.length >= 4;
-      if (isValid) {
-        await storage.upsertUserSettings({
-          userId,
-          brokerType,
-          mql5Account,
-          mql5Password,
-          brokerServer: brokerServer || "",
-          brokerConnected: true,
-          brokerConnectedAt: new Date(),
-          brokerBalance: String(parsedBalance && parsedBalance > 0 ? parsedBalance : 10000),
-        } as any);
-        const bal = parsedBalance && parsedBalance > 0 ? `$${parsedBalance.toLocaleString()}` : "balance set to $10,000";
-        return res.json({ connected: true, message: `MT5 account ${mql5Account} connected via ${brokerServer || "default server"}. ${bal} loaded.`, mode: "live" });
-      } else {
-        return res.json({ connected: false, message: "Invalid account credentials. Please check and retry." });
-      }
+      const test = await testMT5Bridge(bridgeUrl);
+      if (!test.connected) return res.json({ connected: false, message: `MT5 bridge did not respond: ${test.message}` });
+      const info = await getMT5AccountInfo(bridgeUrl);
+      await storage.upsertUserSettings({
+        userId, brokerType, mql5Account: mql5Account || info?.login || null,
+        ...(mql5Password ? { mql5Password } : {}),
+        brokerServer: bridgeUrl, brokerConnected: true, brokerConnectedAt: new Date(),
+        brokerBalance: info?.balance || (parsedBalance && parsedBalance > 0 ? parsedBalance : existing?.brokerBalance ?? 10000),
+      } as any);
+      return res.json({ connected: true, message: test.message, mode: "live" });
     }
 
     if (brokerType === "oanda") {
-      if (!brokerApiKey) return res.json({ connected: false, message: "Please enter your OANDA API key." });
-      const accountId = await getOandaAccountId(brokerApiKey);
-      if (accountId) {
-        await storage.upsertUserSettings({ userId, brokerType, brokerApiKey, brokerAccountId: accountId, brokerConnected: true, brokerConnectedAt: new Date() } as any);
-        return res.json({ connected: true, message: `OANDA account ${accountId} connected. Live orders will be executed automatically.`, mode: "live", accountId });
-      } else {
-        return res.json({ connected: false, message: "OANDA authentication failed. Check your API key or try your practice account key." });
-      }
+      const key = brokerApiKey || existing?.brokerApiKey;
+      if (!key) return res.json({ connected: false, message: "Please enter your OANDA API key." });
+      const acct = await getOandaAccountId(key);
+      if (!acct) return res.json({ connected: false, message: "OANDA authentication failed. Check your API key." });
+      await storage.upsertUserSettings({
+        userId, brokerType, brokerApiKey: key, brokerAccountId: acct.accountId,
+        brokerServer: acct.environment, brokerConnected: true, brokerConnectedAt: new Date(),
+        ...(acct.balance ? { brokerBalance: acct.balance } : {}),
+      } as any);
+      const modeLabel = acct.environment === "live" ? "LIVE (real money)" : "practice (paper money)";
+      return res.json({ connected: true, message: `OANDA ${modeLabel} account ${acct.accountId} connected.`, mode: acct.environment, accountId: acct.accountId });
     }
 
-    if (brokerType === "interactive") {
-      if (!brokerApiKey) return res.json({ connected: false, message: "Please enter your IBKR API key." });
-      await storage.upsertUserSettings({ userId, brokerType, brokerApiKey, brokerConnected: true, brokerConnectedAt: new Date() } as any);
-      return res.json({ connected: true, message: "Interactive Brokers credentials saved. TWS bridge ready.", mode: "live" });
-    }
-
-    return res.json({ connected: false, message: "Unsupported broker type." });
+    return res.json({ connected: false, message: "Unsupported broker type. Supported: demo, OANDA, MT5 bridge." });
   });
 
   // ── Price Alerts ────────────────────────────────────────────────────────────
   app.get("/api/alerts", async (req: Request, res: Response) => {
-    const userId = (req.session as any)?.userId || DEMO_USER_ID;
+    const userId = uid(req);
     const alerts = await storage.getAlerts(userId);
     res.json(alerts);
   });
 
   app.post("/api/alerts", async (req: Request, res: Response) => {
     try {
-      const userId = (req.session as any)?.userId || DEMO_USER_ID;
+      const userId = uid(req);
       const data = insertPriceAlertSchema.parse({ ...req.body, userId });
       const alert = await storage.createAlert(data);
       res.json(alert);
@@ -1890,27 +1940,27 @@ Respond ONLY with this JSON:
   });
 
   app.delete("/api/alerts/:id", async (req: Request, res: Response) => {
-    const userId = (req.session as any)?.userId || DEMO_USER_ID;
+    const userId = uid(req);
     await storage.deleteAlert(req.params.id, userId);
     res.json({ ok: true });
   });
 
   // ── Notifications ───────────────────────────────────────────────────────────
   app.get("/api/notifications", async (req: Request, res: Response) => {
-    const userId = (req.session as any)?.userId || DEMO_USER_ID;
+    const userId = uid(req);
     const notifs = await storage.getNotifications(userId, 30);
     const unread = await storage.getUnreadCount(userId);
     res.json({ notifications: notifs, unread });
   });
 
   app.post("/api/notifications/:id/read", async (req: Request, res: Response) => {
-    const userId = (req.session as any)?.userId || DEMO_USER_ID;
+    const userId = uid(req);
     await storage.markNotificationRead(req.params.id, userId);
     res.json({ ok: true });
   });
 
   app.post("/api/notifications/read-all", async (req: Request, res: Response) => {
-    const userId = (req.session as any)?.userId || DEMO_USER_ID;
+    const userId = uid(req);
     await storage.markAllNotificationsRead(userId);
     res.json({ ok: true });
   });
@@ -1922,7 +1972,7 @@ Respond ONLY with this JSON:
 
   app.post("/api/push/subscribe", async (req: Request, res: Response) => {
     try {
-      const userId = (req.session as any)?.userId || DEMO_USER_ID;
+      const userId = uid(req);
       const { endpoint, keys } = req.body;
       if (!endpoint || !keys?.p256dh || !keys?.auth) {
         return res.status(400).json({ message: "Invalid subscription object" });
@@ -1936,7 +1986,7 @@ Respond ONLY with this JSON:
 
   app.post("/api/push/unsubscribe", async (req: Request, res: Response) => {
     try {
-      const userId = (req.session as any)?.userId || DEMO_USER_ID;
+      const userId = uid(req);
       const { endpoint } = req.body;
       if (endpoint) await removeSubscription(userId, endpoint);
       res.json({ ok: true });
@@ -1947,7 +1997,7 @@ Respond ONLY with this JSON:
 
   app.post("/api/push/test", async (req: Request, res: Response) => {
     try {
-      const userId = (req.session as any)?.userId || DEMO_USER_ID;
+      const userId = uid(req);
       const sent = await sendPushToUser(userId, {
         title: "📊 TradeAI Connected",
         body: "Push notifications are working! You'll receive trade alerts and signals here.",
@@ -1972,56 +2022,52 @@ Respond ONLY with this JSON:
 
   // ── Portfolio Risk ──────────────────────────────────────────────────────────
   app.get("/api/portfolio/risk", async (req: Request, res: Response) => {
-    const userId = (req.session as any)?.userId || DEMO_USER_ID;
-    const openPositions = await storage.getOpenPositions(userId);
-    const closedPositions = await storage.getClosedPositions(userId);
-    const strategy = await storage.getActiveStrategy(userId);
-    const prices = await fetchLivePrices().catch(() => ({})) as Record<string, { bid: number; change: number }>;
-    const settings = await storage.getUserSettings(userId);
+    const userId = uid(req);
+    const [openPositions, closedPositions, strategy, settings] = await Promise.all([
+      storage.getOpenPositions(userId), storage.getClosedPositions(userId),
+      storage.getActiveStrategy(userId), storage.getUserSettings(userId),
+    ]);
+    const prices = await fetchLivePrices().catch(() => ({} as Record<string, LivePrice>));
 
-    const STARTING_BALANCE = settings?.brokerBalance ? parseFloat(String(settings.brokerBalance)) : 10000;
-    const closedPL = closedPositions.reduce((s, p) => s + (p.profit || 0), 0);
-    const accountBalance = STARTING_BALANCE + closedPL;
+    const startingBalance = settings?.brokerBalance ? Number(settings.brokerBalance) : 10000;
+    const accountBalance = startingBalance + closedPositions.reduce((s, p) => s + (p.profit || 0), 0);
 
     const exposure = openPositions.map(p => {
-      const currentPrice = prices[p.symbol]?.bid || p.currentPrice || p.entryPrice;
-      const pipMove = p.type === "BUY" ? currentPrice - p.entryPrice : p.entryPrice - currentPrice;
-      const pips = p.symbol === "XAUUSD" ? pipMove : p.symbol.includes("JPY") ? pipMove / 0.01 : pipMove / 0.0001;
-      const unrealized = pips * (p.symbol === "XAUUSD" ? 1 : 10) * (p.size || 0.1);
-      const distToSL = p.stopLoss ? Math.abs(p.entryPrice - p.stopLoss) : 0;
-      const maxLoss = distToSL > 0 ? distToSL * (p.symbol === "XAUUSD" ? 1 : 10) * (p.size || 0.1) / (p.symbol.includes("JPY") ? 0.01 : 0.0001) : 0;
-      return { id: p.id, symbol: p.symbol, type: p.type, size: p.size, entryPrice: p.entryPrice, currentPrice, unrealized: parseFloat(unrealized.toFixed(2)), maxLoss: parseFloat(maxLoss.toFixed(2)) };
+      const side = normalizeSide(p.type);
+      const quote = prices[p.symbol];
+      const currentPrice = isTradablePrice(quote) ? (side === "BUY" ? quote.bid : quote.ask) : (p.currentPrice ?? p.entryPrice);
+      const unrealized = calcProfit(side, p.entryPrice, currentPrice, p.symbol, p.size);
+      // Loss if the stop is hit (0 when no stop — reported separately as unbounded)
+      const maxLoss = p.stopLoss != null ? Math.max(0, -calcProfit(side, p.entryPrice, p.stopLoss, p.symbol, p.size)) : 0;
+      return { id: p.id, symbol: p.symbol, type: side, size: p.size, entryPrice: p.entryPrice, currentPrice, unrealized, maxLoss, hasStop: p.stopLoss != null };
     });
 
     const totalUnrealized = exposure.reduce((s, e) => s + e.unrealized, 0);
     const totalMaxLoss = exposure.reduce((s, e) => s + e.maxLoss, 0);
-    const exposurePct = accountBalance > 0 ? (totalMaxLoss / accountBalance) * 100 : 0;
 
     res.json({
       accountBalance: parseFloat(accountBalance.toFixed(2)),
       equity: parseFloat((accountBalance + totalUnrealized).toFixed(2)),
       totalUnrealized: parseFloat(totalUnrealized.toFixed(2)),
       totalMaxLoss: parseFloat(totalMaxLoss.toFixed(2)),
-      exposurePct: parseFloat(exposurePct.toFixed(2)),
+      exposurePct: accountBalance > 0 ? parseFloat(((totalMaxLoss / accountBalance) * 100).toFixed(2)) : 0,
+      unprotectedPositions: exposure.filter(e => !e.hasStop).length,
       openCount: openPositions.length,
       maxPositions: strategy?.maxPositions || 3,
       positions: exposure,
     });
   });
 
-  // ── Flatten all positions ───────────────────────────────────────────────────
+  // ── Flatten all positions (emergency) ───────────────────────────────────────
   app.post("/api/portfolio/flatten", async (req: Request, res: Response) => {
-    const userId = (req.session as any)?.userId || DEMO_USER_ID;
-    const prices = await fetchLivePrices().catch(() => ({})) as Record<string, { bid: number }>;
-    const openPositions = await storage.getOpenPositions(userId);
-    for (const p of openPositions) {
-      const closePrice = prices[p.symbol]?.bid || p.currentPrice || p.entryPrice;
-      const diff = p.type === "BUY" ? closePrice - p.entryPrice : p.entryPrice - closePrice;
-      const profit = diff * (p.symbol === "XAUUSD" ? 1 : 10) * (p.size || 0.1) / (p.symbol.includes("JPY") ? 0.01 : p.symbol === "XAUUSD" ? 1 : 0.0001);
-      await storage.closePosition(p.id, closePrice, parseFloat(profit.toFixed(2)));
-    }
-    await storage.createNotification({ userId, type: "trade", title: "All Positions Closed", message: `Emergency flatten: ${openPositions.length} position(s) closed.`, read: false });
-    res.json({ closed: openPositions.length });
+    const userId = uid(req);
+    const result = await closeAllFor(userId);
+    await storage.createNotification({
+      userId, type: "trade", title: "Emergency flatten",
+      message: `${result.closed} position(s) closed.${result.failed.length ? ` ${result.failed.length} could not be closed: ${result.failed.map(f => f.symbol).join(", ")}.` : ""}`,
+      read: false,
+    });
+    res.json(result);
   });
 
   // ── Leaderboard ─────────────────────────────────────────────────────────────
@@ -2034,14 +2080,15 @@ Respond ONLY with this JSON:
     }
   });
 
-  // Get a trader's public strategy (for copy trading)
+  // A trader's public strategy settings (for copy trading). Account size is private.
   app.get("/api/leaderboard/:userId/strategy", async (req: Request, res: Response) => {
     try {
       const { userId } = req.params;
       const strategy = await storage.getActiveStrategy(userId);
       if (!strategy) return res.status(404).json({ message: "No active strategy found for this trader." });
       const user = await storage.getUser(userId);
-      res.json({ ...strategy, username: user?.username });
+      const { accountSize: _private, ...shareable } = strategy;
+      res.json({ ...shareable, username: user?.username });
     } catch (e: any) {
       res.status(500).json({ message: e.message });
     }
@@ -2049,13 +2096,14 @@ Respond ONLY with this JSON:
 
   // Copy another trader's strategy
   app.post("/api/strategy/copy", async (req: Request, res: Response) => {
-    const myUserId = (req.session as any)?.userId || DEMO_USER_ID;
+    const myUserId = uid(req);
     const { fromUserId } = req.body;
     if (!fromUserId) return res.status(400).json({ message: "fromUserId required" });
     try {
       const sourceStrategy = await storage.getActiveStrategy(fromUserId);
       if (!sourceStrategy) return res.status(404).json({ message: "No active strategy to copy." });
       const sourceUser = await storage.getUser(fromUserId);
+      const myAccountSize = (await storage.getActiveStrategy(myUserId))?.accountSize ?? 10000;
       await storage.deactivateAllStrategies(myUserId);
       const copied = await storage.createStrategy({
         userId: myUserId,
@@ -2066,7 +2114,7 @@ Respond ONLY with this JSON:
         riskPercent: sourceStrategy.riskPercent,
         maxPositions: sourceStrategy.maxPositions,
         rrRatio: sourceStrategy.rrRatio,
-        accountSize: sourceStrategy.accountSize,
+        accountSize: myAccountSize, // sizing follows your account, not theirs
         isActive: true,
       });
       res.json({ success: true, strategy: copied });
@@ -2075,20 +2123,39 @@ Respond ONLY with this JSON:
     }
   });
 
-  // ── Backtest (Monte Carlo simulation) ───────────────────────────────────────
-  app.post("/api/backtest", async (req: Request, res: Response) => {
-    const {
-      winRate = 55,
-      riskPercent = 2,
-      rrRatio = 2.5,
-      numTrades = 100,
-      numPaths = 50,
-      startBalance = 10000,
-    } = req.body;
+  // ── Historical backtest on real candles ────────────────────────────────────
+  const historicalSchema = z.object({
+    symbol: z.string().regex(/^[A-Z]{6}$/),
+    timeframe: z.enum(["15min", "1h", "4h", "1day"]),
+    periods: z.number().int().min(200).max(4900).default(2000),
+    strategy: z.enum(["trend_follow", "mean_revert", "breakout"]),
+    riskPercent: z.number().min(0.1).max(5),
+    rrRatio: z.number().min(0.5).max(10),
+  });
+  app.post("/api/backtest/historical", async (req: Request, res: Response) => {
+    try {
+      const key = process.env.TWELVE_DATA_API_KEY;
+      if (!key) return res.status(503).json({ message: "Market data is not configured (TWELVE_DATA_API_KEY)." });
+      const p = historicalSchema.parse(req.body);
+      const settings = await storage.getUserSettings(uid(req));
+      const result = await runBacktest({ ...p, accountSize: Number(settings?.brokerBalance) || 10000, apiKey: key });
+      res.json({ ...result, trades: result.trades.slice(-200) });
+    } catch (e: any) {
+      res.status(400).json({ message: e.message });
+    }
+  });
 
-    const wr = Math.min(99, Math.max(1, winRate)) / 100;
-    const risk = Math.min(10, Math.max(0.1, riskPercent)) / 100;
-    const rr = Math.min(10, Math.max(0.1, rrRatio));
+  // ── Risk-of-ruin simulator (Monte Carlo on an assumed win rate) ─────────────
+  app.post("/api/backtest", async (req: Request, res: Response) => {
+    const { winRate = 55, riskPercent = 2, rrRatio = 2.5 } = req.body;
+
+    const wr = Math.min(99, Math.max(1, Number(winRate) || 55)) / 100;
+    const risk = Math.min(10, Math.max(0.1, Number(riskPercent) || 2)) / 100;
+    const rr = Math.min(10, Math.max(0.1, Number(rrRatio) || 2.5));
+    // Bounded so one request can't tie up the server
+    const numTrades = Math.min(1000, Math.max(10, Math.floor(Number(req.body.numTrades) || 100)));
+    const numPaths = Math.min(1000, Math.max(10, Math.floor(Number(req.body.numPaths) || 200)));
+    const startBalance = Math.min(1e9, Math.max(100, Number(req.body.startBalance) || 10000));
 
     const paths: number[][] = [];
     const finalBalances: number[] = [];
@@ -2154,13 +2221,13 @@ Respond ONLY with this JSON:
 
   // --- Watchlist ---
   app.get("/api/watchlist", async (req: Request, res: Response) => {
-    const userId = (req.session as any)?.userId || DEMO_USER_ID;
+    const userId = uid(req);
     const items = await storage.getWatchlist(userId);
     res.json(items.map(i => i.symbol));
   });
 
   app.post("/api/watchlist", async (req: Request, res: Response) => {
-    const userId = (req.session as any)?.userId || DEMO_USER_ID;
+    const userId = uid(req);
     const { symbols } = req.body;
     if (!Array.isArray(symbols)) return res.status(400).json({ message: "symbols must be an array" });
     await storage.setWatchlist(userId, symbols);
@@ -2168,7 +2235,7 @@ Respond ONLY with this JSON:
   });
 
   app.post("/api/watchlist/add", async (req: Request, res: Response) => {
-    const userId = (req.session as any)?.userId || DEMO_USER_ID;
+    const userId = uid(req);
     const { symbol } = req.body;
     if (!symbol) return res.status(400).json({ message: "symbol required" });
     const item = await storage.addToWatchlist({ userId, symbol: symbol.toUpperCase() });
@@ -2176,21 +2243,21 @@ Respond ONLY with this JSON:
   });
 
   app.delete("/api/watchlist/:symbol", async (req: Request, res: Response) => {
-    const userId = (req.session as any)?.userId || DEMO_USER_ID;
+    const userId = uid(req);
     await storage.removeFromWatchlist(userId, req.params.symbol.toUpperCase());
     res.json({ ok: true });
   });
 
   // --- Trade Journal ---
   app.get("/api/journal", async (req: Request, res: Response) => {
-    const userId = (req.session as any)?.userId || DEMO_USER_ID;
+    const userId = uid(req);
     const entries = await storage.getTradeJournal(userId);
     res.json(entries);
   });
 
   app.post("/api/journal", async (req: Request, res: Response) => {
     try {
-      const userId = (req.session as any)?.userId || DEMO_USER_ID;
+      const userId = uid(req);
       const data = insertTradeJournalSchema.parse({ ...req.body, userId });
       const entry = await storage.createTradeJournalEntry(data);
       res.json(entry);
@@ -2201,7 +2268,7 @@ Respond ONLY with this JSON:
 
   app.patch("/api/journal/:id", async (req: Request, res: Response) => {
     try {
-      const userId = (req.session as any)?.userId || DEMO_USER_ID;
+      const userId = uid(req);
       const entry = await storage.updateTradeJournalEntry(req.params.id, userId, req.body);
       if (!entry) return res.status(404).json({ message: "Not found" });
       res.json(entry);
@@ -2211,7 +2278,7 @@ Respond ONLY with this JSON:
   });
 
   app.delete("/api/journal/:id", async (req: Request, res: Response) => {
-    const userId = (req.session as any)?.userId || DEMO_USER_ID;
+    const userId = uid(req);
     await storage.deleteTradeJournalEntry(req.params.id, userId);
     res.json({ ok: true });
   });
@@ -2219,7 +2286,7 @@ Respond ONLY with this JSON:
   // ── CSV Export ─────────────────────────────────────────────────────────────
 
   app.get("/api/export/journal", async (req: Request, res: Response) => {
-    const userId = (req.session as any)?.userId || DEMO_USER_ID;
+    const userId = uid(req);
     const entries = await storage.getTradeJournal(userId);
     const header = "Date,Symbol,Direction,Entry,Exit,Lots,SL,TP,Pips,P&L,Emotion,Notes,Mode,Outcome";
     const rows = entries.map(e => [
@@ -2236,7 +2303,7 @@ Respond ONLY with this JSON:
   });
 
   app.get("/api/export/analytics", async (req: Request, res: Response) => {
-    const userId = (req.session as any)?.userId || DEMO_USER_ID;
+    const userId = uid(req);
     const history = await storage.getClosedPositions(userId);
     const header = "Date,Symbol,Type,Size,EntryPrice,ExitPrice,P&L,AISignal";
     const rows = history.map(p => [
@@ -2267,29 +2334,31 @@ Respond ONLY with this JSON:
 
   app.post("/api/webhook/tradingview", async (req: Request, res: Response) => {
     try {
-      const { token, action, symbol, price, sl, tp, message } = req.body;
-      if (!token || !action || !symbol) {
+      const { token, action, symbol, price, sl, tp, message } = req.body ?? {};
+      if (typeof token !== "string" || token.length < 32 || !action || !symbol) {
         return res.status(400).json({ message: "token, action, symbol required" });
       }
-      // Find user by webhook token (stored in userSettings.tradingViewUser as token)
-      const allUsers = await storage.getAllUsers();
-      let targetUserId: string | null = null;
-      for (const u of allUsers) {
-        const s = await storage.getUserSettings(u.id);
-        if (s?.tradingViewUser === token) { targetUserId = u.id; break; }
+      // Token is a random per-user secret from Settings → TradingView (indexed lookup)
+      const owner = await storage.getUserSettingsByWebhookToken(token);
+      if (!owner) return res.status(401).json({ message: "Invalid webhook token" });
+      const act = String(action).toUpperCase();
+      if (!["BUY", "SELL", "STRONG BUY", "STRONG SELL"].includes(act)) {
+        return res.status(400).json({ message: "action must be BUY or SELL" });
       }
-      if (!targetUserId) return res.status(401).json({ message: "Invalid webhook token" });
+      const sym = String(symbol).toUpperCase().replace("/", "");
+      if (!/^[A-Z0-9]{3,10}$/.test(sym)) return res.status(400).json({ message: "Invalid symbol" });
       const signal = await storage.createSignal({
-        userId: targetUserId,
-        symbol: symbol.toUpperCase().replace("/", ""),
-        action: String(action).toUpperCase(),
-        confidence: 80,
-        reasoning: message || `TradingView alert: ${action} ${symbol} at ${price}`,
+        userId: owner.userId,
+        symbol: sym,
+        action: act,
+        confidence: 0, // external alert — no model confidence
+        reasoning: String(message || `TradingView alert: ${act} ${sym}${price ? ` at ${price}` : ""}`).slice(0, 500),
         entryPrice: parseFloat(price) || null,
         stopLoss: sl ? parseFloat(sl) : null,
         takeProfit: tp ? parseFloat(tp) : null,
         size: 0.1,
         status: "pending",
+        source: "tradingview",
       });
       res.json({ ok: true, signalId: signal.id });
     } catch (e: any) {
@@ -2324,7 +2393,7 @@ Respond ONLY with this JSON:
   });
 
   app.post("/api/marketplace/:id/vote", async (req: Request, res: Response) => {
-    const userId = (req.session as any)?.userId || DEMO_USER_ID;
+    const userId = uid(req);
     await storage.voteMarketplace(req.params.id, userId);
     const listing = await storage.getMarketplaceListing(req.params.id);
     res.json({ upvotes: listing?.upvotes ?? 0 });
@@ -2332,7 +2401,7 @@ Respond ONLY with this JSON:
 
   app.post("/api/marketplace/:id/copy", async (req: Request, res: Response) => {
     try {
-      const userId = (req.session as any)?.userId || DEMO_USER_ID;
+      const userId = uid(req);
       const listing = await storage.getMarketplaceListing(req.params.id);
       if (!listing) return res.status(404).json({ message: "Not found" });
       await storage.deactivateAllStrategies(userId);
@@ -2405,7 +2474,7 @@ Respond ONLY with this JSON:
   // ── Email notifications ────────────────────────────────────────────────────
 
   app.post("/api/email/test", async (req: Request, res: Response) => {
-    const userId = (req.session as any)?.userId || DEMO_USER_ID;
+    const userId = uid(req);
     const settings = await storage.getUserSettings(userId);
     const to = req.body.email || settings?.emailAddress;
     if (!to) return res.status(400).json({ message: "No email address provided" });
@@ -2414,6 +2483,7 @@ Respond ONLY with this JSON:
   });
 
   app.post("/api/email/verify-smtp", async (req: Request, res: Response) => {
+    if (!isSafeOutboundHost(req.body?.smtpHost)) return res.json({ ok: false, message: "That SMTP host is not allowed." });
     const result = await verifySmtp(req.body);
     res.json(result);
   });
@@ -2422,17 +2492,16 @@ Respond ONLY with this JSON:
 
   app.post("/api/broker/mt5/test", async (req: Request, res: Response) => {
     const { bridgeUrl } = req.body;
-    if (!bridgeUrl) return res.status(400).json({ message: "bridgeUrl required" });
+    if (!bridgeUrl || !/^https?:\/\//i.test(bridgeUrl) || !isSafeOutboundHost(bridgeUrl)) return res.status(400).json({ message: "bridgeUrl must be a public http(s) URL" });
     const result = await testMT5Bridge(bridgeUrl);
     res.json(result);
   });
 
   // ── AI Knowledge Base ───────────────────────────────────────────────────────
 
-  app.get("/api/ai/knowledge", async (_req: Request, res: Response) => {
+  app.get("/api/ai/knowledge", async (req: Request, res: Response) => {
     try {
-      const knowledge = await getAllKnowledge();
-      res.json(knowledge);
+      res.json(await getAllKnowledge(uid(req)));
     } catch (e: any) {
       res.status(500).json({ message: e.message });
     }
@@ -2440,10 +2509,8 @@ Respond ONLY with this JSON:
 
   app.get("/api/ai/reviews", async (req: Request, res: Response) => {
     try {
-      const userId = (req.session as any)?.userId || DEMO_USER_ID;
-      const limit = parseInt(req.query.limit as string) || 20;
-      const reviews = await getTradeReviews(userId, limit);
-      res.json(reviews);
+      const limit = Math.min(100, parseInt(req.query.limit as string) || 20);
+      res.json(await getTradeReviews(uid(req), limit));
     } catch (e: any) {
       res.status(500).json({ message: e.message });
     }
@@ -2452,7 +2519,7 @@ Respond ONLY with this JSON:
   app.get("/api/ai/reviews/:positionId", async (req: Request, res: Response) => {
     try {
       const review = await getTradeReviewByPosition(req.params.positionId);
-      if (!review) return res.status(404).json({ message: "No review yet" });
+      if (!review || review.userId !== uid(req)) return res.status(404).json({ message: "No review yet" });
       res.json(review);
     } catch (e: any) {
       res.status(500).json({ message: e.message });
@@ -2461,23 +2528,26 @@ Respond ONLY with this JSON:
 
   app.post("/api/ai/reviews/:positionId/generate", async (req: Request, res: Response) => {
     try {
-      const userId = (req.session as any)?.userId || DEMO_USER_ID;
+      const userId = uid(req);
       const position = await storage.getPositionById(req.params.positionId);
-      if (!position) return res.status(404).json({ message: "Position not found" });
+      if (!position || position.userId !== userId) return res.status(404).json({ message: "Position not found" });
       if (position.status !== "closed") return res.status(400).json({ message: "Position must be closed" });
+      const side = normalizeSide(position.type);
       generateTradeReview({
         userId,
         positionId: position.id,
         symbol: position.symbol,
-        direction: position.type === "buy" ? "long" : "short",
+        direction: side === "BUY" ? "long" : "short",
         entryPrice: position.entryPrice,
         exitPrice: position.currentPrice ?? position.entryPrice,
         stopLoss: position.stopLoss,
         takeProfit: position.takeProfit,
         profit: position.profit,
+        lots: position.size,
         openedAt: position.openedAt ? new Date(position.openedAt) : new Date(),
         closedAt: position.closedAt ? new Date(position.closedAt) : new Date(),
         aiSignal: position.aiSignal,
+        exitReason: "manual",
       }).catch(() => {});
       res.json({ message: "Review generation started" });
     } catch (e: any) {
@@ -2487,7 +2557,7 @@ Respond ONLY with this JSON:
 
   app.get("/api/ai/weekly-report", async (req: Request, res: Response) => {
     try {
-      const userId = (req.session as any)?.userId || DEMO_USER_ID;
+      const userId = uid(req);
       const report = await generateWeeklyReport(userId);
       res.json({ report: report ?? "No trades this week to analyze." });
     } catch (e: any) {
@@ -2499,7 +2569,7 @@ Respond ONLY with this JSON:
 
   app.get("/api/risk/dashboard", async (req: Request, res: Response) => {
     try {
-      const userId = (req.session as any)?.userId || DEMO_USER_ID;
+      const userId = uid(req);
       const dashboard = await getRiskDashboard(userId);
       res.json(dashboard);
     } catch (e: any) {
@@ -2509,8 +2579,19 @@ Respond ONLY with this JSON:
 
   app.put("/api/risk/limits", async (req: Request, res: Response) => {
     try {
-      const userId = (req.session as any)?.userId || DEMO_USER_ID;
-      const updated = await updateRiskLimits(userId, req.body);
+      const userId = uid(req);
+      const num = (v: any, min: number, max: number) => v == null || v === "" ? undefined : Math.min(max, Math.max(min, Number(v)));
+      const b = req.body ?? {};
+      // Pausing/resuming goes through /api/risk/resume; only limits are editable here
+      const updated = await updateRiskLimits(userId, {
+        dailyLossLimit: num(b.dailyLossLimit, 1, 1e9),
+        maxDrawdownLimit: num(b.maxDrawdownLimit, 1, 1e9),
+        maxOpenPositions: num(b.maxOpenPositions, 1, 50),
+        maxPositionSize: num(b.maxPositionSize, 0.01, 50),
+        trailingStopEnabled: typeof b.trailingStopEnabled === "boolean" ? b.trailingStopEnabled : undefined,
+        trailingStopPips: num(b.trailingStopPips, 1, 5000),
+        weeklyReportEnabled: typeof b.weeklyReportEnabled === "boolean" ? b.weeklyReportEnabled : undefined,
+      });
       res.json(updated);
     } catch (e: any) {
       res.status(500).json({ message: e.message });
@@ -2519,7 +2600,7 @@ Respond ONLY with this JSON:
 
   app.post("/api/risk/resume", async (req: Request, res: Response) => {
     try {
-      const userId = (req.session as any)?.userId || DEMO_USER_ID;
+      const userId = uid(req);
       await resumeTrading(userId);
       res.json({ ok: true });
     } catch (e: any) {
@@ -2543,7 +2624,7 @@ Respond ONLY with this JSON:
     try {
       const { title, summary, currencies } = req.body;
       if (!title) return res.status(400).json({ message: "title required" });
-      const userId = (req.session as any)?.userId || DEMO_USER_ID;
+      const userId = uid(req);
       const userSettings = await storage.getUserSettings(userId).catch(() => null);
       const provider = userSettings?.selectedAiProvider || "none";
       const apiKey = provider === "openai" ? userSettings?.openaiApiKey
@@ -2572,10 +2653,12 @@ Respond in JSON only (no markdown):
   "urgency": "high" | "medium" | "low"
 }`;
 
+      // callAiProvider already returns parsed JSON (or null)
       const raw = await callAiProvider(provider, userSettings || {}, prompt);
-      const jsonMatch = /\{[\s\S]*\}/.exec(raw);
-      const result = jsonMatch ? JSON.parse(jsonMatch[0]) : { sentiment: "neutral", score: 0, impact: raw, pairs: [], urgency: "low" };
-      res.json(result);
+      const ok = raw && ["bullish", "bearish", "neutral"].includes(String(raw.sentiment).toLowerCase());
+      res.json(ok
+        ? { ...raw, sentiment: String(raw.sentiment).toLowerCase(), score: Math.max(-100, Math.min(100, Number(raw.score) || 0)) }
+        : { sentiment: "neutral", score: 0, impact: "The AI did not return a usable reading for this headline.", pairs: [], urgency: "low" });
     } catch (e: any) {
       res.status(500).json({ message: e.message });
     }
@@ -2584,84 +2667,46 @@ Respond in JSON only (no markdown):
   // ─── AI Chart / Market Analysis ─────────────────────────────────────────────
   app.post("/api/analysis/ai-read", async (req: Request, res: Response) => {
     try {
-      const { symbol, timeframe } = req.body;
-      if (!symbol) return res.status(400).json({ message: "symbol required" });
-      const userId = (req.session as any)?.userId || DEMO_USER_ID;
-      const userSettings = await storage.getUserSettings(userId).catch(() => null);
+      const symbol = String(req.body?.symbol ?? "").toUpperCase();
+      const timeframe = String(req.body?.timeframe ?? "H1");
+      if (!/^[A-Z0-9]{3,10}$/.test(symbol)) return res.status(400).json({ message: "symbol required" });
+      const userId = uid(req);
+      const userSettings = await storage.getUserSettings(userId).catch(() => undefined);
       const provider = userSettings?.selectedAiProvider || "none";
-      const apiKey = provider === "openai" ? userSettings?.openaiApiKey
-        : provider === "anthropic" ? userSettings?.anthropicApiKey
-        : provider === "gemini" ? userSettings?.geminiApiKey
-        : provider === "groq" ? userSettings?.groqApiKey
-        : provider === "xai" ? userSettings?.xaiApiKey
-        : provider === "perplexity" ? userSettings?.perplexityApiKey
-        : null;
+      if (provider === "none") return res.status(400).json({ message: "No AI provider configured. Connect one in Settings." });
 
-      if (!apiKey || provider === "none") {
-        return res.status(400).json({ message: "No AI provider configured. Connect one in Settings." });
-      }
+      // Real data only: live quote + computed H1/H4/D1 indicators from candles
+      const quote = (await fetchLivePrices().catch(() => ({} as Record<string, LivePrice>)))[symbol];
+      if (!isTradablePrice(quote)) return res.status(503).json({ message: `No live price for ${symbol} right now.` });
+      const tfs = await getMarketContext(symbol);
+      const dp = priceDecimals(symbol);
+      const f = (n: number) => n.toFixed(dp);
+      const data = tfs.map(t =>
+        `${t.label}: close ${f(t.close)}, EMA20 ${f(t.ema20)}, EMA50 ${f(t.ema50)}, RSI14 ${t.rsi14.toFixed(1)}, ATR14 ${f(t.atr14)}, trend ${t.trend}, ` +
+        `20-bar range ${f(t.rangeLow)}–${f(t.rangeHigh)}, swing highs ${t.swingHighs.map(f).join(", ") || "—"}, swing lows ${t.swingLows.map(f).join(", ") || "—"}`
+      ).join("\n");
 
-      // Get current price data for context (synchronous)
-      const prices = getMarketPrices();
-      const priceEntry = (prices as any)?.[symbol];
-      const currentPrice = typeof priceEntry === "object" ? priceEntry?.bid ?? priceEntry?.ask : priceEntry ?? null;
+      const strategy = await storage.getActiveStrategy(userId).catch(() => undefined);
+      const strategyContext = strategy ? `\nTrader profile: ${strategy.style ?? "unset"} style, risk ${strategy.riskPercent ?? 1}% per trade.` : "";
 
-      // Fetch candle data if Twelve Data key is available
-      let candleContext = "";
-      try {
-        const tdKey = process.env.TWELVE_DATA_API_KEY || "";
-        if (tdKey) {
-          const candleData = await fetchCandlesForAI(symbol, tdKey);
-          const h1Candles = candleData.h1 ?? [];
-          if (h1Candles.length > 0) {
-            const recent = h1Candles.slice(-12);
-            const highs = recent.map((c) => c.high).filter(Boolean);
-            const lows = recent.map((c) => c.low).filter(Boolean);
-            const closes = recent.map((c) => c.close).filter(Boolean);
-            const d1 = candleData.d1 ?? [];
-            candleContext = `\nRecent H1 price data (last ${recent.length} candles):
-- High range: ${Math.min(...highs).toFixed(5)} – ${Math.max(...highs).toFixed(5)}
-- Low range: ${Math.min(...lows).toFixed(5)} – ${Math.max(...lows).toFixed(5)}
-- Most recent H1 close: ${closes[closes.length - 1]?.toFixed(5) ?? "N/A"}
-- Current live price: ${currentPrice ? Number(currentPrice).toFixed(5) : "N/A"}
-${d1.length > 0 ? `- Daily trend: ${d1[d1.length - 1]?.close > d1[0]?.close ? "Bullish" : "Bearish"} (${d1.length} days)` : ""}`;
-          }
-        } else if (currentPrice) {
-          candleContext = `\nCurrent live price: ${Number(currentPrice).toFixed(5)}`;
-        }
-      } catch { /* candle data is enrichment only */ }
+      const prompt = `Analyse ${symbol} for a trader focused on the ${timeframe} timeframe.
 
-      const strategy = await storage.getActiveStrategy(userId).catch(() => null);
-      const strategyContext = strategy ? `\nTrader profile: ${strategy.style ?? "unset"} style, risk ${strategy.riskPercent ?? 2}% per trade.` : "";
+DATA (the only information you have)
+Live bid/ask: ${f(quote.bid)} / ${f(quote.ask)}
+${data}${strategyContext}
 
-      const { callAiProviderMarkdown } = await import("./ai-engine");
-      const prompt = `Provide a comprehensive market analysis for ${symbol} on the ${timeframe || "H1"} timeframe.
-${candleContext}${strategyContext}
+Sections:
+## Market Bias — Bullish / Bearish / Neutral, citing the numbers above
+## Key Levels — use the listed swing points and ranges; do not invent others
+## Structure — what the EMAs, RSI and ranges show across timeframes, and where they disagree
+## Trade Setup — entry zone, stop (beyond a listed level or ≥0.5× H1 ATR), target, R:R; or what to wait for
+## What This Doesn't Know — news, events and order flow are not in the data; name the risks the trader should check
+## Confidence — High / Medium / Low and why
 
-Your analysis MUST include ALL of the following sections. Be specific with exact price levels where possible.
+Under 500 words.`;
 
-## Market Bias
-State your directional bias (Bullish / Bearish / Neutral) and why. One clear paragraph.
-
-## Key Price Levels
-List 2–3 support levels and 2–3 resistance levels with specific prices. Format as a bullet list.
-
-## Pattern Detection
-Identify any chart patterns, candlestick formations, order blocks, fair value gaps, or structural levels visible. Be specific.
-
-## Trade Setup
-If a valid setup exists: entry zone, stop loss level, take profit target, R:R ratio. If no setup: explain what to wait for.
-
-## Risk & Catalysts
-List upcoming macro events or risks that could affect this pair in the next 24–48 hours.
-
-## Confidence
-Rate your analysis confidence: High / Medium / Low, and explain briefly why.
-
-Keep the full analysis under 600 words. Be direct and actionable — this trader will use your analysis to decide whether to take a trade.`;
-
-      const analysis = await callAiProviderMarkdown(provider, userSettings || {}, prompt);
-      res.json({ symbol, timeframe: timeframe || "H1", analysis, currentPrice, timestamp: new Date().toISOString() });
+      const analysis = await callAiProviderMarkdown(provider, userSettings as any, prompt);
+      res.json({ symbol, timeframe, analysis, currentPrice: quote.bid, timestamp: new Date().toISOString() });
     } catch (e: any) {
       res.status(500).json({ message: e.message });
     }

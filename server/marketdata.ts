@@ -45,6 +45,13 @@ const FALLBACK: Record<string, number> = {
   AUDUSD: 0.6521, USDCAD: 1.3612, XAUUSD: 2345.50, GBPJPY: 188.74,
 };
 
+const MAX_PRICE_AGE_MS = 120_000;
+
+/** True only for a real quote fetched within the last 2 minutes — never a hardcoded fallback. */
+export function isTradablePrice(p: LivePrice | undefined | null): p is LivePrice {
+  return !!p && p.source !== "simulated" && Date.now() - p.timestamp < MAX_PRICE_AGE_MS;
+}
+
 function spread(sym: string) {
   if (sym === "XAUUSD") return 0.30;
   if (sym === "USDJPY" || sym === "GBPJPY") return 0.02;

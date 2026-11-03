@@ -29,8 +29,23 @@ const pgPool = new Pool({
   connectionTimeoutMillis: 10000,
 });
 
+if (isProduction && !process.env.SESSION_SECRET) {
+  throw new Error("SESSION_SECRET must be set in production — refusing to start with a default secret.");
+}
+
+// Behind a hosting proxy (Railway/Render/Fly) so secure cookies work over HTTPS
+if (isProduction) app.set("trust proxy", 1);
+
+app.use((_req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "SAMEORIGIN");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  if (isProduction) res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  next();
+});
+
 app.use(session({
-  secret: process.env.SESSION_SECRET || "tradeai-secret-key-2024",
+  secret: process.env.SESSION_SECRET || "dev-only-insecure-secret",
   resave: false,
   saveUninitialized: false,
   store: new PgSession({
@@ -38,11 +53,12 @@ app.use(session({
     tableName: "session",
     createTableIfMissing: true,
   }),
-  cookie: { secure: false, maxAge: 86400000 * 30 },
+  cookie: { secure: isProduction, httpOnly: true, sameSite: "lax", maxAge: 86400000 * 30 },
 }));
 
 app.use(
   express.json({
+    limit: "200kb",
     verify: (req, _res, buf) => {
       req.rawBody = buf;
     },
@@ -61,28 +77,14 @@ export function log(message: string, source = "express") {
   console.log(`${formattedTime} [${source}] ${message}`);
 }
 
+// Request log: method, path, status, timing only — response bodies can contain
+// account data and must never be written to logs
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
-  let capturedJsonResponse: Record<string, any> | undefined = undefined;
-
-  const originalResJson = res.json;
-  res.json = function (bodyJson, ...args) {
-    capturedJsonResponse = bodyJson;
-    return originalResJson.apply(res, [bodyJson, ...args]);
-  };
-
   res.on("finish", () => {
-    const duration = Date.now() - start;
-    if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
-      }
-      log(logLine);
-    }
+    if (path.startsWith("/api")) log(`${req.method} ${path} ${res.statusCode} in ${Date.now() - start}ms`);
   });
-
   next();
 });
 
@@ -98,9 +100,9 @@ app.use((req, res, next) => {
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-    res.status(status).json({ message });
-    throw err;
+    const message = status < 500 ? (err.message || "Bad request") : "Internal Server Error";
+    console.error("[Error]", err);
+    if (!res.headersSent) res.status(status).json({ message });
   });
 
   if (process.env.NODE_ENV === "production") {

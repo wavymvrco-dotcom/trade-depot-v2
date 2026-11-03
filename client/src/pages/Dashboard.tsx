@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { Position } from "@shared/schema";
+import { calcProfit, priceDecimals } from "@shared/pips";
 import { format } from "date-fns";
 import {
   BarChart2, BookOpen, ShoppingCart, TrendingUp, TrendingDown,
@@ -44,16 +45,13 @@ interface StrategyAdvice {
 
 type MobileView = "chart" | "positions" | "orders";
 
-// Compute live floating P&L for a position using live bid/ask
+// Live floating P&L using the same math the server books trades with
 function computeLivePL(position: Position, liveBid: number | undefined, liveAsk: number | undefined): number {
   if (!liveBid && !liveAsk) return position.profit ?? 0;
-  const entry = position.entryPrice ?? 0;
-  const dir = position.type === "buy" || position.type === "BUY" ? 1 : -1;
-  // For BUY: use bid (we sell at bid to close); for SELL: use ask (we buy at ask to close)
-  const closePrice = dir === 1 ? (liveBid ?? liveAsk ?? entry) : (liveAsk ?? liveBid ?? entry);
-  const size = position.size ?? 0.1;
-  const rawPL = (closePrice - entry) * dir * size * 100000;
-  return parseFloat(rawPL.toFixed(2));
+  const isBuy = position.type.toUpperCase().includes("BUY");
+  // A long closes at the bid, a short at the ask
+  const closePrice = isBuy ? (liveBid ?? liveAsk!) : (liveAsk ?? liveBid!);
+  return calcProfit(isBuy ? "BUY" : "SELL", position.entryPrice, closePrice, position.symbol, position.size ?? 0.1);
 }
 
 export default function Dashboard() {
@@ -80,7 +78,8 @@ export default function Dashboard() {
   const positions = openPositions as Position[];
   const history = closedPositions as Position[];
   const settings = (settingsData as any)?.settings ?? (settingsData as any) ?? null;
-  const accountBalance = settings?.accountBalance ?? null;
+  const realizedPL = (closedPositions as Position[]).reduce((s, p) => s + (p.profit ?? 0), 0);
+  const accountBalance = settings?.brokerBalance != null ? Number(settings.brokerBalance) + realizedPL : null;
   const brokerConnected = settings?.brokerConnected ?? false;
   const brokerType = settings?.brokerType ?? "demo";
 
@@ -148,26 +147,27 @@ export default function Dashboard() {
   }, [toast]);
 
   const handleClosePosition = useCallback(async (position: Position) => {
-    const lp = livePrices[position.symbol];
-    const dir = position.type === "buy" || position.type === "BUY" ? 1 : -1;
-    // Use live price if available, else fallback to simulated
-    const closePrice = lp
-      ? (dir === 1 ? (lp.bid ?? lp.ask) : (lp.ask ?? lp.bid))
-      : (position.entryPrice || 0) + (Math.random() - 0.5) * 0.002;
-    const profit = livePLMap[position.id] ?? parseFloat(
-      (((closePrice - (position.entryPrice || 0)) * dir) * (position.size || 0.1) * 100000).toFixed(2)
-    );
-    await closePosition.mutateAsync({ id: position.id, closePrice, profit });
-    toast({
-      title: "Position Closed",
-      description: `${position.symbol} ${position.type.toUpperCase()} closed. P/L: ${profit >= 0 ? "+" : ""}$${profit.toFixed(2)}`,
-      className: profit >= 0 ? "border-green-500/50" : "border-destructive/50",
-    });
-  }, [closePosition, livePrices, livePLMap, toast]);
+    try {
+      // The server closes at its own live quote and computes P&L
+      const closed: Position = await closePosition.mutateAsync({ id: position.id });
+      const profit = closed?.profit ?? 0;
+      toast({
+        title: "Position Closed",
+        description: `${position.symbol} ${position.type.toUpperCase()} closed at ${closed?.currentPrice}. P/L: ${profit >= 0 ? "+" : ""}$${profit.toFixed(2)}`,
+        className: profit >= 0 ? "border-green-500/50" : "border-destructive/50",
+      });
+    } catch (e: any) {
+      toast({ title: "Close failed", description: e.message, variant: "destructive" });
+    }
+  }, [closePosition, toast]);
 
-  const handleGenerateSignal = useCallback(() => {
-    generateSignal.mutate(activeTab.symbol);
-    toast({ title: "Analyzing market…", description: `Generating AI signal for ${activeTab.symbol}` });
+  const handleGenerateSignal = useCallback(async () => {
+    try {
+      const result: any = await generateSignal.mutateAsync(activeTab.symbol);
+      if (result?.noTrade) toast({ title: "No trade", description: result.message });
+    } catch (e: any) {
+      toast({ title: "Signal unavailable", description: e.message, variant: "destructive" });
+    }
   }, [generateSignal, activeTab.symbol, toast]);
 
   // ── Sub-component: P&L stat strip ────────────────────────────────────────
@@ -202,7 +202,7 @@ export default function Dashboard() {
       </div>
       {brokerConnected && (
         <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-green-500/10 text-green-400 border border-green-500/20 text-[10px] font-semibold">
-          {brokerType.toUpperCase()} Live
+          {brokerType === "demo" ? "DEMO (paper)" : `${brokerType.toUpperCase()} connected`}
         </div>
       )}
     </div>
@@ -222,15 +222,15 @@ export default function Dashboard() {
           </span>
         </TableCell>
         <TableCell>{(p.size ?? 0).toFixed(2)}</TableCell>
-        <TableCell>{(p.entryPrice ?? 0).toFixed(5)}</TableCell>
+        <TableCell>{(p.entryPrice ?? 0).toFixed(priceDecimals(p.symbol))}</TableCell>
         <TableCell className="text-muted-foreground">
-          {livePrice ? (isBuy ? livePrice.bid : livePrice.ask)?.toFixed(5) : "—"}
+          {livePrice ? (isBuy ? livePrice.bid : livePrice.ask)?.toFixed(priceDecimals(p.symbol)) : "—"}
         </TableCell>
         <TableCell className={cn("font-bold", lp >= 0 ? "text-green-500" : "text-red-500")}>
           {lp >= 0 ? "+" : ""}${lp.toFixed(2)}
         </TableCell>
-        <TableCell className="text-red-400">{p.stopLoss?.toFixed(5) || "—"}</TableCell>
-        <TableCell className="text-green-400">{p.takeProfit?.toFixed(5) || "—"}</TableCell>
+        <TableCell className="text-red-400">{p.stopLoss?.toFixed(priceDecimals(p.symbol)) || "—"}</TableCell>
+        <TableCell className="text-green-400">{p.takeProfit?.toFixed(priceDecimals(p.symbol)) || "—"}</TableCell>
         <TableCell>
           <Button
             size="sm" variant="outline"
@@ -398,7 +398,7 @@ export default function Dashboard() {
                             <TableCell className="font-bold">{p.symbol}</TableCell>
                             <TableCell><span className={cn("font-bold", p.type === "BUY" || p.type === "buy" ? "text-green-500" : "text-red-500")}>{p.type.toUpperCase()}</span></TableCell>
                             <TableCell>{(p.size ?? 0).toFixed(2)}</TableCell>
-                            <TableCell>{(p.entryPrice ?? 0).toFixed(5)}</TableCell>
+                            <TableCell>{(p.entryPrice ?? 0).toFixed(priceDecimals(p.symbol))}</TableCell>
                             <TableCell className="text-muted-foreground">{p.closedAt ? format(new Date(p.closedAt), "MM/dd HH:mm") : "—"}</TableCell>
                             <TableCell className={cn("font-bold", (p.profit ?? 0) >= 0 ? "text-green-500" : "text-red-500")}>
                               {(p.profit ?? 0) >= 0 ? "+" : ""}${(p.profit ?? 0).toFixed(2)}
@@ -507,16 +507,16 @@ export default function Dashboard() {
                               {p.aiSignal && <span className="text-[10px] px-1 py-0.5 rounded bg-primary/10 text-primary font-mono">AI</span>}
                             </div>
                             <div className="text-[10px] text-muted-foreground font-mono">
-                              Entry: {(p.entryPrice ?? 0).toFixed(5)} · {(p.size ?? 0).toFixed(2)} lots
+                              Entry: {(p.entryPrice ?? 0).toFixed(priceDecimals(p.symbol))} · {(p.size ?? 0).toFixed(2)} lots
                             </div>
                             {livePrice && (
                               <div className="text-[10px] font-mono text-foreground/70">
-                                Live: {(isBuy ? livePrice.bid : livePrice.ask)?.toFixed(5)}
+                                Live: {(isBuy ? livePrice.bid : livePrice.ask)?.toFixed(priceDecimals(p.symbol))}
                               </div>
                             )}
                             <div className="text-[10px] font-mono mt-0.5 flex gap-2">
-                              <span className="text-red-400">SL: {p.stopLoss?.toFixed(5) || "—"}</span>
-                              <span className="text-green-400">TP: {p.takeProfit?.toFixed(5) || "—"}</span>
+                              <span className="text-red-400">SL: {p.stopLoss?.toFixed(priceDecimals(p.symbol)) || "—"}</span>
+                              <span className="text-green-400">TP: {p.takeProfit?.toFixed(priceDecimals(p.symbol)) || "—"}</span>
                             </div>
                           </div>
                           <div className="flex flex-col items-end gap-2 shrink-0">
@@ -594,7 +594,7 @@ export default function Dashboard() {
           {(() => {
             const totalRealized = history.reduce((s, p) => s + (p.profit ?? 0), 0);
             const equity = (accountBalance ?? 10000) + totalLivePL;
-            const startBalance = 10000;
+            const startBalance = Number(settings?.brokerBalance ?? 10000);
             const wins = history.filter(p => (p.profit ?? 0) > 0);
             const losses = history.filter(p => (p.profit ?? 0) <= 0);
             const winRate = history.length > 0 ? Math.round((wins.length / history.length) * 100) : 0;

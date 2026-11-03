@@ -55,19 +55,16 @@ export function StrategyPanel({
       id: `${symbol}-${Date.now()}`,
     };
 
-    // Simulate AI reasoning
-    const advice: StrategyAdvice = {
-      approved: Math.random() > 0.3,
-      confidence: Math.floor(Math.random() * 30 + 70),
+    // This panel only saves chart notes — it does not evaluate them. Say so
+    // rather than showing an approval that nothing computed.
+    onStrategyAdvice({
+      approved: true,
+      confidence: 0,
       reasoning: [
-        "Checked strategy syntax and risk parameters",
-        "Verified compatibility with current market conditions",
-        "Analyzed historical backtest data",
+        "Saved to this chart tab.",
+        "Not evaluated — run it through Strategy → Analyze or Analytics → Backtest to test it.",
       ],
-      suggestion: canCopyFrom ? `Consider copying from ${canCopyFrom.name}?` : undefined,
-    };
-
-    onStrategyAdvice(advice);
+    });
     onStrategySet(strategy);
 
     // Reset form
@@ -86,18 +83,6 @@ export function StrategyPanel({
       name: `${canCopyFrom.name} (Copied)`,
     };
 
-    // Simulate quick approval for copied strategy
-    const advice: StrategyAdvice = {
-      approved: true,
-      confidence: 92,
-      reasoning: [
-        "Strategy already proven on similar chart",
-        "Market conditions align with previous setup",
-        "Risk parameters compatible",
-      ],
-    };
-
-    onStrategyAdvice(advice);
     onStrategySet(copiedStrategy);
   };
 

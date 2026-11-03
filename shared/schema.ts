@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, real, boolean, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, real, boolean, timestamp, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -65,7 +65,8 @@ export const positions = pgTable("positions", {
   closedAt: timestamp("closed_at"),
   aiSignal: boolean("ai_signal").notNull().default(false),
   brokerTradeId: text("broker_trade_id"),
-});
+  signalId: varchar("signal_id"),
+}, (t) => [index("positions_user_status_idx").on(t.userId, t.status)]);
 
 export const insertPositionSchema = createInsertSchema(positions).omit({
   id: true,
@@ -93,9 +94,11 @@ export const aiSignals = pgTable("ai_signals", {
   outcomeAt: timestamp("outcome_at"),
   aiProvider: text("ai_provider"),   // which provider generated this signal
   htfBias: text("htf_bias"),         // 'bullish' | 'bearish' | 'neutral'
+  source: text("source").default("ai"), // 'ai' | 'rules' | 'tradingview'
+  knowledgeIds: text("knowledge_ids").array(), // lessons injected into the prompt — credited/blamed on outcome
   executedAt: timestamp("executed_at"),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (t) => [index("ai_signals_user_status_idx").on(t.userId, t.status)]);
 
 export const insertAiSignalSchema = createInsertSchema(aiSignals).omit({
   id: true,
@@ -121,6 +124,7 @@ export const userSettings = pgTable("user_settings", {
   brokerBalance: real("broker_balance").default(10000),
   // TradingView
   tradingViewUser: text("tradingview_user"),
+  webhookToken: text("webhook_token").unique(), // random secret for /api/webhook/tradingview
   tradingviewConnected: boolean("tradingview_connected").default(false),
   tradingviewConnectedAt: timestamp("tradingview_connected_at"),
   // AI Providers
@@ -276,6 +280,7 @@ export const marketplaceVotes = pgTable("marketplace_votes", {
 // Each row is a "lesson" — either seeded expert knowledge or learned from real trades
 export const aiKnowledge = pgTable("ai_knowledge", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id"), // null = shared seed lesson; set = learned from this user's trades
   category: text("category").notNull(), // 'entry_pattern' | 'risk_rule' | 'pair_behavior' | 'psychology' | 'learned'
   title: text("title").notNull(),
   content: text("content").notNull(),

@@ -1,9 +1,13 @@
 import { storage } from "./storage";
 import { generateAiSignal } from "./ai-engine";
-import { fetchLivePrices } from "./marketdata";
-import { placeOandaOrder, closeOandaTrade } from "./brokers/oanda";
+import { fetchLivePrices, isTradablePrice, type LivePrice } from "./marketdata";
+import { getOandaTradeState } from "./brokers/oanda";
 import { sendPushToUser } from "./push";
-import { calcProfit as sharedCalcProfit, getSymbolConfig } from "./pips";
+import { calcProfit, getSymbolConfig, priceDecimals } from "@shared/pips";
+import { getRiskLimits } from "./risk";
+import { openTrade, closeTrade, normalizeSide, sizeForRisk } from "./execution";
+import { recordLessonOutcome } from "./ai-knowledge";
+import type { Position } from "@shared/schema";
 
 let running = false;
 
@@ -24,135 +28,108 @@ function isSessionOpen(open: number, close: number, utcHour: number): boolean {
 
 function isInActiveSessions(sessions: string[] | null | undefined): boolean {
   if (!sessions || sessions.length === 0) return true; // no restriction = always trade
-  const utcHour = new Date().getUTCHours() + new Date().getUTCMinutes() / 60;
+  const now = new Date();
+  const utcHour = now.getUTCHours() + now.getUTCMinutes() / 60;
   return sessions.some(s => {
     const hours = SESSION_UTC_HOURS[s.toLowerCase()];
     return hours ? isSessionOpen(hours[0], hours[1], utcHour) : false;
   });
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function calcProfit(type: string, entryPrice: number, exitPrice: number, symbol: string, lots: number) {
-  return sharedCalcProfit(type, entryPrice, exitPrice, symbol, lots);
+/** FX is closed from Friday 21:00 UTC to Sunday 21:00 UTC. */
+export function isFxMarketOpen(d = new Date()): boolean {
+  const day = d.getUTCDay(), h = d.getUTCHours();
+  if (day === 6) return false;
+  if (day === 5 && h >= 21) return false;
+  if (day === 0 && h < 21) return false;
+  return true;
 }
 
-// ─── Smart Trailing Stop ──────────────────────────────────────────────────────
-// Once price moves TRAIL_TRIGGER_PCT of the TP distance in our favour,
-// ratchet the SL to lock in at least TRAIL_LOCK_PCT of that distance.
+// ─── Trailing Stop ────────────────────────────────────────────────────────────
+// Once price has moved TRAIL_TRIGGER of the way to target, ratchet the stop to
+// trail price by the user's configured distance — never loosening it.
 
-const TRAIL_TRIGGER_PCT = 0.40;
-const TRAIL_LOCK_PCT    = 0.15;
+const TRAIL_TRIGGER = 0.40;
 
-async function applyTrailingStop(
-  position: { id: string; type: string; symbol: string; entryPrice: number; stopLoss: number | null; takeProfit: number | null },
-  currentPrice: number
-) {
-  const { type, entryPrice, stopLoss, takeProfit } = position;
-  if (!takeProfit) return null;
+function trailedStop(pos: Position, side: "BUY" | "SELL", price: number, trailPips: number): number | null {
+  if (!pos.takeProfit) return null;
+  const tpDistance = Math.abs(pos.takeProfit - pos.entryPrice);
+  const progress = side === "BUY" ? price - pos.entryPrice : pos.entryPrice - price;
+  if (tpDistance === 0 || progress < tpDistance * TRAIL_TRIGGER) return null;
 
-  const tpDistance = Math.abs(takeProfit - entryPrice);
-  if (tpDistance === 0) return null;
-
-  const currentProfit = type === "BUY"
-    ? currentPrice - entryPrice
-    : entryPrice - currentPrice;
-
-  if (currentProfit < tpDistance * TRAIL_TRIGGER_PCT) return null;
-
-  const lockDistance = tpDistance * TRAIL_LOCK_PCT;
-  const newSL = type === "BUY"
-    ? entryPrice + lockDistance
-    : entryPrice - lockDistance;
-
-  const trailedSL = type === "BUY"
-    ? currentPrice - lockDistance
-    : currentPrice + lockDistance;
-
-  const bestNewSL = type === "BUY"
-    ? Math.max(newSL, trailedSL)
-    : Math.min(newSL, trailedSL);
-
-  const shouldUpdate = stopLoss == null
-    || (type === "BUY"  && bestNewSL > stopLoss)
-    || (type === "SELL" && bestNewSL < stopLoss);
-
-  if (!shouldUpdate) return null;
-  return parseFloat(bestNewSL.toFixed(5));
+  const trail = trailPips * getSymbolConfig(pos.symbol).pipSize;
+  const candidate = side === "BUY" ? price - trail : price + trail;
+  const improves = pos.stopLoss == null || (side === "BUY" ? candidate > pos.stopLoss : candidate < pos.stopLoss);
+  return improves ? parseFloat(candidate.toFixed(priceDecimals(pos.symbol))) : null;
 }
 
-// ─── Check open positions: trail SL, then close on TP/SL hit ─────────────────
+// ─── Open positions: mark to market, reconcile broker, trail, SL/TP ──────────
 
-async function checkOpenPositions(prices: Record<string, { bid: number; ask: number }>) {
+async function notifyClosed(pos: Position, reason: string, price: number, profit: number) {
+  const emoji = reason === "Take Profit" ? "✅" : reason === "Stop Loss" ? "🛑" : "🔁";
+  await storage.createNotification({
+    userId: pos.userId, type: "trade",
+    title: `${emoji} Position Closed — ${reason}`,
+    message: `${pos.symbol} ${normalizeSide(pos.type)} closed at ${price}. P&L: ${profit >= 0 ? "+" : ""}$${profit.toFixed(2)}`,
+    read: false,
+  });
+  await sendPushToUser(pos.userId, {
+    title: `${emoji} ${pos.symbol} Closed — ${reason}`,
+    body: `${normalizeSide(pos.type)} closed @ ${price} · P&L: ${profit >= 0 ? "+" : ""}$${profit.toFixed(2)}`,
+  }).catch(() => {});
+}
+
+async function checkOpenPositions(prices: Record<string, LivePrice>) {
   const allUsers = await storage.getAllUsers();
 
   for (const user of allUsers) {
     const openPositions = await storage.getOpenPositions(user.id);
     if (openPositions.length === 0) continue;
-
     const settings = await storage.getUserSettings(user.id);
+    const limits = await getRiskLimits(user.id);
 
     for (const pos of openPositions) {
-      const price = prices[pos.symbol];
-      if (!price) continue;
+      try {
+        const side = normalizeSide(pos.type);
 
-      const currentPrice = pos.type === "BUY" ? price.bid : price.ask;
-      const lots = pos.size || 0.1;
-
-      // ── 1. Apply trailing stop ─────────────────────────────────────────────
-      const newSL = await applyTrailingStop(
-        { id: pos.id, type: pos.type, symbol: pos.symbol, entryPrice: pos.entryPrice, stopLoss: pos.stopLoss ?? null, takeProfit: pos.takeProfit ?? null },
-        currentPrice
-      );
-      const floatingProfit = calcProfit(pos.type, pos.entryPrice, currentPrice, pos.symbol, lots);
-      if (newSL !== null) {
-        await storage.updatePosition(pos.id, { stopLoss: newSL, currentPrice, profit: floatingProfit });
-        console.log(`[AutoTrade] Trailing SL → ${newSL} for ${pos.symbol} (${pos.type})`);
-      } else {
-        await storage.updatePosition(pos.id, { currentPrice, profit: floatingProfit });
-      }
-
-      const sl = newSL ?? pos.stopLoss;
-      const tp = pos.takeProfit;
-
-      // ── 2. Check TP/SL ────────────────────────────────────────────────────
-      const tpHit = tp != null && (
-        (pos.type === "BUY"  && currentPrice >= tp) ||
-        (pos.type === "SELL" && currentPrice <= tp)
-      );
-      const slHit = sl != null && (
-        (pos.type === "BUY"  && currentPrice <= sl) ||
-        (pos.type === "SELL" && currentPrice >= sl)
-      );
-
-      if (tpHit || slHit) {
-        const profit = calcProfit(pos.type, pos.entryPrice, currentPrice, pos.symbol, lots);
-
-        // ── Close on real broker if applicable ────────────────────────────
-        if (settings?.brokerType === "oanda" && settings.brokerApiKey && settings.brokerAccountId && (pos as any).brokerTradeId) {
-          closeOandaTrade(settings.brokerApiKey, settings.brokerAccountId, (pos as any).brokerTradeId)
-            .catch(e => console.warn(`[OANDA] Failed to close trade on broker: ${e.message}`));
+        // Broker-held trades: the broker's own SL/TP orders are authoritative.
+        // If the broker already closed it, record the broker's real fill price.
+        if (pos.brokerTradeId?.startsWith("oanda:") && settings?.brokerApiKey && settings.brokerAccountId) {
+          const state = await getOandaTradeState(settings.brokerApiKey, settings.brokerAccountId, settings.brokerServer, pos.brokerTradeId);
+          if (state?.state === "CLOSED") {
+            const exit = state.closePrice ?? pos.currentPrice ?? pos.entryPrice;
+            const closed = await closeTrade({ ...pos, brokerTradeId: null }, { price: exit, reason: "broker" });
+            if (closed) await notifyClosed(pos, "Closed at broker", exit, closed.profit);
+            continue;
+          }
         }
 
-        await storage.closePosition(pos.id, currentPrice, profit);
+        const quote = prices[pos.symbol];
+        // Never trail or close on fallback or stale quotes
+        if (!isTradablePrice(quote)) continue;
+        const price = side === "BUY" ? quote.bid : quote.ask;
 
-        const reason = tpHit ? "Take Profit" : "Stop Loss";
-        const emoji  = tpHit ? "✅" : (newSL !== null ? "🔒" : "🛑");
-
-        await storage.createNotification({
-          userId: user.id,
-          type: "trade",
-          title: `${emoji} Position Closed — ${reason}`,
-          message: `${pos.symbol} ${pos.type} closed at ${currentPrice.toFixed(5)}. P&L: ${profit >= 0 ? "+" : ""}$${profit}`,
-          read: false,
+        let stopLoss = pos.stopLoss;
+        // Trailing only for locally-managed positions; broker stops aren't modified here
+        if (limits.trailingStopEnabled && !pos.brokerTradeId) {
+          const newSL = trailedStop(pos, side, price, limits.trailingStopPips ?? 20);
+          if (newSL != null) stopLoss = newSL;
+        }
+        await storage.updatePosition(pos.id, {
+          stopLoss, currentPrice: price,
+          profit: calcProfit(side, pos.entryPrice, price, pos.symbol, pos.size),
         });
 
-        await sendPushToUser(user.id, {
-          title: `${emoji} ${pos.symbol} Closed — ${reason}`,
-          body: `${pos.type} closed @ ${currentPrice.toFixed(5)} · P&L: ${profit >= 0 ? "+" : ""}$${profit.toFixed(2)}`,
-        }).catch(() => {});
+        if (pos.brokerTradeId) continue; // broker enforces its own SL/TP
 
-        console.log(`[AutoTrade] ${reason} → closed ${pos.symbol} ${pos.type} @ ${currentPrice} | P&L: $${profit} | user#${user.id}`);
+        const tpHit = pos.takeProfit != null && (side === "BUY" ? price >= pos.takeProfit : price <= pos.takeProfit);
+        const slHit = stopLoss != null && (side === "BUY" ? price <= stopLoss : price >= stopLoss);
+        if (tpHit || slHit) {
+          const closed = await closeTrade({ ...pos, stopLoss }, { price, reason: tpHit ? "take_profit" : "stop_loss" });
+          if (closed) await notifyClosed(pos, tpHit ? "Take Profit" : "Stop Loss", price, closed.profit);
+        }
+      } catch (e: any) {
+        console.warn(`[AutoTrade] Position ${pos.id} check failed: ${e.message}`);
       }
     }
   }
@@ -164,14 +141,11 @@ async function pushSignalNotification(userId: string) {
   try {
     const sig = await storage.getPendingSignal(userId);
     if (!sig) return;
-    const dir     = sig.action.includes("BUY") ? "📈 BUY" : "📉 SELL";
-    const conf    = sig.confidence ? ` · ${sig.confidence}% confidence` : "";
-    const sl      = sig.stopLoss   ? ` | SL ${Number(sig.stopLoss).toFixed(5)}` : "";
-    const tp      = sig.takeProfit ? ` | TP ${Number(sig.takeProfit).toFixed(5)}` : "";
-    const snippet = sig.reasoning  ? `\n${sig.reasoning.substring(0, 90)}…` : "";
+    const dir = sig.action.includes("BUY") ? "📈 BUY" : "📉 SELL";
+    const conf = sig.confidence ? ` · ${sig.confidence}% model confidence` : "";
     await sendPushToUser(userId, {
       title: `${dir} Signal — ${sig.symbol}${conf}`,
-      body:  `Entry ${Number(sig.entryPrice).toFixed(5)}${sl}${tp}${snippet}\nTap to review in TradeAI.`,
+      body: `Entry ~${sig.entryPrice} | SL ${sig.stopLoss ?? "—"} | TP ${sig.takeProfit ?? "—"}\nTap to review in TradeAI.`,
     });
   } catch (e: any) {
     console.warn("[Signal Push] Failed:", e.message);
@@ -182,34 +156,34 @@ async function runAutoTradePass() {
   if (running) return;
   running = true;
   try {
-    const prices = await fetchLivePrices().catch(() => ({})) as Record<string, { bid: number; ask: number }>;
+    const prices = await fetchLivePrices().catch(() => ({} as Record<string, LivePrice>));
 
     await checkOpenPositions(prices);
+
+    if (!isFxMarketOpen()) return;
 
     const allUsers = await storage.getAllUsers();
     for (const user of allUsers) {
       try {
+        if (user.isBanned) continue;
         const settings = await storage.getUserSettings(user.id);
         if (!settings?.autoTrade) continue;
 
         // ── Session / off-hours check ───────────────────────────────────────
-        const activeSessions = (settings as any).activeSessions as string[] | null;
-        const offHoursBehavior = (settings as any).offHoursBehavior as string || "pause";
-        const offHoursRiskReduction = (settings as any).offHoursRiskReduction as number ?? 50;
-        const inSession = isInActiveSessions(activeSessions);
+        const offHoursBehavior = settings.offHoursBehavior || "pause";
+        const offHoursRiskReduction = settings.offHoursRiskReduction ?? 50;
+        const inSession = isInActiveSessions(settings.activeSessions);
 
         if (!inSession) {
-          if (offHoursBehavior === "pause") {
-            console.log(`[AutoTrade] Off-hours — paused for user#${user.id}`);
-            continue;
-          }
+          if (offHoursBehavior === "pause") continue;
           if (offHoursBehavior === "alert_only") {
-            await generateAiSignal(user.id).catch(() => {});
-            console.log(`[AutoTrade] Off-hours alert-only signal generated for user#${user.id}`);
-            await pushSignalNotification(user.id);
+            if (!(await storage.getPendingSignal(user.id))) {
+              await generateAiSignal(user.id).catch(() => {});
+              await pushSignalNotification(user.id);
+            }
             continue;
           }
-          // ai_autonomous: proceed but reduce risk below
+          // ai_autonomous: proceed with reduced risk below
         }
 
         const strategy = await storage.getActiveStrategy(user.id);
@@ -219,82 +193,61 @@ async function runAutoTradePass() {
         if (openPositions.length >= (strategy.maxPositions || 3)) continue;
 
         const pending = await storage.getPendingSignal(user.id);
-        if (pending) {
-          await storage.updateSignalStatus(pending.id, "executed");
-          const entryPrice = pending.entryPrice || prices[pending.symbol]?.bid || 1;
-          const accountSize = (strategy as any).accountSize || 10000;
-          let riskPct = parseFloat(String(strategy.riskPercent || "2")) || 2;
-          // Apply off-hours risk reduction for AI Autonomous mode
-          if (!inSession && offHoursBehavior === "ai_autonomous") {
-            riskPct = riskPct * (1 - offHoursRiskReduction / 100);
-            riskPct = Math.max(0.01, riskPct);
-          }
-          const slPips = pending.stopLoss
-            ? Math.round(Math.abs(entryPrice - pending.stopLoss) / getSymbolConfig(pending.symbol).pipSize)
-            : getSymbolConfig(pending.symbol).minSL * 2;
-          const riskUSD = accountSize * (riskPct / 100);
-          const lots = parseFloat(Math.max(0.01, Math.min(10, riskUSD / Math.max(1, slPips * getSymbolConfig(pending.symbol).pipValue))).toFixed(2));
-          const tradeType = pending.action.includes("BUY") ? "BUY" : "SELL";
-
-          // ── Execute on real broker if OANDA ────────────────────────────────
-          let brokerTradeId: string | null = null;
-          if (settings?.brokerType === "oanda" && settings.brokerApiKey && settings.brokerAccountId) {
-            brokerTradeId = await placeOandaOrder(
-              settings.brokerApiKey,
-              settings.brokerAccountId,
-              pending.symbol,
-              tradeType,
-              lots,
-              pending.stopLoss,
-              pending.takeProfit
-            ).catch(e => { console.warn(`[OANDA] Order failed: ${e.message}`); return null; });
-          }
-
-          await storage.createPosition({
-            userId: user.id,
-            symbol: pending.symbol,
-            type: tradeType,
-            size: lots,
-            entryPrice,
-            currentPrice: entryPrice,
-            stopLoss: pending.stopLoss || null,
-            takeProfit: pending.takeProfit || null,
-            profit: 0,
-            status: "open",
-            aiSignal: true,
-            brokerTradeId,
-          } as any);
-
-          const brokerNote = brokerTradeId
-            ? ` Sent to OANDA (Trade #${brokerTradeId}).`
-            : settings?.brokerType === "oanda" ? " (OANDA order failed — DB only)." : "";
-
-          await storage.createNotification({
-            userId: user.id,
-            type: "trade",
-            title: `⚡ Auto-Trade: ${pending.action} ${pending.symbol}`,
-            message: `Entered at ${entryPrice}. SL: ${pending.stopLoss ?? "none"} | TP: ${pending.takeProfit ?? "none"}.${brokerNote} ${pending.reasoning.substring(0, 60)}…`,
-            read: false,
-          });
-
-          // ── Live push notification with full trade detail ──────────────────
-          const dir       = pending.action.includes("BUY") ? "📈" : "📉";
-          const confLabel = pending.confidence ? ` · ${pending.confidence}% confidence` : "";
-          const slLabel   = pending.stopLoss   ? ` | SL ${Number(pending.stopLoss).toFixed(5)}` : "";
-          const tpLabel   = pending.takeProfit ? ` | TP ${Number(pending.takeProfit).toFixed(5)}` : "";
-          const brokerTag = brokerTradeId ? " ✓ OANDA" : settings?.brokerType === "paper" ? " (Paper)" : "";
-          const snippet   = pending.reasoning ? `\n${pending.reasoning.substring(0, 90)}…` : "";
-          await sendPushToUser(user.id, {
-            title: `${dir} EXECUTED — ${pending.action} ${pending.symbol}${confLabel}`,
-            body:  `Entry ${Number(entryPrice).toFixed(5)}${slLabel}${tpLabel} · ${lots} lot${lots !== 1 ? "s" : ""}${brokerTag}${snippet}`,
-          }).catch(() => {});
-
-          console.log(`[AutoTrade] Opened ${pending.action} ${pending.symbol} @ ${entryPrice} for user#${user.id}${brokerTradeId ? " [OANDA confirmed]" : ""}`);
-        } else {
-          await generateAiSignal(user.id);
-          console.log(`[AutoTrade] New signal generated for user#${user.id}`);
-          await pushSignalNotification(user.id);
+        if (!pending) {
+          const created = await generateAiSignal(user.id).catch((e: any) => { console.warn(`[AutoTrade] Signal error: ${e.message}`); return null; });
+          if (created) await pushSignalNotification(user.id);
+          continue;
         }
+
+        // Signals older than 15 minutes are stale — the market has moved on
+        if (pending.createdAt && Date.now() - new Date(pending.createdAt).getTime() > 15 * 60_000) {
+          await storage.updateSignalStatus(pending.id, "expired");
+          continue;
+        }
+        // Rule-based fallback signals are advisory only — never auto-executed
+        if (pending.source === "rules") continue;
+
+        // Size from the real account balance when the broker reports it
+        const accountSize = Number(settings.brokerBalance) || strategy.accountSize || 10000;
+        let riskPct = Number(strategy.riskPercent) || 1;
+        if (!inSession && offHoursBehavior === "ai_autonomous") {
+          riskPct = Math.max(0.01, riskPct * (1 - offHoursRiskReduction / 100));
+        }
+        const ref = pending.entryPrice ?? prices[pending.symbol]?.bid ?? 0;
+        if (!pending.stopLoss || !ref) {
+          await storage.updateSignalStatus(pending.id, "dismissed");
+          continue; // never auto-trade without a stop
+        }
+        const lots = sizeForRisk(pending.symbol, accountSize, riskPct, Math.abs(ref - pending.stopLoss));
+
+        const result = await openTrade({
+          userId: user.id, symbol: pending.symbol, side: normalizeSide(pending.action), lots,
+          stopLoss: pending.stopLoss, takeProfit: pending.takeProfit, aiSignal: true, signalId: pending.id,
+        });
+
+        if (!result.ok) {
+          await storage.updateSignalStatus(pending.id, "dismissed");
+          await storage.createNotification({
+            userId: user.id, type: "trade",
+            title: `⛔ Auto-Trade blocked: ${pending.action} ${pending.symbol}`,
+            message: result.reason, read: false,
+          });
+          console.log(`[AutoTrade] Blocked ${pending.symbol} for user#${user.id}: ${result.reason}`);
+          continue;
+        }
+
+        await storage.updateSignalStatus(pending.id, "executed");
+        const p = result.position;
+        await storage.createNotification({
+          userId: user.id, type: "trade",
+          title: `⚡ Auto-Trade: ${pending.action} ${pending.symbol}`,
+          message: `Filled ${p.size} lots at ${p.entryPrice} (${result.brokerNote}). SL ${p.stopLoss ?? "none"} | TP ${p.takeProfit ?? "none"}.`,
+          read: false,
+        });
+        await sendPushToUser(user.id, {
+          title: `${pending.action.includes("BUY") ? "📈" : "📉"} EXECUTED — ${pending.action} ${pending.symbol}`,
+          body: `${p.size} lots @ ${p.entryPrice} · SL ${p.stopLoss ?? "—"} · TP ${p.takeProfit ?? "—"} · ${result.brokerNote}`,
+        }).catch(() => {});
       } catch (e: any) {
         console.warn(`[AutoTrade] Error for user ${user.id}: ${e.message}`);
       }
@@ -317,11 +270,12 @@ export async function checkPriceAlerts() {
     const alerts = await storage.getUntriggeredAlerts();
     if (alerts.length === 0) return;
 
-    const prices = await fetchLivePrices().catch(() => ({})) as Record<string, { bid: number }>;
+    const prices = await fetchLivePrices().catch(() => ({} as Record<string, LivePrice>));
 
     for (const alert of alerts) {
-      const currentPrice = prices[alert.symbol]?.bid;
-      if (!currentPrice) continue;
+      const quote = prices[alert.symbol];
+      if (!isTradablePrice(quote)) continue;
+      const currentPrice = quote.bid;
 
       const triggered =
         (alert.direction === "above" && currentPrice >= alert.targetPrice) ||
@@ -333,10 +287,10 @@ export async function checkPriceAlerts() {
           userId: alert.userId,
           type: "alert",
           title: `🔔 Price Alert: ${alert.symbol}`,
-          message: `${alert.symbol} hit ${currentPrice.toFixed(5)} — your alert of ${alert.targetPrice} (${alert.direction}) was reached. ${alert.label || ""}`,
+          message: `${alert.symbol} hit ${currentPrice} — your alert of ${alert.targetPrice} (${alert.direction}) was reached. ${alert.label || ""}`,
           read: false,
         });
-        console.log(`[Alert] ${alert.symbol} triggered @ ${currentPrice} for user ${alert.userId}`);
+        await sendPushToUser(alert.userId, { title: `🔔 ${alert.symbol} ${alert.direction} ${alert.targetPrice}`, body: `Now ${currentPrice}` }).catch(() => {});
       }
     }
   } catch (e: any) {
@@ -350,28 +304,26 @@ export function startAlertWatcher() {
 }
 
 // ─── Signal Outcome Watcher ────────────────────────────────────────────────────
-// Monitors active AI signals. Marks TP_HIT / SL_HIT / EXPIRED when resolved.
-// Feeds outcomes back into the AI learning system.
+// Tracks every AI signal (taken or not) against live prices so the model's real
+// hit rate can be measured. Outcomes credit only the lessons that signal used.
 
 async function checkSignalOutcomes() {
   try {
     const activeSignals = await storage.getActiveSignalsAllUsers();
     if (activeSignals.length === 0) return;
 
-    const prices = await fetchLivePrices().catch(() => ({})) as Record<string, { bid: number; ask: number }>;
+    const prices = await fetchLivePrices().catch(() => ({} as Record<string, LivePrice>));
     const now = Date.now();
 
     for (const sig of activeSignals) {
-      const price = prices[sig.symbol];
-      if (!price || !sig.entryPrice || !sig.stopLoss || !sig.takeProfit) continue;
+      const quote = prices[sig.symbol];
+      if (!isTradablePrice(quote) || !sig.entryPrice || !sig.stopLoss || !sig.takeProfit) continue;
 
-      const isLong = sig.action === "BUY" || sig.action === "STRONG BUY";
-      const currentPrice = isLong ? price.bid : price.ask;
+      const isLong = sig.action.includes("BUY");
+      const currentPrice = isLong ? quote.bid : quote.ask;
 
-      // Determine outcome
       let outcome: string | null = null;
       let outcomePrice = currentPrice;
-
       if (isLong) {
         if (currentPrice >= sig.takeProfit) { outcome = "TP_HIT"; outcomePrice = sig.takeProfit; }
         else if (currentPrice <= sig.stopLoss) { outcome = "SL_HIT"; outcomePrice = sig.stopLoss; }
@@ -380,55 +332,24 @@ async function checkSignalOutcomes() {
         else if (currentPrice >= sig.stopLoss) { outcome = "SL_HIT"; outcomePrice = sig.stopLoss; }
       }
 
-      // Expire signals older than 48h with no resolution
       const ageHours = (now - new Date(sig.createdAt!).getTime()) / 3_600_000;
       if (!outcome && ageHours > 48) outcome = "EXPIRED";
+      if (!outcome) continue;
 
-      if (outcome) {
-        await storage.resolveSignalOutcome(sig.id, outcome, outcomePrice);
+      await storage.resolveSignalOutcome(sig.id, outcome, outcomePrice);
 
-        // Notify the user
-        await storage.createNotification({
-          userId: sig.userId,
-          type: "signal_outcome",
-          title: `${outcome === "TP_HIT" ? "✅" : outcome === "SL_HIT" ? "❌" : "⏰"} Signal ${outcome.replace("_", " ")}: ${sig.symbol}`,
-          message: `${sig.action} ${sig.symbol} signal (${sig.confidence}% confidence) ${outcome === "TP_HIT" ? "hit take profit" : outcome === "SL_HIT" ? "hit stop loss" : "expired"} at ${outcomePrice}.`,
-          read: false,
-        });
-
-        // Feed outcome into AI knowledge for self-improvement
-        if (outcome !== "EXPIRED") {
-          try {
-            const { db: kdb } = await import("./db");
-            const { aiKnowledge } = await import("@shared/schema");
-            const { eq } = await import("drizzle-orm");
-            const isWin = outcome === "TP_HIT";
-
-            // Reinforce: update confidence of existing relevant knowledge
-            const lessons = await kdb.select().from(aiKnowledge)
-              .where(eq(aiKnowledge.isActive, true));
-            for (const lesson of lessons) {
-              if (!lesson.pairs || lesson.pairs.length === 0 || lesson.pairs.includes(sig.symbol)) {
-                const newSuccess = lesson.successCount + (isWin ? 1 : 0);
-                const newFailure = lesson.failureCount + (isWin ? 0 : 1);
-                const total = newSuccess + newFailure;
-                const newConf = Math.round(Math.max(40, Math.min(96, (newSuccess / total) * 100)));
-                await kdb.update(aiKnowledge).set({
-                  successCount: newSuccess,
-                  failureCount: newFailure,
-                  confidence: newConf,
-                  updatedAt: new Date(),
-                }).where(eq(aiKnowledge.id, lesson.id));
-              }
-            }
-          } catch (e: any) {
-            console.warn("[SignalWatcher] Knowledge update failed:", e.message);
-          }
-        }
-
-        const resultEmoji = outcome === "TP_HIT" ? "✅" : outcome === "SL_HIT" ? "❌" : "⏰";
-        console.log(`[SignalWatcher] ${resultEmoji} ${sig.symbol} ${sig.action} → ${outcome} @ ${outcomePrice}`);
+      if (outcome !== "EXPIRED" && sig.knowledgeIds?.length) {
+        await recordLessonOutcome(sig.knowledgeIds, outcome === "TP_HIT").catch(e =>
+          console.warn("[SignalWatcher] Lesson update failed:", e.message));
       }
+
+      await storage.createNotification({
+        userId: sig.userId,
+        type: "signal_outcome",
+        title: `${outcome === "TP_HIT" ? "✅" : outcome === "SL_HIT" ? "❌" : "⏰"} Signal ${outcome.replace("_", " ")}: ${sig.symbol}`,
+        message: `${sig.action} ${sig.symbol} signal ${outcome === "TP_HIT" ? "would have hit take profit" : outcome === "SL_HIT" ? "would have hit stop loss" : "expired"} at ${outcomePrice}.`,
+        read: false,
+      });
     }
   } catch (e: any) {
     console.warn("[SignalWatcher] Check failed:", e.message);
@@ -436,6 +357,6 @@ async function checkSignalOutcomes() {
 }
 
 export function startSignalOutcomeWatcher() {
-  console.log("[SignalWatcher] Signal outcome tracker started — checking every 5 min");
-  setInterval(checkSignalOutcomes, 5 * 60_000);
+  console.log("[SignalWatcher] Signal outcome tracker started — checking every 60s");
+  setInterval(checkSignalOutcomes, 60_000);
 }

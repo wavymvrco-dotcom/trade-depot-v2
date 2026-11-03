@@ -62,9 +62,9 @@ function Router() {
   const alwaysPublic = ["/landing", "/terms", "/privacy", "/forgot-password", "/reset-password", "/verify-email", "/auth"];
   const isPublic = alwaysPublic.some(p => location === p || location.startsWith(p + "?") || location.startsWith(p + "/"));
 
-  if (isPublic) return <PublicRoutes />;
-
+  // Hooks must run on every render, so the public-route early return comes after them
   useEffect(() => {
+    if (isPublic) return;
     if (loading || !user) { setOnboardingChecked(false); return; }
     const localDone = localStorage.getItem("tradeai_onboarded") === "true";
     if (localDone) { setOnboardingDone(true); setOnboardingChecked(true); return; }
@@ -72,14 +72,15 @@ function Router() {
       .then(r => r.json())
       .then(d => { setOnboardingDone(d.completed === true); setOnboardingChecked(true); })
       .catch(() => { setOnboardingDone(false); setOnboardingChecked(true); });
-  }, [user, loading]);
+  }, [user, loading, isPublic]);
 
   useEffect(() => {
-    if (loading || !user || !onboardingChecked) return;
+    if (isPublic || loading || !user || !onboardingChecked) return;
     if (!onboardingDone && location !== "/onboarding") setLocation("/onboarding");
     else if (onboardingDone && location === "/onboarding") setLocation("/");
-  }, [user, loading, onboardingChecked, onboardingDone, location]);
+  }, [user, loading, onboardingChecked, onboardingDone, location, isPublic]);
 
+  if (isPublic) return <PublicRoutes />;
   if (loading || (user && !onboardingChecked)) return <Loader />;
 
   // Unauthenticated users get the landing page at root or any app route

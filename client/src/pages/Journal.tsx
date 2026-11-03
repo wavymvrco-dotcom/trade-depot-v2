@@ -1,3 +1,4 @@
+import { calcProfit, calcPips } from "@shared/pips";
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
@@ -116,15 +117,12 @@ const emptyForm = (): FormState => ({
 
 function calcPL(entry: Partial<TradeJournal>) {
   if (!entry.exitPrice || !entry.entryPrice) return null;
-  const diff = entry.direction === "long"
-    ? (entry.exitPrice - entry.entryPrice)
-    : (entry.entryPrice - entry.exitPrice);
-  const lots = entry.lots || 0.1;
-  const isJPY = entry.symbol?.includes("JPY");
-  const pipVal = isJPY ? 0.01 : 0.0001;
-  const pips = diff / pipVal;
-  const pipValue = isJPY ? (lots * 1000) : (lots * 10);
-  return { pips: parseFloat(pips.toFixed(1)), pl: parseFloat((pips * pipValue / 100).toFixed(2)) };
+  const side = entry.direction === "long" ? "BUY" : "SELL";
+  const symbol = entry.symbol || "EURUSD";
+  return {
+    pips: calcPips(side, entry.entryPrice, entry.exitPrice, symbol),
+    pl: calcProfit(side, entry.entryPrice, entry.exitPrice, symbol, entry.lots || 0.1),
+  };
 }
 
 function MetricCard({ label, value, sub, color = "" }: { label: string; value: string; sub?: string; color?: string }) {

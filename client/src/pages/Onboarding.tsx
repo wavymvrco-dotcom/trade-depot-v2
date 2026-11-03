@@ -31,10 +31,9 @@ const AI_PROVIDERS = [
 ];
 
 const BROKER_OPTIONS = [
-  { id: "demo",        Icon: Monitor,          title: "Demo Account",    sub: "Paper Trading",       desc: "$100,000 virtual balance. No real money at risk. Perfect for getting started.",  badge: "Start Here",    badgeCls: "text-green-400 bg-green-500/10 border-green-500/25" },
+  { id: "demo",        Icon: Monitor,          title: "Demo Account",    sub: "Paper Trading",       desc: "$10,000 virtual balance. No real money at risk. Perfect for getting started.",  badge: "Start Here",    badgeCls: "text-green-400 bg-green-500/10 border-green-500/25" },
   { id: "mql5",        Icon: CandlestickChart, title: "MetaTrader 5",    sub: "Live via MQL5",       desc: "Connect your MT5 live or demo account. Credentials validated at runtime.",        badge: "Most Popular",  badgeCls: "text-blue-400 bg-blue-500/10 border-blue-500/25" },
   { id: "oanda",       Icon: Building2,        title: "OANDA",           sub: "Live via REST API",   desc: "Real-time connection verified against OANDA's API. Requires a live account.",      badge: "Verified Live", badgeCls: "text-violet-400 bg-violet-500/10 border-violet-500/25" },
-  { id: "interactive", Icon: Server,           title: "IBKR",            sub: "Interactive Brokers", desc: "Credentials saved and connected via IBKR Client Portal Gateway at launch.",        badge: "Institutional", badgeCls: "text-amber-400 bg-amber-500/10 border-amber-500/25" },
 ];
 
 const FEATURES = [
@@ -583,7 +582,7 @@ export default function Onboarding({ onComplete }: { onComplete?: () => void }) 
                     <motion.div key="demo" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                       className="p-4 bg-green-500/8 border border-green-500/25 rounded-xl">
                       <p className="font-semibold text-green-400 mb-1.5 flex items-center gap-1.5 text-sm"><Monitor className="w-4 h-4" />Paper Trading Mode</p>
-                      <p className="text-muted-foreground text-xs leading-relaxed">Starts with $100,000 virtual balance. All trades are fully simulated — zero real money at risk. You can switch to a live broker anytime from Settings.</p>
+                      <p className="text-muted-foreground text-xs leading-relaxed">Starts with $10,000 virtual balance. All trades are fully simulated — zero real money at risk. You can switch to a live broker anytime from Settings.</p>
                     </motion.div>
                   )}
 

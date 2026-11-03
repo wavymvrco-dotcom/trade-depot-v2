@@ -41,22 +41,9 @@ export function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
   const closedPL = history.reduce((s, p) => s + (p.profit || 0), 0);
   const balance = startingBalance + closedPL;
 
+  // Floating P&L as last marked by the server (updated every minute)
   const openUnrealizedPL = openPositions.reduce((s, p) => s + (p.profit || 0), 0);
-  const [equity, setEquity] = useState(balance + openUnrealizedPL);
-
-  useEffect(() => {
-    setEquity(balance + openUnrealizedPL + (Math.random() - 0.5) * 1.5);
-  }, [balance, openUnrealizedPL]);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setEquity(prev => {
-        const drift = (Math.random() - 0.49) * 2;
-        return Math.max(balance * 0.5, prev + drift);
-      });
-    }, 4000);
-    return () => clearInterval(interval);
-  }, [balance]);
+  const equity = balance + openUnrealizedPL;
 
   const wins = history.filter((p) => (p.profit || 0) > 0).length;
   const winRate = history.length > 0 ? Math.round((wins / history.length) * 100) : 0;

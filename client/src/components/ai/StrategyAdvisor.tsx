@@ -48,11 +48,13 @@ export function StrategyAdvisor({
                 )}
                 <div>
                   <h3 className="font-bold text-lg">
-                    {advice.approved ? "Strategy Approved" : "Strategy Review"}
+                    {advice.confidence > 0 ? (advice.approved ? "Strategy Approved" : "Strategy Review") : "Strategy Saved"}
                   </h3>
-                  <p className="text-xs text-muted-foreground">
-                    Confidence: <span className="font-mono font-bold">{advice.confidence}%</span>
-                  </p>
+                  {advice.confidence > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      Confidence: <span className="font-mono font-bold">{advice.confidence}%</span>
+                    </p>
+                  )}
                 </div>
               </motion.div>
 

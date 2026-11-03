@@ -14,6 +14,18 @@ import type {
   Subscription, InsertSubscription,
 } from "@shared/schema";
 import { eq, desc, and, asc, sql, lt, gt } from "drizzle-orm";
+import { encryptSecret, decryptSecret, SECRET_SETTING_FIELDS } from "./crypto";
+
+function encryptSettings<T extends Record<string, any>>(s: T): T {
+  const out: Record<string, any> = { ...s };
+  for (const f of SECRET_SETTING_FIELDS) if (f in out) out[f] = encryptSecret(out[f]);
+  return out as T;
+}
+function decryptSettings<T extends Record<string, any>>(s: T): T {
+  const out: Record<string, any> = { ...s };
+  for (const f of SECRET_SETTING_FIELDS) if (f in out) out[f] = decryptSecret(out[f]);
+  return out as T;
+}
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -204,6 +216,10 @@ export class DatabaseStorage implements IStorage {
     const [s] = await db.select().from(aiSignals).where(and(eq(aiSignals.userId, userId), eq(aiSignals.status, "pending"))).orderBy(desc(aiSignals.createdAt));
     return s;
   }
+  async getSignalForUser(id: string, userId: string) {
+    const [s] = await db.select().from(aiSignals).where(and(eq(aiSignals.id, id), eq(aiSignals.userId, userId)));
+    return s;
+  }
   async createSignal(signal: InsertAiSignal) {
     const [s] = await db.insert(aiSignals).values(signal).returning();
     return s;
@@ -262,16 +278,21 @@ export class DatabaseStorage implements IStorage {
 
   async getUserSettings(userId: string) {
     const [s] = await db.select().from(userSettings).where(eq(userSettings.userId, userId));
-    return s;
+    return s ? decryptSettings(s) : s;
+  }
+  async getUserSettingsByWebhookToken(token: string) {
+    const [s] = await db.select().from(userSettings).where(eq(userSettings.webhookToken, token));
+    return s ? decryptSettings(s) : s;
   }
   async upsertUserSettings(settings: InsertUserSettings) {
-    const existing = await this.getUserSettings(settings.userId);
+    const encrypted = encryptSettings(settings);
+    const [existing] = await db.select({ id: userSettings.id }).from(userSettings).where(eq(userSettings.userId, settings.userId));
     if (existing) {
-      const [s] = await db.update(userSettings).set({ ...settings, updatedAt: new Date() }).where(eq(userSettings.userId, settings.userId)).returning();
-      return s;
+      const [s] = await db.update(userSettings).set({ ...encrypted, updatedAt: new Date() }).where(eq(userSettings.userId, settings.userId)).returning();
+      return decryptSettings(s);
     }
-    const [s] = await db.insert(userSettings).values(settings).returning();
-    return s;
+    const [s] = await db.insert(userSettings).values(encrypted).returning();
+    return decryptSettings(s);
   }
 
   async getAlerts(userId: string) {
