@@ -72,26 +72,75 @@ function toTwelveSymbol(symbol: string) {
   return symbol.slice(0, 3) + "/" + symbol.slice(3);
 }
 
+// ─── Twelve Data access: shared rate limit + cache ───────────────────────────
+// The free plan allows 8 requests/minute. Every candle request in the app goes
+// through here, so concurrent features queue instead of tripping the limit.
+
+const RATE_PER_MIN = Number(process.env.TWELVE_DATA_RATE_PER_MIN) || 8;
+const requestTimes: number[] = [];
+let queue: Promise<void> = Promise.resolve();
+
+function rateSlot(): Promise<void> {
+  const next = queue.then(async () => {
+    for (;;) {
+      const now = Date.now();
+      while (requestTimes.length && now - requestTimes[0] > 60_000) requestTimes.shift();
+      if (requestTimes.length < RATE_PER_MIN) { requestTimes.push(now); return; }
+      await new Promise(r => setTimeout(r, 60_000 - (now - requestTimes[0]) + 250));
+    }
+  });
+  queue = next.catch(() => {});
+  return next;
+}
+
+/** How long a fetched series stays fresh — roughly a fraction of one bar. */
+function ttlFor(interval: string) {
+  if (interval === "1day") return 60 * 60_000;
+  if (interval === "4h") return 15 * 60_000;
+  if (interval === "1h") return 5 * 60_000;
+  return 2 * 60_000;
+}
+
+const candleCache = new Map<string, { at: number; size: number; data: Candle[] }>();
+const inflight = new Map<string, Promise<Candle[]>>();
+
 export async function fetchCandles(symbol: string, interval: string, outputsize: number, apiKey: string): Promise<Candle[]> {
-  const url = `${TWELVE_BASE}/time_series?symbol=${encodeURIComponent(toTwelveSymbol(symbol))}&interval=${encodeURIComponent(interval)}&outputsize=${outputsize}&apikey=${encodeURIComponent(apiKey)}&order=ASC`;
-  const res = await fetch(url, { signal: AbortSignal.timeout(15_000) });
-  if (!res.ok) throw new Error(`Candle fetch failed: HTTP ${res.status}`);
-  const data = await res.json() as any;
-  if (data.status === "error") throw new Error(`Candle fetch failed: ${data.message || "Twelve Data error"}`);
-  const values = data.values as any[];
-  if (!values?.length) throw new Error("Candle fetch failed: no data returned");
-  return values.map((v: any) => ({
-    time: v.datetime,
-    open: parseFloat(v.open),
-    high: parseFloat(v.high),
-    low: parseFloat(v.low),
-    close: parseFloat(v.close),
-    volume: v.volume ? parseFloat(v.volume) : undefined,
-  }));
+  const key = `${symbol}:${interval}`;
+  const cached = candleCache.get(key);
+  // A larger cached series also serves smaller requests (take the most recent bars)
+  if (cached && cached.size >= outputsize && Date.now() - cached.at < ttlFor(interval)) {
+    return cached.data.slice(-outputsize);
+  }
+  const flightKey = `${key}:${outputsize}`;
+  const pending = inflight.get(flightKey);
+  if (pending) return pending;
+
+  const p = (async () => {
+    await rateSlot();
+    const url = `${TWELVE_BASE}/time_series?symbol=${encodeURIComponent(toTwelveSymbol(symbol))}&interval=${encodeURIComponent(interval)}&outputsize=${outputsize}&timezone=UTC&apikey=${encodeURIComponent(apiKey)}&order=ASC`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(20_000) });
+    if (!res.ok) throw new Error(`Candle fetch failed: HTTP ${res.status}`);
+    const data = await res.json() as any;
+    if (data.status === "error") throw new Error(`Candle fetch failed: ${data.message || "Twelve Data error"}`);
+    const values = data.values as any[];
+    if (!values?.length) throw new Error("Candle fetch failed: no data returned");
+    const candles: Candle[] = values.map((v: any) => ({
+      time: v.datetime,
+      open: parseFloat(v.open),
+      high: parseFloat(v.high),
+      low: parseFloat(v.low),
+      close: parseFloat(v.close),
+      volume: v.volume ? parseFloat(v.volume) : undefined,
+    }));
+    candleCache.set(key, { at: Date.now(), size: outputsize, data: candles });
+    return candles;
+  })();
+  inflight.set(flightKey, p);
+  try { return await p; } finally { inflight.delete(flightKey); }
 }
 
 /** Typical retail costs in pips — conservative so results aren't flattering. */
-function defaultSpreadPips(symbol: string) {
+export function defaultSpreadPips(symbol: string) {
   if (symbol === "EURUSD") return 1.0;
   if (symbol === "USDJPY") return 1.2;
   if (symbol === "GBPUSD") return 1.5;

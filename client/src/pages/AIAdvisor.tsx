@@ -118,10 +118,20 @@ function SignalsTab() {
                     )}>
                       {sig.action.includes("BUY") ? <><ArrowUpRight className="w-3 h-3 inline mr-0.5" />{sig.action}</> : sig.action.includes("SELL") ? <><ArrowDownRight className="w-3 h-3 inline mr-0.5" />{sig.action}</> : <><Minus className="w-3 h-3 inline mr-0.5" />HOLD</>}
                     </div>
+                    {sig.tdciScore != null && (
+                      <span
+                        title={`TDCI ${sig.tdciScore}/100 ${sig.tdciDirection} at signal time`}
+                        className={cn("text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border shrink-0",
+                          (sig.tdciDirection === "LONG") === sig.action.includes("BUY") && sig.tdciDirection !== "NEUTRAL"
+                            ? "text-primary border-primary/30 bg-primary/10" : "text-amber-500 border-amber-500/30 bg-amber-500/10")}
+                      >
+                        TDCI {sig.tdciScore}
+                      </span>
+                    )}
                     <div className="flex-1 min-w-0">
                       {sig.confidence > 0
                         ? <ConfidenceBar value={sig.confidence} />
-                        : <span className="text-[10px] text-muted-foreground">{sig.source === "rules" ? "Rule-based (advisory)" : sig.source === "tradingview" ? "TradingView alert" : "—"}</span>}
+                        : <span className="text-[10px] text-muted-foreground">{sig.source === "rules" ? "TDCI rule signal" : sig.source === "tradingview" ? "TradingView alert" : "—"}</span>}
                       {sig.outcome && (
                         <span className={cn("text-[9px] font-semibold", sig.outcome === "TP_HIT" ? "text-green-400" : sig.outcome === "SL_HIT" ? "text-red-400" : "text-muted-foreground")}>
                           {sig.outcome.replace("_", " ")}

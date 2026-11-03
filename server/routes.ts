@@ -7,6 +7,7 @@ import { priceDecimals } from "@shared/pips";
 import { openTrade, closeTrade, normalizeSide } from "./execution";
 import { fetchLivePrices, verifyPolygonConnection, getMarketDataStatus, isTradablePrice, type LivePrice } from "./marketdata";
 import { checkCanOpenTrade } from "./trade-guard";
+import { getLiveTdci, calibrate, latestCalibration, listCalibrations, TDCI_SYMBOLS, TDCI_INTERVALS, type CalibrationResult } from "./tdci-service";
 import { SECRET_SETTING_FIELDS, randomToken } from "./crypto";
 import { calcProfit } from "./pips";
 import { fetchEconomicCalendar } from "./calendar";
@@ -553,6 +554,65 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // --- Market data status ---
   app.get("/api/market/status", (_req: Request, res: Response) => {
     res.json(getMarketDataStatus());
+  });
+
+  // ── Trade Depot Confluence Index ──────────────────────────────────────────
+  const tdciParams = z.object({
+    symbol: z.string().transform(s => s.toUpperCase()).refine(s => TDCI_SYMBOLS.includes(s), "Unsupported symbol"),
+    interval: z.enum(TDCI_INTERVALS).default("4h"),
+  });
+
+  app.get("/api/tdci/symbols", (_req: Request, res: Response) => {
+    res.json({ symbols: TDCI_SYMBOLS, intervals: TDCI_INTERVALS });
+  });
+
+  app.get("/api/tdci/calibrations", async (_req: Request, res: Response) => {
+    const rows = await listCalibrations();
+    res.json(rows.map(r => {
+      const x = r.result as CalibrationResult;
+      return {
+        symbol: r.symbol, interval: r.interval, createdAt: r.createdAt,
+        recommendedMin: x.recommendedMin, verdict: x.verdict,
+        oosAnySignalAvgR: x.outOfSample.anySignal.avgR, oosMonotonic: x.outOfSample.monotonic,
+      };
+    }));
+  });
+
+  app.get("/api/tdci/calibration/:symbol/:interval", async (req: Request, res: Response) => {
+    try {
+      const p = tdciParams.parse(req.params);
+      const row = await latestCalibration(p.symbol, p.interval);
+      if (!row) return res.status(404).json({ message: "Not calibrated yet" });
+      res.json({ ...(row.result as object), createdAt: row.createdAt });
+    } catch (e: any) {
+      res.status(400).json({ message: e.issues?.[0]?.message ?? e.message });
+    }
+  });
+
+  // One calibration at a time: each pulls years of history through the rate-limited feed
+  let calibrating: string | null = null;
+  app.post("/api/tdci/calibrate", async (req: Request, res: Response) => {
+    try {
+      const p = tdciParams.parse(req.body ?? {});
+      if (calibrating) return res.status(409).json({ message: `Calibration for ${calibrating} is already running — try again shortly.` });
+      calibrating = `${p.symbol} ${p.interval}`;
+      try {
+        res.json(await calibrate(p.symbol, p.interval));
+      } finally {
+        calibrating = null;
+      }
+    } catch (e: any) {
+      res.status(400).json({ message: e.issues?.[0]?.message ?? e.message });
+    }
+  });
+
+  app.get("/api/tdci/:symbol", async (req: Request, res: Response) => {
+    try {
+      const p = tdciParams.parse({ symbol: req.params.symbol, interval: req.query.interval ?? "4h" });
+      res.json(await getLiveTdci(p.symbol, p.interval));
+    } catch (e: any) {
+      res.status(400).json({ message: e.issues?.[0]?.message ?? e.message });
+    }
   });
 
   // Real correlation: Pearson on 60 daily log returns, cached 6h
@@ -1604,7 +1664,7 @@ Respond ONLY with this JSON:
   // test-* endpoints, which verify them before saving.
   const WRITABLE_SETTINGS = [
     "notifications", "autoTrade", "riskMode", "theme", "tradingInstruments", "tradingTimezone",
-    "activeSessions", "offHoursBehavior", "offHoursRiskReduction", "selectedAiProvider",
+    "activeSessions", "offHoursBehavior", "offHoursRiskReduction", "selectedAiProvider", "tdciMinScore",
     "emailAddress", "emailNotifications", "smtpHost", "smtpPort", "smtpUser", "smtpPass",
   ] as const;
 
@@ -1620,6 +1680,9 @@ Respond ONLY with this JSON:
       }
       if (patch.offHoursRiskReduction != null) {
         patch.offHoursRiskReduction = Math.min(100, Math.max(0, parseInt(patch.offHoursRiskReduction) || 0));
+      }
+      if (patch.tdciMinScore != null) {
+        patch.tdciMinScore = Math.min(100, Math.max(0, parseInt(patch.tdciMinScore) || 0));
       }
       const settings = await storage.upsertUserSettings(patch as any);
       res.json(redactSettings(settings));

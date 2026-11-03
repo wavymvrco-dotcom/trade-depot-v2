@@ -7,9 +7,25 @@ import { calcProfit, getSymbolConfig, priceDecimals } from "@shared/pips";
 import { getRiskLimits } from "./risk";
 import { openTrade, closeTrade, normalizeSide, sizeForRisk } from "./execution";
 import { recordLessonOutcome } from "./ai-knowledge";
-import type { Position } from "@shared/schema";
+import type { Position, AiSignal } from "@shared/schema";
+import { latestCalibration, type CalibrationResult } from "./tdci-service";
 
 let running = false;
+const SIGNAL_INTERVAL_MS = 15 * 60_000;
+
+/** Reason a generated signal may not be auto-executed, or null if it may. */
+async function tdciGate(signal: AiSignal, userMin: number): Promise<string | null> {
+  const cal = await latestCalibration(signal.symbol, "4h").catch(() => null);
+  const recommended = (cal?.result as CalibrationResult | undefined)?.recommendedMin ?? null;
+  if (!cal) return "TDCI not calibrated for this market";
+  if (recommended == null) return "no proven TDCI edge on this market";
+  if (signal.tdciScore == null || !signal.tdciDirection) return "signal has no TDCI reading";
+  const wantDir = signal.action.includes("BUY") ? "LONG" : "SHORT";
+  if (signal.tdciDirection !== wantDir) return `TDCI points ${signal.tdciDirection}, signal is ${signal.action}`;
+  const min = Math.max(userMin, recommended);
+  if (signal.tdciScore < min) return `TDCI ${signal.tdciScore} below required ${min}`;
+  return null;
+}
 
 // ─── Trading Session Helpers ──────────────────────────────────────────────────
 
@@ -194,6 +210,9 @@ async function runAutoTradePass() {
 
         const pending = await storage.getPendingSignal(user.id);
         if (!pending) {
+          // At most one new signal per user every 15 minutes — each one costs AI and data calls
+          const [last] = await storage.getRecentSignals(user.id, 1);
+          if (last?.createdAt && Date.now() - new Date(last.createdAt).getTime() < SIGNAL_INTERVAL_MS) continue;
           const created = await generateAiSignal(user.id).catch((e: any) => { console.warn(`[AutoTrade] Signal error: ${e.message}`); return null; });
           if (created) await pushSignalNotification(user.id);
           continue;
@@ -204,8 +223,17 @@ async function runAutoTradePass() {
           await storage.updateSignalStatus(pending.id, "expired");
           continue;
         }
-        // Rule-based fallback signals are advisory only — never auto-executed
-        if (pending.source === "rules") continue;
+
+        // TDCI gate: generated signals only auto-execute where calibration has
+        // shown an out-of-sample edge. TradingView alerts are the user's own system.
+        if (pending.source !== "tradingview") {
+          const blocked = await tdciGate(pending, settings.tdciMinScore ?? 60);
+          if (blocked) {
+            await storage.updateSignalStatus(pending.id, "dismissed");
+            console.log(`[AutoTrade] ${pending.symbol} for user#${user.id} not auto-traded: ${blocked}`);
+            continue; // left for manual review; no notification spam every pass
+          }
+        }
 
         // Size from the real account balance when the broker reports it
         const accountSize = Number(settings.brokerBalance) || strategy.accountSize || 10000;
@@ -252,6 +280,9 @@ async function runAutoTradePass() {
         console.warn(`[AutoTrade] Error for user ${user.id}: ${e.message}`);
       }
     }
+  } catch (e: any) {
+    // A database or network outage must skip this pass, not crash the server
+    console.warn(`[AutoTrade] Pass skipped: ${e.message}`);
   } finally {
     running = false;
   }

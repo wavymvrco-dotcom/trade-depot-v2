@@ -4,6 +4,7 @@ import { getSymbolConfig, priceDecimals } from "@shared/pips";
 import { fetchCandlesForAI } from "./backtest";
 import { ema, rsi, atr, swingPoints, last, type Candle } from "./indicators";
 import { getRelevantKnowledge } from "./ai-knowledge";
+import { getLiveTdci, TDCI_SYMBOLS, type LiveTdci } from "./tdci-service";
 
 const SYMBOLS = ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD", "XAUUSD", "GBPJPY"];
 
@@ -238,28 +239,40 @@ function validateSignal(parsed: any, symbol: string, quote: LivePrice, tfs: Time
   };
 }
 
-// ─── Rule-based fallback (no AI key) ──────────────────────────────────────────
-// Deterministic and transparent: trend on H4 + pullback on H1. Returns null when
-// conditions aren't met — no trade is a valid answer. Advisory only.
+// ─── TDCI-based signal (no AI key) ────────────────────────────────────────────
+// Uses the exact trade model the TDCI calibration measures (stop 1.5× ATR,
+// target 2R), so this signal's track record IS the calibration table.
+// Returns null when the TDCI is weak — no trade is a valid answer.
 
-function rulesSignal(symbol: string, tfs: TimeframeRead[], quote: LivePrice): ValidSignal | null {
-  const h1 = tfs.find(t => t.label === "H1"), h4 = tfs.find(t => t.label === "H4");
-  if (!h1 || !h4) return null;
-  let action: "BUY" | "SELL" | null = null;
-  if (h4.trend === "up" && h1.rsi14 > 40 && h1.rsi14 < 55 && h1.close > h1.ema50) action = "BUY";
-  if (h4.trend === "down" && h1.rsi14 < 60 && h1.rsi14 > 45 && h1.close < h1.ema50) action = "SELL";
-  if (!action) return null;
+const TDCI_SIGNAL_MIN = 50;
+
+function tdciSignal(symbol: string, tdci: LiveTdci, quote: LivePrice): ValidSignal | null {
+  if (tdci.direction === "NEUTRAL" || tdci.score < TDCI_SIGNAL_MIN) return null;
+  const action = tdci.direction === "LONG" ? "BUY" : "SELL";
   const entry = action === "BUY" ? quote.ask : quote.bid;
-  const slDist = 1.5 * h1.atr14;
+  const slDist = 1.5 * tdci.atr;
   const dp = priceDecimals(symbol);
+  const top = [...tdci.layers].filter(l => l.key !== "regime").sort((a, b) => Math.abs(b.value * b.weight) - Math.abs(a.value * a.weight)).slice(0, 2);
+  const hist = tdci.historical && tdci.historical.trades >= 20
+    ? ` Historically, out-of-sample trades at this score: ${tdci.historical.trades} trades, ${tdci.historical.winRate}% win, avg ${tdci.historical.avgR}R after costs.`
+    : " This score range has no reliable calibration history yet.";
   return {
     action,
-    confidence: 0, // rules carry no model probability
-    reasoning: `Rule: H4 trend is ${h4.trend} (EMA20 ${h4.ema20.toFixed(dp)} vs EMA50 ${h4.ema50.toFixed(dp)}) and H1 RSI ${h1.rsi14.toFixed(1)} shows a pullback. Stop = 1.5× H1 ATR, target = 2× stop. Advisory only — not auto-executed.`,
+    confidence: 0, // the TDCI score is reported separately; it is not a win probability
+    reasoning: `TDCI ${tdci.score}/100 ${tdci.direction} on ${tdci.interval}. Strongest layers: ${top.map(l => `${l.label} — ${l.detail}`).join(" ")}${hist} Stop 1.5× ATR, target 2R.`,
     entryPrice: parseFloat(entry.toFixed(dp)),
     stopLoss: parseFloat((action === "BUY" ? entry - slDist : entry + slDist).toFixed(dp)),
     takeProfit: parseFloat((action === "BUY" ? entry + 2 * slDist : entry - 2 * slDist).toFixed(dp)),
   };
+}
+
+function formatTdci(t: LiveTdci | null) {
+  if (!t) return "";
+  const layers = t.layers.map(l => `  ${l.label}: ${l.value >= 0 ? "+" : ""}${l.value}${l.key === "regime" ? " (quality 0–1)" : ""} — ${l.detail}`).join("\n");
+  const cal = t.weightsSource === "calibrated"
+    ? `Calibrated ${t.calibratedAt?.slice(0, 10)}; recommended minimum score: ${t.recommendedMin ?? "none (no proven edge on this market)"}.`
+    : "Not yet calibrated on this market.";
+  return `\n\nTRADE DEPOT CONFLUENCE INDEX (rule-based, backtested)\nScore ${t.score}/100, direction ${t.direction}, layer agreement ${Math.round(t.agreement * 100)}%. ${cal}\n${layers}`;
 }
 
 // ─── Main export ──────────────────────────────────────────────────────────────
@@ -276,7 +289,7 @@ ${context}${strat}${kb}
 
 Rules:
 - Use only the numbers above. Do not cite patterns, levels, news or statistics that aren't in the data.
-- "NO_TRADE" is the correct answer whenever the timeframes conflict or the setup is unclear.
+- "NO_TRADE" is the correct answer whenever the timeframes conflict, the TDCI disagrees, or the setup is unclear.
 - Stop loss goes beyond a listed swing point or at least 0.5× H1 ATR from price. Take profit at least 1.5× the stop distance.
 - confidence = your honest probability (1–90) that take profit is hit before stop loss.
 
@@ -296,7 +309,10 @@ export async function generateAiSignal(userId: string, symbol?: string) {
   const quote = (await fetchLivePrices().catch(() => ({} as Record<string, LivePrice>)))[targetSymbol];
   if (!isTradablePrice(quote)) throw new Error(`No live price for ${targetSymbol} — signals are paused until data returns.`);
 
-  const tfs = await getMarketContext(targetSymbol);
+  const [tfs, tdci] = await Promise.all([
+    getMarketContext(targetSymbol),
+    TDCI_SYMBOLS.includes(targetSymbol) ? getLiveTdci(targetSymbol, "4h").catch(e => { console.warn(`[TDCI] ${targetSymbol}: ${e.message}`); return null; }) : Promise.resolve(null),
+  ]);
   const strategy = await storage.getActiveStrategy(userId).catch(() => undefined);
   const provider = settings?.selectedAiProvider;
   const hasProvider = !!provider && provider !== "none";
@@ -308,7 +324,8 @@ export async function generateAiSignal(userId: string, symbol?: string) {
   if (hasProvider) {
     const kb = await getRelevantKnowledge(userId, targetSymbol);
     knowledgeIds = kb.ids;
-    const raw = await callAiProvider(provider!, settings as any, buildSignalPrompt(formatContext(targetSymbol, tfs, quote), kb.text, strategy));
+    const prompt = buildSignalPrompt(formatContext(targetSymbol, tfs, quote) + formatTdci(tdci), kb.text, strategy);
+    const raw = await callAiProvider(provider!, settings as any, prompt);
     if (raw && String(raw.action).toUpperCase() === "NO_TRADE") return null;
     signal = validateSignal(raw, targetSymbol, quote, tfs);
     if (!signal) {
@@ -317,7 +334,8 @@ export async function generateAiSignal(userId: string, symbol?: string) {
     }
     source = "ai";
   } else {
-    signal = rulesSignal(targetSymbol, tfs, quote);
+    if (!tdci) return null;
+    signal = tdciSignal(targetSymbol, tdci, quote);
     if (!signal) return null;
   }
 
@@ -340,9 +358,12 @@ export async function generateAiSignal(userId: string, symbol?: string) {
     size: sizeLots,
     userId,
     status: "pending",
-    aiProvider: source === "ai" ? provider! : "rules",
+    aiProvider: source === "ai" ? provider! : "tdci",
     source,
     htfBias: h4 ? (h4.trend === "up" ? "bullish" : h4.trend === "down" ? "bearish" : "neutral") : null,
     knowledgeIds: knowledgeIds.length ? knowledgeIds : null,
+    tdciScore: tdci?.score ?? null,
+    tdciDirection: tdci?.direction ?? null,
+    tdciLayers: tdci ? { interval: tdci.interval, weightsSource: tdci.weightsSource, recommendedMin: tdci.recommendedMin, layers: tdci.layers } : null,
   });
 }

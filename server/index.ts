@@ -11,6 +11,12 @@ import { setupWebSocket } from "./ws";
 import { seedExpertKnowledge, seedInstitutionalKnowledge } from "./ai-knowledge";
 import { startPushDigest } from "./push";
 
+// Last line of defense: a stray rejected promise in a background worker (a DB
+// or network blip) is logged instead of taking the whole server down.
+process.on("unhandledRejection", (reason: any) => {
+  console.error("[Process] Unhandled rejection:", reason?.message ?? reason);
+});
+
 const app = express();
 const httpServer = createServer(app);
 

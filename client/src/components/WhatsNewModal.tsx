@@ -9,6 +9,12 @@ export function WhatsNewModal() {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
+    // First-run users get the guided tour instead; a changelog means nothing
+    // to them yet, and two stacked modals block each other's buttons
+    if (localStorage.getItem("tradeai_tour_seen") !== "true") {
+      localStorage.setItem(SEEN_KEY, APP_VERSION);
+      return;
+    }
     const seen = localStorage.getItem(SEEN_KEY);
     if (seen !== APP_VERSION) {
       const t = setTimeout(() => setOpen(true), 1500);

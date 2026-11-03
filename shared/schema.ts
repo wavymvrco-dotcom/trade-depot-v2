@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, real, boolean, timestamp, index } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, real, boolean, timestamp, index, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -96,6 +96,9 @@ export const aiSignals = pgTable("ai_signals", {
   htfBias: text("htf_bias"),         // 'bullish' | 'bearish' | 'neutral'
   source: text("source").default("ai"), // 'ai' | 'rules' | 'tradingview'
   knowledgeIds: text("knowledge_ids").array(), // lessons injected into the prompt — credited/blamed on outcome
+  tdciScore: integer("tdci_score"),           // 0–100 confluence at signal time
+  tdciDirection: text("tdci_direction"),      // LONG | SHORT | NEUTRAL
+  tdciLayers: jsonb("tdci_layers"),           // per-layer values and explanations
   executedAt: timestamp("executed_at"),
   createdAt: timestamp("created_at").defaultNow(),
 }, (t) => [index("ai_signals_user_status_idx").on(t.userId, t.status)]);
@@ -165,6 +168,7 @@ export const userSettings = pgTable("user_settings", {
   activeSessions: text("active_sessions").array(),
   offHoursBehavior: text("off_hours_behavior").default("pause"),
   offHoursRiskReduction: integer("off_hours_risk_reduction").default(50),
+  tdciMinScore: integer("tdci_min_score").default(60), // auto-trade only at or above this TDCI
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
@@ -367,3 +371,16 @@ export const riskLimits = pgTable("risk_limits", {
   pauseReason: text("pause_reason"),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
+
+// ─── TDCI calibrations ────────────────────────────────────────────────────────
+// Result of backtesting the Trade Depot Confluence Index on one symbol/timeframe:
+// learned layer weights (fit in-sample) and out-of-sample performance by score.
+export const tdciCalibrations = pgTable("tdci_calibrations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  symbol: text("symbol").notNull(),
+  interval: text("interval").notNull(),
+  weights: jsonb("weights").notNull(),
+  result: jsonb("result").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => [index("tdci_calibrations_symbol_interval_idx").on(t.symbol, t.interval, t.createdAt)]);
+export type TdciCalibration = typeof tdciCalibrations.$inferSelect;

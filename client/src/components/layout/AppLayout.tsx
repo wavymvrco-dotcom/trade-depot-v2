@@ -6,7 +6,7 @@ import {
   Bot, Bell, HelpCircle, Menu, X, Target, Zap,
   TrendingUp, TrendingDown, CheckCircle2, Clock,
   CalendarDays, BarChart2, BellRing, Check, GraduationCap, BookMarked, Store, Activity, Shield,
-  RefreshCw, LogOut, Crown, ShoppingCart,
+  RefreshCw, LogOut, Crown, ShoppingCart, Gauge,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
@@ -311,6 +311,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const navItems = [
     { icon: LayoutDashboard, label: "Terminal",    path: "/" },
     { icon: LineChart,       label: "Analysis",    path: "/analysis" },
+    { icon: Gauge,           label: "TDCI",        path: "/tdci" },
     { icon: Target,          label: "Strategy",    path: "/strategy" },
     { icon: BarChart2,       label: "Analytics",   path: "/analytics" },
     { icon: CalendarDays,    label: "Calendar",    path: "/calendar" },

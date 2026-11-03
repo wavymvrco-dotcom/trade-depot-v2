@@ -33,6 +33,7 @@ const PublicProfile = lazy(() => import("@/pages/PublicProfile"));
 const AppHealth     = lazy(() => import("@/pages/AppHealth"));
 const Admin         = lazy(() => import("@/pages/Admin"));
 const Trade         = lazy(() => import("@/pages/Trade"));
+const Tdci          = lazy(() => import("@/pages/Tdci"));
 
 const Loader = () => (
   <div className="w-full h-screen bg-background flex items-center justify-center">
@@ -106,6 +107,7 @@ function Router() {
       <Route path="/admin"><Suspense fallback={<Loader />}><Admin /></Suspense></Route>
       <Route path="/pricing"><Suspense fallback={<Loader />}><Pricing /></Suspense></Route>
       <Route path="/trade"><Suspense fallback={<Loader />}><Trade /></Suspense></Route>
+      <Route path="/tdci"><Suspense fallback={<Loader />}><Tdci /></Suspense></Route>
       <Route component={NotFound} />
     </Switch>
   );

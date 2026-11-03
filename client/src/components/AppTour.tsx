@@ -454,7 +454,7 @@ export function AppTour() {
               )}
               <div className="flex-1" />
               <button
-                onClick={isFirst ? next : dismiss}
+                onClick={dismiss}
                 data-testid="tour-skip"
                 className="text-xs text-muted-foreground hover:text-foreground transition-colors px-3 py-2 rounded-lg font-medium"
               >

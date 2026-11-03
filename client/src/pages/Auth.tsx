@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { LineChart, Eye, EyeOff, Bot, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -25,6 +25,7 @@ export default function Auth() {
   const [loading, setLoading] = useState(false);
   const [showInstall, setShowInstall] = useState(false);
   const { login, register } = useAuth();
+  const [, setLocation] = useLocation();
   const { toast } = useToast();
 
   const shouldOfferInstall =
@@ -37,17 +38,20 @@ export default function Auth() {
       toast({ title: "Required", description: "Please enter your username and password.", variant: "destructive" });
       return;
     }
-    if (password.length < 6) {
-      toast({ title: "Weak password", description: "Password must be at least 6 characters.", variant: "destructive" });
+    if (mode === "register" && password.length < 8) {
+      toast({ title: "Weak password", description: "Password must be at least 8 characters.", variant: "destructive" });
       return;
     }
     setLoading(true);
     try {
       if (mode === "login") {
         await login(username.trim(), password);
+        setLocation("/");
       } else {
         await register(username.trim(), password, email.trim() || undefined);
+        // Offer install first; continue into the app once it's dismissed
         if (shouldOfferInstall) setShowInstall(true);
+        else setLocation("/");
       }
     } catch (err: any) {
       const msg = err.message || "Something went wrong";
@@ -171,7 +175,7 @@ export default function Auth() {
                     </button>
                   </div>
                   {mode === "register" && (
-                    <p className="text-[11px] text-muted-foreground">Must be at least 6 characters.</p>
+                    <p className="text-[11px] text-muted-foreground">At least 8 characters.</p>
                   )}
                 </div>
 
@@ -216,7 +220,7 @@ export default function Auth() {
 
       <AnimatePresence>
         {showInstall && (
-          <InstallPrompt mode="modal" onDismiss={() => setShowInstall(false)} />
+          <InstallPrompt mode="modal" onDismiss={() => { setShowInstall(false); setLocation("/"); }} />
         )}
       </AnimatePresence>
     </div>
