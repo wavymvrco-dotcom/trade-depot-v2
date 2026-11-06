@@ -30,7 +30,7 @@ import {
   getCustomerSubscriptions,
 } from "./stripe";
 
-const BCRYPT_ROUNDS = 12;
+import { BCRYPT_ROUNDS, verifyPassword } from "./password";
 
 /** Settings as sent to the browser: credentials replaced with has* flags. */
 function redactSettings(s: Record<string, any>) {
@@ -124,18 +124,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const { username, password } = req.body;
       const user = await storage.getUserByUsername(username?.trim());
       if (!user) return res.status(401).json({ message: "Invalid credentials" });
-      // Support both bcrypt-hashed and plain-text (legacy) passwords
-      let valid = false;
-      if (user.password.startsWith("$2")) {
-        valid = await bcrypt.compare(password, user.password);
-      } else {
-        valid = user.password === password;
-        // Upgrade legacy plain-text to hash on successful login
-        if (valid) {
-          const hashed = await bcrypt.hash(password, BCRYPT_ROUNDS);
-          await storage.updateUserPassword(user.id, hashed);
-        }
-      }
+      // bcrypt hashes only — a non-hash stored value never matches
+      const valid = await verifyPassword(password, user.password);
       if (!valid) return res.status(401).json({ message: "Invalid credentials" });
       if (user.isBanned) return res.status(403).json({ message: "Account suspended" });
       await startSession(req, user.id);

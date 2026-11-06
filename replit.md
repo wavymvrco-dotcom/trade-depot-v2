@@ -8,7 +8,7 @@ Full-stack autonomous AI trading terminal with adaptive AI learning, multi-broke
 - **Backend**: Express.js + TypeScript
 - **Database**: PostgreSQL + Drizzle ORM
 - **Sessions**: PostgreSQL-backed sessions via connect-pg-simple (persistent across restarts)
-- **Auth**: bcrypt password hashing (12 rounds) with legacy plain-text auto-upgrade on login
+- **Auth**: bcrypt password hashing (12 rounds); plain-text passwords are never accepted (server/password.ts)
 - **Real-time**: WebSocket price feed at `/ws/prices` (3s broadcast interval)
 
 ## Admin System
