@@ -7,6 +7,7 @@ import bcrypt from "bcrypt";
 import { storage } from "../storage";
 import { BCRYPT_ROUNDS } from "../password";
 import { uid } from "./_shared";
+import { dailyUsage, sessionUsage } from "../lab/service/data";
 
 export function register(app: Express) {
   // ─── Admin middleware ────────────────────────────────────────────────────────
@@ -28,6 +29,13 @@ export function register(app: Express) {
       const banned = allUsers.filter((u: any) => u.isBanned).length;
       const recentUsers = allUsers.filter((u: any) => u.createdAt && new Date(u.createdAt) > new Date(Date.now() - 7 * 86400000)).length;
       res.json({ ...stats, admins, banned, recentUsers });
+    } catch (err: any) { res.status(500).json({ message: err.message }); }
+  });
+
+  // ─── Admin: Market-data usage (Twelve Data requests and candle-cache hit rate)
+  app.get("/api/admin/data-usage", requireAdmin as any, async (_req: Request, res: Response) => {
+    try {
+      res.json({ days: await dailyUsage(14), sinceRestart: sessionUsage() });
     } catch (err: any) { res.status(500).json({ message: err.message }); }
   });
 

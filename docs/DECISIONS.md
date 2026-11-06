@@ -31,3 +31,13 @@ Newest at the bottom. Format: date — decision — why.
   of the listed groups. App Health Score routes live in `admin.ts` (the sheet moves Health Score to Admin);
   backtest, watchlist, candles, calendar and news live in `market.ts`; leaderboard and strategy copy in
   `marketplace.ts`. *Why:* simplest grouping to verify; no URL changed.
+
+## 2026-11-06 — Candle cache
+
+- `candle_cache.time` stores Twelve Data's UTC time string instead of a timestamp, so a cached bar is
+  byte-identical to a fetched one (determinism, invariant 10) and parsing stays in one place. The strings
+  sort correctly within an interval.
+- The Twelve Data rate limit (8/min on the free plan) is now shared by every process through an
+  advisory-locked `external_calls` table; if the database is unreachable it falls back to a per-process limit.
+- Measured: second load of EURUSD swing (5,000 4h + 954 daily bars) in a fresh process served 99.9% of
+  bars from the cache with 2 small requests.

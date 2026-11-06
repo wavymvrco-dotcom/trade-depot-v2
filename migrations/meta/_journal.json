@@ -15,6 +15,13 @@
       "when": 1793740446695,
       "tag": "0001_tdci",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794006361511,
+      "tag": "0002_candle_cache",
+      "breakpoints": true
     }
   ]
 }

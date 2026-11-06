@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, real, boolean, timestamp, index, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, real, boolean, timestamp, index, jsonb, doublePrecision, primaryKey, date, bigint, bigserial } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -384,3 +384,34 @@ export const tdciCalibrations = pgTable("tdci_calibrations", {
   createdAt: timestamp("created_at").defaultNow(),
 }, (t) => [index("tdci_calibrations_symbol_interval_idx").on(t.symbol, t.interval, t.createdAt)]);
 export type TdciCalibration = typeof tdciCalibrations.$inferSelect;
+
+// ─── Market data cache (shared by all users) ──────────────────────────────────
+// Every candle the app has fetched, so the same history is never requested
+// twice. `time` keeps Twelve Data's UTC string ("YYYY-MM-DD HH:MM:SS", or
+// "YYYY-MM-DD" for daily+) so cached bars are byte-identical to fetched ones.
+export const candleCache = pgTable("candle_cache", {
+  symbol: text("symbol").notNull(),
+  interval: text("interval").notNull(),
+  time: text("time").notNull(),
+  open: doublePrecision("open").notNull(),
+  high: doublePrecision("high").notNull(),
+  low: doublePrecision("low").notNull(),
+  close: doublePrecision("close").notNull(),
+  volume: doublePrecision("volume"),
+}, (t) => [primaryKey({ columns: [t.symbol, t.interval, t.time] })]);
+
+// One row per external market-data request; drives the cross-process rate limit.
+export const externalCalls = pgTable("external_calls", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  provider: text("provider").notNull(),
+  at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index("external_calls_provider_at_idx").on(t.provider, t.at)]);
+
+// Daily totals for the Admin page: requests made and cache effectiveness.
+export const apiUsage = pgTable("api_usage", {
+  day: date("day").notNull(),
+  provider: text("provider").notNull(),
+  calls: integer("calls").notNull().default(0),
+  cachedBars: bigint("cached_bars", { mode: "number" }).notNull().default(0),
+  fetchedBars: bigint("fetched_bars", { mode: "number" }).notNull().default(0),
+}, (t) => [primaryKey({ columns: [t.day, t.provider] })]);
