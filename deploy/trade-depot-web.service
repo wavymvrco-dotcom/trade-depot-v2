@@ -1,0 +1,27 @@
+# Trade Depot web server (API + site). Install: see deploy/README.md
+[Unit]
+Description=Trade Depot web
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=tradedepot
+WorkingDirectory=/opt/trade-depot
+EnvironmentFile=/etc/trade-depot.env
+Environment=NODE_ENV=production
+Environment=PORT=5000
+# The worker service runs the background jobs
+Environment=RUN_WORKERS=false
+Environment=PROCESS_ROLE=web
+ExecStart=/usr/bin/node dist/index.cjs
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/trade-depot
+
+[Install]
+WantedBy=multi-user.target

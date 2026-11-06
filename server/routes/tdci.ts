@@ -54,22 +54,24 @@ export function register(app: Express) {
   });
 
   // Calibrations run in a background queue; the UI polls /api/tdci/job
-  app.get("/api/tdci/job", (_req: Request, res: Response) => res.json(jobStatus()));
+  app.get("/api/tdci/job", async (_req: Request, res: Response) => {
+    try { res.json(await jobStatus()); } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
 
-  app.post("/api/tdci/calibrate", (req: Request, res: Response) => {
+  app.post("/api/tdci/calibrate", async (req: Request, res: Response) => {
     try {
       const p = tdciParams.parse(req.body ?? {});
-      res.status(202).json(enqueueCalibrations([{ symbol: p.symbol, style: p.style }]));
+      res.status(202).json(await enqueueCalibrations([{ symbol: p.symbol, style: p.style }]));
     } catch (e: any) {
       res.status(400).json({ message: tdciError(e) });
     }
   });
 
-  app.post("/api/tdci/calibrate-all", (req: Request, res: Response) => {
+  app.post("/api/tdci/calibrate-all", async (req: Request, res: Response) => {
     const styles = (Array.isArray(req.body?.styles) ? req.body.styles : STYLES).filter(isStyle);
     const symbols = (Array.isArray(req.body?.symbols) ? req.body.symbols : TDCI_SYMBOLS).map((s: string) => String(s).toUpperCase()).filter((s: string) => TDCI_SYMBOLS.includes(s));
     const pairs = styles.flatMap((style: StyleKey) => symbols.map((symbol: string) => ({ symbol, style })));
-    res.status(202).json(enqueueCalibrations(pairs));
+    try { res.status(202).json(await enqueueCalibrations(pairs)); } catch (e: any) { res.status(500).json({ message: e.message }); }
   });
 
   app.get("/api/tdci/:symbol", async (req: Request, res: Response) => {

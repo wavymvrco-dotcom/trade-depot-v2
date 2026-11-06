@@ -1,0 +1,28 @@
+# Trade Depot background worker: auto-trade, alerts, signal outcomes, push
+# digest and the durable job queue. Must never sleep. See deploy/README.md
+[Unit]
+Description=Trade Depot worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=tradedepot
+WorkingDirectory=/opt/trade-depot
+EnvironmentFile=/etc/trade-depot.env
+Environment=NODE_ENV=production
+Environment=PROCESS_ROLE=worker
+ExecStart=/usr/bin/node dist/worker.cjs
+# SIGTERM lets active jobs finish (interrupted ones are retried later)
+KillSignal=SIGTERM
+TimeoutStopSec=30
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/trade-depot
+
+[Install]
+WantedBy=multi-user.target

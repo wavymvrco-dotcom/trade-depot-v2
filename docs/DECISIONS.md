@@ -41,3 +41,16 @@ Newest at the bottom. Format: date — decision — why.
   advisory-locked `external_calls` table; if the database is unreachable it falls back to a per-process limit.
 - Measured: second load of EURUSD swing (5,000 4h + 954 daily bars) in a fresh process served 99.9% of
   bars from the cache with 2 small requests.
+
+## 2026-11-06 — Job queue, worker process, hosting files
+
+- pg-boss 12 (MIT) is the durable queue. It connects through `DATABASE_URL_UNPOOLED` (Neon's direct endpoint)
+  because it keeps long-lived connections. pg-boss is ESM-only and needs Node ≥ 22.12; it is bundled into
+  `dist/*.cjs` and `package.json` declares `engines.node >= 22.12`.
+- The TDCI calibration queue moved from memory into pg-boss (`tdci.calibrate`), so calibrations survive
+  restarts and run in the worker. Live progress messages ("Scoring and simulating…") are no longer shown;
+  the UI shows queued / running / done with the result. Verified: a job queued with no worker running was
+  picked up and completed when `dist/worker.cjs` started.
+- `RUN_WORKERS` defaults to true (one process for local dev). The VPS service files set it to false on the
+  web process and run `dist/worker.cjs` as a second always-on service. `deploy/` replaces Render;
+  `render.yaml` is kept for now but no longer used.

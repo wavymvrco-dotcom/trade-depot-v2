@@ -7,6 +7,7 @@ import { fetchCandles, defaultSpreadPips } from "./backtest";
 import { getPairCot } from "./cot";
 import { getPairRates } from "./rates";
 import { toWeekly } from "./indicators";
+import { getBoss, QUEUES } from "./jobs";
 import { calcProfit, getSymbolConfig } from "@shared/pips";
 import {
   prepare, warmup, layerValues, combine, computeAt, lastClosedIndex, PROFILES, STYLES,
@@ -340,50 +341,67 @@ export async function calibrate(symbol: string, style: StyleKey, onProgress?: (m
 
 // ─── Background calibration jobs ──────────────────────────────────────────────
 // Calibrations pull months of data through the rate-limited feed, so they run
-// one at a time in the background; the UI polls the job status.
+// in the durable job queue (server/jobs.ts), one at a time, in the worker
+// process. The UI polls the job status, read back from the queue.
 
 export interface JobItem { symbol: string; style: StyleKey; status: "queued" | "running" | "done" | "failed"; message?: string; recommendedMin?: number | null }
-const job = { items: [] as JobItem[], running: false, startedAt: 0 as number, finishedAt: 0 as number };
+interface CalJobData { symbol: string; style: StyleKey }
+interface CalJobOutput { message?: string; recommendedMin?: number | null }
 
-export function jobStatus() {
-  const done = job.items.filter(i => i.status === "done" || i.status === "failed").length;
-  return { running: job.running, startedAt: job.startedAt || null, finishedAt: job.finishedAt || null, total: job.items.length, done, items: job.items };
+const STATE_TO_STATUS: Record<string, JobItem["status"]> = {
+  created: "queued", retry: "queued", active: "running", completed: "done", failed: "failed", cancelled: "failed",
+};
+
+export async function jobStatus() {
+  const boss = await getBoss();
+  const since = Date.now() - 24 * 3600_000;
+  const jobs = (await boss.findJobs<CalJobData>(QUEUES.tdciCalibrate, { limit: 5000 }))
+    .filter(j => new Date(j.createdOn).getTime() > since)
+    .slice(-200);
+  const items: JobItem[] = jobs.map(j => {
+    const out = (j.output ?? {}) as CalJobOutput & { message?: string };
+    const status = STATE_TO_STATUS[j.state] ?? "queued";
+    return {
+      symbol: j.data.symbol, style: j.data.style, status,
+      message: status === "running" ? "Running" : status === "queued" && j.retryCount > 0 ? `Retrying (attempt ${j.retryCount + 1})` : out.message,
+      recommendedMin: out.recommendedMin ?? null,
+    };
+  });
+  const running = items.some(i => i.status === "queued" || i.status === "running");
+  const done = items.filter(i => i.status === "done" || i.status === "failed").length;
+  const startedAt = jobs.length ? Math.min(...jobs.map(j => new Date(j.createdOn).getTime())) : null;
+  const finished = jobs.map(j => j.completedOn).filter(Boolean).map(d => new Date(d as Date).getTime());
+  const finishedAt = !running && finished.length ? Math.max(...finished) : null;
+  return { running, startedAt, finishedAt, total: items.length, done, items };
 }
 
-export function enqueueCalibrations(pairs: { symbol: string; style: StyleKey }[]) {
+export async function enqueueCalibrations(pairs: { symbol: string; style: StyleKey }[]) {
+  const boss = await getBoss();
+  const pending = await boss.findJobs<CalJobData>(QUEUES.tdciCalibrate, { queued: true, limit: 5000 });
+  const active = (await boss.findJobs<CalJobData>(QUEUES.tdciCalibrate, { limit: 5000 })).filter(j => j.state === "active");
+  const busy = new Set([...pending, ...active].map(j => `${j.data.symbol}:${j.data.style}`));
   for (const p of pairs) {
-    const existing = job.items.find(i => i.symbol === p.symbol && i.style === p.style && (i.status === "queued" || i.status === "running"));
-    if (!existing) job.items.push({ ...p, status: "queued" });
+    const key = `${p.symbol}:${p.style}`;
+    if (busy.has(key)) continue;
+    busy.add(key);
+    await boss.send(QUEUES.tdciCalibrate, { symbol: p.symbol, style: p.style }, { singletonKey: key });
   }
-  if (!job.running) void runQueue();
   return jobStatus();
 }
 
-async function runQueue() {
-  job.running = true;
-  if (!job.startedAt || job.finishedAt) { job.startedAt = Date.now(); job.finishedAt = 0; }
-  try {
-    for (;;) {
-      const next = job.items.find(i => i.status === "queued");
-      if (!next) break;
-      next.status = "running";
-      try {
-        const r = await calibrate(next.symbol, next.style, msg => { next.message = msg; });
-        next.status = "done";
-        next.recommendedMin = r.recommendedMin;
-        next.message = r.recommendedMin != null ? `Edge found ≥ ${r.recommendedMin}` : "No proven edge";
-      } catch (e: any) {
-        next.status = "failed";
-        next.message = e.message;
-        console.warn(`[TDCI] Calibration ${next.symbol} ${next.style} failed: ${e.message}`);
-      }
+/** Worker side: process calibration jobs one at a time. */
+export async function startCalibrationWorker() {
+  const boss = await getBoss();
+  await boss.work<CalJobData, CalJobOutput>(QUEUES.tdciCalibrate, { batchSize: 1 }, async ([job]) => {
+    const { symbol, style } = job.data;
+    try {
+      const r = await calibrate(symbol, style);
+      return { recommendedMin: r.recommendedMin, message: r.recommendedMin != null ? `Edge found ≥ ${r.recommendedMin}` : "No proven edge" };
+    } catch (e: any) {
+      console.warn(`[TDCI] Calibration ${symbol} ${style} failed: ${e.message}`);
+      throw e;
     }
-  } finally {
-    job.running = false;
-    job.finishedAt = Date.now();
-    // Keep the finished list for the UI, but cap its size
-    if (job.items.length > 200) job.items = job.items.slice(-200);
-  }
+  });
 }
 
 function round(v: number, dp = 3) { const m = 10 ** dp; return Math.round(v * m) / m; }
