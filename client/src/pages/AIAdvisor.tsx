@@ -329,7 +329,7 @@ function BrainTab() {
 }
 
 // ─── Reviews Tab ──────────────────────────────────────────────────────────────
-function ReviewsTab() {
+export function ReviewsTab() {
   const { data: reviews = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/ai/reviews"],
     queryFn: () => apiRequest("GET", "/api/ai/reviews?limit=30").then(r => r.json()),

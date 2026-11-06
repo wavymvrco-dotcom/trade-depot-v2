@@ -1,4 +1,4 @@
-import { Switch, Route, useLocation } from "wouter";
+import { Switch, Route, Redirect, useLocation } from "wouter";
 import { Suspense, lazy, useEffect, useState } from "react";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -16,24 +16,21 @@ import ResetPassword from "@/pages/ResetPassword";
 import VerifyEmail from "@/pages/VerifyEmail";
 const Pricing = lazy(() => import("@/pages/Pricing"));
 
-const Dashboard     = lazy(() => import("@/pages/Dashboard"));
 const Onboarding    = lazy(() => import("@/pages/Onboarding"));
 const Analysis      = lazy(() => import("@/pages/Analysis"));
-const News          = lazy(() => import("@/pages/News"));
-const AIAdvisor     = lazy(() => import("@/pages/AIAdvisor"));
 const Settings      = lazy(() => import("@/pages/Settings"));
 const Strategy      = lazy(() => import("@/pages/Strategy"));
-const Analytics     = lazy(() => import("@/pages/Analytics"));
-const Calendar      = lazy(() => import("@/pages/Calendar"));
 const Alerts        = lazy(() => import("@/pages/Alerts"));
-const Learn         = lazy(() => import("@/pages/Learn"));
-const Journal       = lazy(() => import("@/pages/Journal"));
 const Marketplace   = lazy(() => import("@/pages/Marketplace"));
 const PublicProfile = lazy(() => import("@/pages/PublicProfile"));
 const AppHealth     = lazy(() => import("@/pages/AppHealth"));
 const Admin         = lazy(() => import("@/pages/Admin"));
 const Trade         = lazy(() => import("@/pages/Trade"));
 const Tdci          = lazy(() => import("@/pages/Tdci"));
+const Terminal      = lazy(() => import("@/pages/Terminal"));
+const Lab           = lazy(() => import("@/pages/Lab"));
+const Performance   = lazy(() => import("@/pages/Performance"));
+const LearnHub      = lazy(() => import("@/pages/LearnHub"));
 
 const Loader = () => (
   <div className="w-full h-screen bg-background flex items-center justify-center">
@@ -90,16 +87,21 @@ function Router() {
   return (
     <Switch>
       <Route path="/onboarding"><Suspense fallback={<Loader />}><Onboarding onComplete={() => { setOnboardingDone(true); queryClient.invalidateQueries(); }} /></Suspense></Route>
-      <Route path="/"><Suspense fallback={<Loader />}><Dashboard /></Suspense></Route>
+      {/* The five hubs */}
+      <Route path="/"><Suspense fallback={<Loader />}><Terminal /></Suspense></Route>
+      <Route path="/lab"><Suspense fallback={<Loader />}><Lab /></Suspense></Route>
+      <Route path="/performance"><Suspense fallback={<Loader />}><Performance /></Suspense></Route>
+      <Route path="/learn"><Suspense fallback={<Loader />}><LearnHub /></Suspense></Route>
+      {/* Old URLs now live inside a hub */}
+      <Route path="/analytics"><Redirect to="/performance?tab=analytics" replace /></Route>
+      <Route path="/journal"><Redirect to="/performance?tab=journal" replace /></Route>
+      <Route path="/ai"><Redirect to="/learn?tab=advisor" replace /></Route>
+      <Route path="/news"><Redirect to="/?panel=news" replace /></Route>
+      <Route path="/calendar"><Redirect to="/?panel=calendar" replace /></Route>
+      {/* Still reachable from a hub (Terminal, Lab) until Phase 1 replaces them */}
       <Route path="/analysis"><Suspense fallback={<Loader />}><Analysis /></Suspense></Route>
-      <Route path="/news"><Suspense fallback={<Loader />}><News /></Suspense></Route>
       <Route path="/strategy"><Suspense fallback={<Loader />}><Strategy /></Suspense></Route>
-      <Route path="/analytics"><Suspense fallback={<Loader />}><Analytics /></Suspense></Route>
-      <Route path="/calendar"><Suspense fallback={<Loader />}><Calendar /></Suspense></Route>
       <Route path="/alerts"><Suspense fallback={<Loader />}><Alerts /></Suspense></Route>
-      <Route path="/learn"><Suspense fallback={<Loader />}><Learn /></Suspense></Route>
-      <Route path="/journal"><Suspense fallback={<Loader />}><Journal /></Suspense></Route>
-      <Route path="/ai"><Suspense fallback={<Loader />}><AIAdvisor /></Suspense></Route>
       <Route path="/settings"><Suspense fallback={<Loader />}><Settings /></Suspense></Route>
       <Route path="/marketplace"><Suspense fallback={<Loader />}><Marketplace /></Suspense></Route>
       <Route path="/profile/:username"><Suspense fallback={<Loader />}><PublicProfile /></Suspense></Route>

@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { useAuth } from "@/hooks/useAuth";
-import { useLocation } from "wouter";
+import { Link, useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
@@ -705,6 +705,7 @@ export default function Admin() {
               <h1 className="text-xl font-bold">Admin Panel</h1>
               <p className="text-xs text-muted-foreground">Logged in as <strong className="text-amber-400">{user.username}</strong> · Full platform access</p>
             </div>
+            <Link href="/health" className="ml-auto text-sm underline min-h-[44px] flex items-center">App Health Score</Link>
           </div>
 
           {/* Tab Bar */}

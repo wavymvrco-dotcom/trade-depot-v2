@@ -54,3 +54,14 @@ Newest at the bottom. Format: date — decision — why.
 - `RUN_WORKERS` defaults to true (one process for local dev). The VPS service files set it to false on the
   web process and run `dist/worker.cjs` as a second always-on service. `deploy/` replaces Render;
   `render.yaml` is kept for now but no longer used.
+
+## 2026-11-06 — 5-hub navigation
+
+- Sidebar and mobile bar show only Terminal, Lab, Performance, Learn, Settings (+ Admin for admins).
+- Hub pages show the existing pages as tabs (`?tab=`); a nested `AppLayout` renders only its content, so no
+  page needed rewriting. Old URLs redirect: /analytics, /journal → Performance; /ai → Learn (AI Advisor tab);
+  /news, /calendar → the Terminal's side panel.
+- Still reachable but out of the menu: /analysis, /trade, /alerts (linked from the Terminal panel and the bell),
+  /strategy and /tdci (linked from the Lab placeholder until Phase 1 replaces them), /health (linked from Admin;
+  the route itself stays open so users don't lose their own score), /marketplace (hidden, per Marco).
+- The app tour was rewritten for the five hubs, with copy that makes no performance claims.

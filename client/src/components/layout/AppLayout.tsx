@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, createContext, useContext } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { Link, useLocation } from "wouter";
 import {
@@ -6,7 +6,7 @@ import {
   Bot, Bell, HelpCircle, Menu, X, Target, Zap,
   TrendingUp, TrendingDown, CheckCircle2, Clock,
   CalendarDays, BarChart2, BellRing, Check, GraduationCap, BookMarked, Store, Activity, Shield,
-  RefreshCw, LogOut, Crown, ShoppingCart, Gauge,
+  RefreshCw, LogOut, Crown, ShoppingCart, Gauge, FlaskConical,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
@@ -292,7 +292,26 @@ function UserMenuPopover() {
   );
 }
 
+// The five hubs. A hub is active on its own path and on the older pages it now contains.
+export const HUBS = [
+  { icon: LayoutDashboard, label: "Terminal",    path: "/",            match: ["/", "/analysis", "/trade", "/news", "/calendar", "/alerts"] },
+  { icon: FlaskConical,    label: "Lab",         path: "/lab",         match: ["/lab", "/strategy", "/tdci"] },
+  { icon: BarChart2,       label: "Performance", path: "/performance", match: ["/performance", "/analytics", "/journal"] },
+  { icon: GraduationCap,   label: "Learn",       path: "/learn",       match: ["/learn", "/ai"] },
+  { icon: Settings,        label: "Settings",    path: "/settings",    match: ["/settings"] },
+];
+
+// Pages wrap themselves in AppLayout. A hub page shows other pages as tabs, so
+// a nested AppLayout renders only its children (no second sidebar or top bar).
+const LayoutNested = createContext(false);
+
 export function AppLayout({ children }: { children: React.ReactNode }) {
+  const nested = useContext(LayoutNested);
+  if (nested) return <>{children}</>;
+  return <LayoutNested.Provider value={true}><AppLayoutShell>{children}</AppLayoutShell></LayoutNested.Provider>;
+}
+
+function AppLayoutShell({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
@@ -309,31 +328,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   }, []);
 
   const navItems = [
-    { icon: LayoutDashboard, label: "Terminal",    path: "/" },
-    { icon: LineChart,       label: "Analysis",    path: "/analysis" },
-    { icon: Gauge,           label: "TDCI",        path: "/tdci" },
-    { icon: Target,          label: "Strategy",    path: "/strategy" },
-    { icon: BarChart2,       label: "Analytics",   path: "/analytics" },
-    { icon: CalendarDays,    label: "Calendar",    path: "/calendar" },
-    { icon: Bell,            label: "Alerts",      path: "/alerts" },
-    { icon: Newspaper,       label: "News",        path: "/news" },
-    { icon: Bot,             label: "AI Advisor",  path: "/ai" },
-    { icon: GraduationCap,   label: "Learn",       path: "/learn" },
-    { icon: BookMarked,      label: "Journal",     path: "/journal" },
-    { icon: Store,           label: "Marketplace", path: "/marketplace" },
-    { icon: Activity,        label: "Health Score", path: "/health" },
-    { icon: Settings,        label: "Settings",    path: "/settings" },
-    ...((user as any)?.isAdmin ? [{ icon: Shield, label: "Admin Panel", path: "/admin" }] : []),
+    ...HUBS,
+    ...((user as any)?.isAdmin ? [{ icon: Shield, label: "Admin Panel", path: "/admin", match: ["/admin", "/health"] }] : []),
   ];
+  const isActive = (match: string[]) => match.includes(location);
 
-  // Primary nav items shown in mobile bottom bar
-  const mobileNavItems = [
-    { icon: LayoutDashboard, label: "Terminal",  path: "/" },
-    { icon: LineChart,       label: "Analysis",  path: "/analysis" },
-    { icon: ShoppingCart,    label: "Trade",     path: "/trade" },
-    { icon: Bell,            label: "Alerts",    path: "/alerts" },
-    { icon: Menu,            label: "More",      path: "__more__" },
-  ];
+  // Mobile bottom bar: the same five hubs
+  const mobileNavItems = HUBS;
 
   return (
     <div className="flex h-screen bg-background text-foreground flex-col overflow-hidden">
@@ -378,7 +379,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           <div className="flex flex-col items-center gap-0.5 w-full px-2">
             {navItems.map((item) => (
               <div key={item.path} className="w-full">
-                <Link href={item.path}>
+                <Link href={item.path} aria-label={item.label}>
                   <div
                     data-testid={`nav-link-${item.label.toLowerCase().replace(/ /g, "-")}`}
                     onClick={() => setSidebarOpen(false)}
@@ -386,7 +387,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                     onMouseLeave={() => setHoverTip(null)}
                     className={cn(
                       "w-full h-10 rounded-lg flex items-center justify-center cursor-pointer transition-all duration-150 hover:bg-muted",
-                      location === item.path
+                      isActive(item.match)
                         ? "bg-primary text-primary-foreground shadow-lg shadow-primary/30"
                         : "text-muted-foreground hover:text-foreground"
                     )}
@@ -429,7 +430,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
         )}
 
-        <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
+        <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative pb-16 md:pb-0">
           <UpdateBanner />
           <EmailVerificationBanner />
           <BrokerAutoTradeBanner />
@@ -437,35 +438,19 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         </main>
       </div>
 
-      {/* ── Mobile Bottom Navigation Bar (not on terminal which has its own) ─── */}
-      <nav className={cn("md:hidden fixed bottom-0 left-0 right-0 z-50 h-16 bg-card/95 backdrop-blur-xl border-t border-border flex items-stretch", location === "/" && "hidden")}>
-        {mobileNavItems.map(({ icon: Icon, label, path }) => {
-          const isActive = path !== "__more__" && location === path;
-          return (
-            <button
-              key={path}
-              onClick={() => {
-                if (path === "__more__") { setSidebarOpen(o => !o); }
-              }}
-              className={cn("flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors",
-                isActive ? "text-primary" : "text-muted-foreground"
-              )}
-              data-testid={`mobile-bottom-nav-${label.toLowerCase()}`}
-            >
-              {path === "__more__" ? (
-                <>
-                  <Icon className="w-5 h-5" />
-                  <span className="text-[10px] font-medium">More</span>
-                </>
-              ) : (
-                <Link href={path} className="flex flex-col items-center justify-center gap-0.5 w-full h-full">
-                  <Icon className="w-5 h-5" />
-                  <span className="text-[10px] font-medium">{label}</span>
-                </Link>
-              )}
-            </button>
-          );
-        })}
+      {/* ── Mobile bottom bar: the five hubs ─── */}
+      <nav aria-label="Main" className="md:hidden fixed bottom-0 left-0 right-0 z-50 h-16 bg-card/95 backdrop-blur-xl border-t border-border flex items-stretch">
+        {mobileNavItems.map(({ icon: Icon, label, path, match }) => (
+          <Link key={path} href={path}
+            aria-current={isActive(match) ? "page" : undefined}
+            className={cn("flex-1 min-h-[44px] flex flex-col items-center justify-center gap-0.5 transition-colors",
+              isActive(match) ? "text-primary" : "text-muted-foreground")}
+            data-testid={`mobile-bottom-nav-${label.toLowerCase()}`}
+          >
+            <Icon className="w-5 h-5" aria-hidden="true" />
+            <span className="text-[10px] font-medium">{label}</span>
+          </Link>
+        ))}
       </nav>
 
       <KeyboardShortcuts open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
