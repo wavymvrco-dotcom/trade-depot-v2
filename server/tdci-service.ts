@@ -38,7 +38,17 @@ function apiKey() {
 
 const HTF_PER_PRIMARY: Record<string, number> = { "5min→1h": 1 / 12, "15min→4h": 1 / 16, "4h→1day": 1 / 6 };
 
-async function loadContext(symbol: string, profile: Profile, bars: number): Promise<TdciContext> {
+/** Trading costs used by calibration (and the Lab) for a symbol and style, in price units / $ per lot. */
+export interface TradeCost { half: number; slip: number; commission: number }
+export function costFor(symbol: string, style: StyleKey): TradeCost {
+  const cfg = getSymbolConfig(symbol);
+  const spreadPips = defaultSpreadPips(symbol);
+  const slippagePips = style === "scalp" ? 0.2 : 0.3, commissionPerLot = 7;
+  return { half: (spreadPips * cfg.pipSize) / 2, slip: slippagePips * cfg.pipSize, commission: commissionPerLot };
+}
+
+/** Candles + COT + rates for a symbol, prepared for TDCI scoring. Shared by calibration, live scoring and the Lab. */
+export async function loadContext(symbol: string, profile: Profile, bars: number): Promise<TdciContext> {
   const key = apiKey();
   const p = await fetchCandles(symbol, profile.interval, bars, key);
   let h;
@@ -256,10 +266,9 @@ export async function calibrate(symbol: string, style: StyleKey, onProgress?: (m
   const profile = PROFILES[style];
   onProgress?.(`Loading ${profile.history.calibrate.toLocaleString()} ${profile.interval} bars`);
   const ctx = await loadContext(symbol, profile, profile.history.calibrate);
-  const cfg = getSymbolConfig(symbol);
-  const spreadPips = defaultSpreadPips(symbol);
-  const slippagePips = style === "scalp" ? 0.2 : 0.3, commissionPerLot = 7;
-  const cost = { half: (spreadPips * cfg.pipSize) / 2, slip: slippagePips * cfg.pipSize, commission: commissionPerLot };
+  const cost = costFor(symbol, style);
+  const pipSize = getSymbolConfig(symbol).pipSize;
+  const spreadPips = defaultSpreadPips(symbol), slippagePips = round(cost.slip / pipSize, 2), commissionPerLot = cost.commission;
   const h = profile.model.icHorizon, maxHold = profile.model.maxHold;
 
   const start = warmup(ctx), end = ctx.p.length - 1 - maxHold;

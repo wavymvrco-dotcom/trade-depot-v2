@@ -23,3 +23,11 @@ Newest at the bottom. Format: date — decision — why.
   5-hub navigation yet and may return for sharing Licensed strategies.
 - **Mirror data contribution on by default,** clearly explained in Settings, with an opt-out.
   *Note:* some privacy laws prefer opt-in; to be reviewed by a lawyer before launch.
+
+## 2026-11-06 — Phase 0 routes split
+
+- `server/routes.ts` was split by a script as a pure move into `server/routes/*.ts`. The sheet's list of
+  groups is kept, plus one extra module, `alerts.ts` (price alerts, notifications, push), which fits none
+  of the listed groups. App Health Score routes live in `admin.ts` (the sheet moves Health Score to Admin);
+  backtest, watchlist, candles, calendar and news live in `market.ts`; leaderboard and strategy copy in
+  `marketplace.ts`. *Why:* simplest grouping to verify; no URL changed.

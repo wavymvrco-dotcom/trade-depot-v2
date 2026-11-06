@@ -34,7 +34,7 @@ test("hash detection accepts $2a/$2b/$2y and rejects plain text", () => {
 });
 
 test("login route has no plain-text comparison path", () => {
-  const src = readFileSync(new URL("../server/routes.ts", import.meta.url), "utf8");
+  const src = readFileSync(new URL("../server/routes/auth.ts", import.meta.url), "utf8");
   const login = src.slice(src.indexOf('app.post("/api/auth/login"'), src.indexOf('app.post("/api/auth/register"'));
   assert.ok(login.includes("verifyPassword("), "login must use verifyPassword");
   assert.ok(!/user\.password\s*===/.test(login), "login must not compare stored passwords directly");
