@@ -8,3 +8,4 @@ vite.config.ts.*
 .env.*
 !.env.example
 .neon
+packages/layer-kit/dist

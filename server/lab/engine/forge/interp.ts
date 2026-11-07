@@ -137,7 +137,9 @@ function evalNode(n: Node, inp: LayerInput, memo: Map<string, Arr>): Arr {
     case "if": {
       const c = evalNode(n.c, inp, memo), a = evalNode(n.a, inp, memo), b = evalNode(n.b, inp, memo);
       out = new Float64Array(N);
-      for (let i = 0; i < N; i++) out[i] = !Number.isFinite(c[i]) ? NaN : c[i] > 0 ? a[i] : b[i];
+      // Like every other op, `if` is warmed up only once all its inputs are (otherwise a branch
+      // still warming up would surface later as a non-finite value and wrongly reject the layer)
+      for (let i = 0; i < N; i++) out[i] = !Number.isFinite(c[i]) || !Number.isFinite(a[i]) || !Number.isFinite(b[i]) ? NaN : c[i] > 0 ? a[i] : b[i];
       break;
     }
   }

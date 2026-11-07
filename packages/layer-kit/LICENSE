@@ -1,0 +1,8 @@
+Layer Kit — license to be chosen by the owner.
+
+Copyright © 2026 [OWNER ENTITY]. All rights reserved until a license is chosen.
+
+The owner intends to publish this kit (the layer grammar, its interpreter and
+the CLI) under an open license so outside authors can write layers. Until that
+choice is recorded here, no license is granted. The package is marked private
+so it cannot be published to npm by accident.

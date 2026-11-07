@@ -1,0 +1,1 @@
+{"op":"clamp","lo":-1,"hi":1,"x":{"op":"neg","x":{"op":"zscore","n":20,"x":{"op":"series","name":"close"}}}}
