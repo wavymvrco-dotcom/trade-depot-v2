@@ -32,14 +32,14 @@ function EmailVerificationBanner() {
   const u = user as any;
   if (dismissed || !u?.email || u?.emailVerified) return null;
   return (
-    <div className="flex items-center gap-3 px-4 py-2.5 bg-amber-500/10 border-b border-amber-500/20 text-xs shrink-0">
-      <div className="w-4 h-4 rounded-full bg-amber-500/20 flex items-center justify-center shrink-0">
-        <span className="text-amber-400 text-[9px] font-bold">!</span>
+    <div className="flex items-center gap-3 px-4 py-2.5 bg-warn/10 border-b border-warn/20 text-xs shrink-0">
+      <div className="w-4 h-4 rounded-full bg-warn/20 flex items-center justify-center shrink-0">
+        <span className="text-warn text-[9px] font-bold">!</span>
       </div>
-      <span className="text-amber-300/80 flex-1">
-        Check your inbox — we sent a verification link to <span className="font-semibold text-amber-300">{u.email}</span>
+      <span className="text-warn/80 flex-1">
+        Check your inbox — we sent a verification link to <span className="font-semibold text-warn">{u.email}</span>
       </span>
-      <button onClick={() => setDismissed(true)} className="text-amber-400/50 hover:text-amber-400 transition-colors text-base leading-none">×</button>
+      <button onClick={() => setDismissed(true)} className="text-warn/50 hover:text-warn transition-colors text-base leading-none">×</button>
     </div>
   );
 }
@@ -51,14 +51,14 @@ function BrokerAutoTradeBanner() {
   if (dismissed) return null;
   if (!settings?.autoTrade || settings?.brokerConnected) return null;
   return (
-    <div className="flex items-center gap-3 px-4 py-2.5 bg-orange-500/10 border-b border-orange-500/20 text-xs shrink-0">
-      <div className="w-4 h-4 rounded-full bg-orange-500/20 flex items-center justify-center shrink-0">
-        <Zap className="w-2.5 h-2.5 text-orange-400" />
+    <div className="flex items-center gap-3 px-4 py-2.5 bg-warn/10 border-b border-warn/20 text-xs shrink-0">
+      <div className="w-4 h-4 rounded-full bg-warn/20 flex items-center justify-center shrink-0">
+        <Zap className="w-2.5 h-2.5 text-warn" />
       </div>
-      <span className="text-orange-300/90 flex-1">
-        <span className="font-semibold text-orange-300">Auto-trade is ON but no live broker is connected</span> — trades are executing in paper mode only. <Link href="/settings" className="underline hover:text-orange-200 transition-colors">Connect a broker in Settings</Link> to trade real funds.
+      <span className="text-warn/90 flex-1">
+        <span className="font-semibold text-warn">Auto-trade is ON but no live broker is connected</span> — trades are executing in paper mode only. <Link href="/settings" className="underline hover:text-warn transition-colors">Connect a broker in Settings</Link> to trade real funds.
       </span>
-      <button onClick={() => setDismissed(true)} className="text-orange-400/50 hover:text-orange-400 transition-colors text-base leading-none">×</button>
+      <button onClick={() => setDismissed(true)} className="text-warn/50 hover:text-warn transition-colors text-base leading-none">×</button>
     </div>
   );
 }
@@ -81,8 +81,8 @@ function NotificationsPanel() {
   const totalBadge = unread + activeAlerts;
 
   const typeIcon = (type: string) => {
-    if (type === "alert") return <BellRing className="w-4 h-4 text-orange-400" />;
-    if (type === "trade") return <Zap className="w-4 h-4 text-green-500" />;
+    if (type === "alert") return <BellRing className="w-4 h-4 text-warn" />;
+    if (type === "trade") return <Zap className="w-4 h-4 text-pos" />;
     if (type === "signal") return <TrendingUp className="w-4 h-4 text-primary" />;
     return <Bell className="w-4 h-4 text-muted-foreground" />;
   };
@@ -96,7 +96,7 @@ function NotificationsPanel() {
             <motion.span
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
-              className="absolute top-1 right-1 w-4 h-4 bg-destructive rounded-full border-2 border-background flex items-center justify-center text-[9px] font-bold text-white"
+              className="absolute top-1 right-1 w-4 h-4 bg-destructive rounded-full border-2 border-background flex items-center justify-center text-[9px] font-bold text-on-strong"
             >
               {totalBadge > 9 ? "9+" : totalBadge}
             </motion.span>
@@ -155,9 +155,9 @@ function NotificationsPanel() {
         </ScrollArea>
 
         {activeAlerts > 0 && (
-          <div className="px-4 py-2 border-t border-border bg-orange-500/5">
+          <div className="px-4 py-2 border-t border-border bg-warn/5">
             <Link href="/alerts">
-              <div className="flex items-center gap-2 text-[11px] text-orange-400 hover:text-orange-300 cursor-pointer transition-colors">
+              <div className="flex items-center gap-2 text-[11px] text-warn hover:text-warn cursor-pointer transition-colors">
                 <BellRing className="w-3 h-3" />
                 {activeAlerts} active price alert{activeAlerts !== 1 ? "s" : ""} — view all
               </div>
@@ -184,7 +184,7 @@ function UserMenuPopover() {
     setRefreshing(false);
     setRefreshed(true);
     setTimeout(() => { setRefreshed(false); setOpen(false); }, 1500);
-    toast({ title: "Account refreshed", description: "All data reloaded.", className: "border-green-500/50" });
+    toast({ title: "Account refreshed", description: "All data reloaded.", className: "border-pos/50" });
   };
 
   const initial = (user?.username ?? "?").charAt(0).toUpperCase();
@@ -199,8 +199,8 @@ function UserMenuPopover() {
         >
           {initial}
           {isAdmin && (
-            <span className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-amber-500 flex items-center justify-center border-2 border-background">
-              <Crown className="w-2 h-2 text-white" />
+            <span className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-warn flex items-center justify-center border-2 border-background">
+              <Crown className="w-2 h-2 text-foreground" />
             </span>
           )}
           <span className="absolute left-14 bg-popover text-popover-foreground px-2 py-1 rounded text-xs opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap border border-border pointer-events-none z-50 shadow-lg">
@@ -217,15 +217,15 @@ function UserMenuPopover() {
               {initial}
             </div>
             {isAdmin && (
-              <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-amber-500 flex items-center justify-center border border-background">
-                <Crown className="w-2 h-2 text-white" />
+              <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-warn flex items-center justify-center border border-background">
+                <Crown className="w-2 h-2 text-foreground" />
               </span>
             )}
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold truncate">{user?.username}</p>
             {isAdmin && (
-              <span className="text-[10px] font-bold text-amber-400">Admin</span>
+              <span className="text-[10px] font-bold text-warn">Admin</span>
             )}
             {!isAdmin && (
               <p className="text-[11px] text-muted-foreground">Active session</p>
@@ -242,14 +242,14 @@ function UserMenuPopover() {
             className={cn(
               "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors",
               refreshed
-                ? "text-green-400 bg-green-500/10"
+                ? "text-pos bg-pos/10"
                 : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
             )}
           >
             {refreshing ? (
               <RefreshCw className="w-4 h-4 animate-spin shrink-0" />
             ) : refreshed ? (
-              <CheckCircle2 className="w-4 h-4 shrink-0 text-green-400" />
+              <CheckCircle2 className="w-4 h-4 shrink-0 text-pos" />
             ) : (
               <RefreshCw className="w-4 h-4 shrink-0" />
             )}
@@ -371,7 +371,7 @@ function AppLayoutShell({ children }: { children: React.ReactNode }) {
         >
           <motion.div
             initial={{ scale: 0 }} animate={{ scale: 1 }}
-            className="w-9 h-9 rounded-lg bg-gradient-to-br from-primary to-accent text-white flex items-center justify-center mb-2 shadow-lg shadow-primary/20 shrink-0"
+            className="w-9 h-9 rounded-lg bg-primary text-on-strong flex items-center justify-center mb-2 shadow-lg shrink-0"
           >
             <LineChart className="w-5 h-5" />
           </motion.div>
@@ -388,7 +388,7 @@ function AppLayoutShell({ children }: { children: React.ReactNode }) {
                     className={cn(
                       "w-full h-10 rounded-lg flex items-center justify-center cursor-pointer transition-all duration-150 hover:bg-muted",
                       isActive(item.match)
-                        ? "bg-primary text-primary-foreground shadow-lg shadow-primary/30"
+                        ? "bg-primary text-primary-foreground shadow-lg "
                         : "text-muted-foreground hover:text-foreground"
                     )}
                   >

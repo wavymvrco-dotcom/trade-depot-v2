@@ -15,12 +15,12 @@ import { formatDistanceToNow } from "date-fns";
 
 const INSTRUMENT_TABS = [
   { id: "all",         label: "All",          color: "text-foreground" },
-  { id: "forex",       label: "Forex",        color: "text-blue-400" },
-  { id: "stocks",      label: "Stocks",       color: "text-green-400" },
-  { id: "crypto",      label: "Crypto",       color: "text-orange-400" },
-  { id: "bonds",       label: "Bonds",        color: "text-purple-400" },
-  { id: "commodities", label: "Commodities",  color: "text-amber-400" },
-  { id: "indices",     label: "Indices",      color: "text-sky-400" },
+  { id: "forex",       label: "Forex",        color: "text-info" },
+  { id: "stocks",      label: "Stocks",       color: "text-pos" },
+  { id: "crypto",      label: "Crypto",       color: "text-warn" },
+  { id: "bonds",       label: "Bonds",        color: "text-info" },
+  { id: "commodities", label: "Commodities",  color: "text-warn" },
+  { id: "indices",     label: "Indices",      color: "text-info" },
 ] as const;
 
 const CURRENCY_TABS = ["All", "USD", "EUR", "GBP", "JPY", "AUD", "CAD", "CHF", "XAU"] as const;
@@ -34,11 +34,11 @@ const CATEGORY_LABELS: Record<string, string> = {
   "general": "General",
 };
 const CATEGORY_COLORS: Record<string, string> = {
-  "central-bank": "text-amber-400 bg-amber-400/10 border-amber-400/20",
-  "macro": "text-blue-400 bg-blue-400/10 border-blue-400/20",
-  "trade": "text-orange-400 bg-orange-400/10 border-orange-400/20",
-  "market": "text-green-400 bg-green-400/10 border-green-400/20",
-  "technical": "text-purple-400 bg-purple-400/10 border-purple-400/20",
+  "central-bank": "text-warn bg-warn/10 border-warn/20",
+  "macro": "text-info bg-info/10 border-info/20",
+  "trade": "text-warn bg-warn/10 border-warn/20",
+  "market": "text-pos bg-pos/10 border-pos/20",
+  "technical": "text-info bg-info/10 border-info/20",
   "general": "text-muted-foreground bg-muted/50 border-border",
 };
 
@@ -64,12 +64,12 @@ interface SentimentResult {
 
 function SentimentBadge({ sentiment, score }: { sentiment: string; score: number }) {
   if (sentiment === "bullish") return (
-    <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-green-500/15 text-green-400 border border-green-500/20">
+    <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-pos/15 text-pos border border-pos/20">
       <TrendingUp className="w-3 h-3" /> Bullish +{score}
     </span>
   );
   if (sentiment === "bearish") return (
-    <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-red-500/15 text-red-400 border border-red-500/20">
+    <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-neg/15 text-neg border border-neg/20">
       <TrendingDown className="w-3 h-3" /> Bearish {score}
     </span>
   );
@@ -81,8 +81,8 @@ function SentimentBadge({ sentiment, score }: { sentiment: string; score: number
 }
 
 function UrgencyDot({ urgency }: { urgency: string }) {
-  if (urgency === "high") return <span className="w-2 h-2 rounded-full bg-red-400 animate-pulse" title="High impact" />;
-  if (urgency === "medium") return <span className="w-2 h-2 rounded-full bg-amber-400" title="Medium impact" />;
+  if (urgency === "high") return <span className="w-2 h-2 rounded-full bg-neg animate-pulse" title="High impact" />;
+  if (urgency === "medium") return <span className="w-2 h-2 rounded-full bg-warn" title="Medium impact" />;
   return <span className="w-2 h-2 rounded-full bg-muted-foreground/40" title="Low impact" />;
 }
 
@@ -380,7 +380,7 @@ export default function News() {
                     Economic Calendar
                   </h2>
                 </div>
-                <div className="flex-1 bg-[#131722]">
+                <div className="flex-1 bg-background">
                   <TradingViewCalendar />
                 </div>
               </motion.div>

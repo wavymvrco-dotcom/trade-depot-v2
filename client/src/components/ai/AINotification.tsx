@@ -51,8 +51,8 @@ export function AINotification({ onExecute, onCancel }: {
   }, [signal, dismissSignal, onCancel]);
 
   const isBuy = signal?.action?.includes("BUY");
-  const signalColor = isBuy ? "border-green-500/40 bg-green-500/5" : "border-red-500/40 bg-red-500/5";
-  const actionColor = isBuy ? "text-green-400" : "text-red-400";
+  const signalColor = isBuy ? "border-pos/40 bg-pos/5" : "border-neg/40 bg-neg/5";
+  const actionColor = isBuy ? "text-pos" : "text-neg";
 
   return (
     <AnimatePresence>
@@ -86,11 +86,11 @@ export function AINotification({ onExecute, onCancel }: {
               </div>
               <div className="text-center">
                 <p className="text-muted-foreground mb-0.5">SL</p>
-                <p className="font-bold text-red-400">{signal.stopLoss?.toFixed(5)}</p>
+                <p className="font-bold text-neg">{signal.stopLoss?.toFixed(5)}</p>
               </div>
               <div className="text-center">
                 <p className="text-muted-foreground mb-0.5">TP</p>
-                <p className="font-bold text-green-400">{signal.takeProfit?.toFixed(5)}</p>
+                <p className="font-bold text-pos">{signal.takeProfit?.toFixed(5)}</p>
               </div>
             </div>
 
@@ -106,7 +106,7 @@ export function AINotification({ onExecute, onCancel }: {
 
             <div className="grid grid-cols-2 gap-2">
               <Button
-                className={`h-9 text-sm font-bold ${isBuy ? "bg-green-500 hover:bg-green-600" : "bg-red-500 hover:bg-red-600"} text-white`}
+                className={`h-9 text-sm font-bold ${isBuy ? "bg-pos hover:bg-pos" : "bg-neg hover:bg-neg"} text-white`}
                 onClick={handleExecute}
                 disabled={executeSignal.isPending}
               >

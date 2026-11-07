@@ -7,15 +7,11 @@ import { apiRequest } from "@/lib/queryClient";
 import { format, formatDistanceToNow, isPast, isToday, isTomorrow } from "date-fns";
 
 const IMPACT_COLORS: Record<string, string> = {
-  high:   "bg-red-500/20 text-red-400 border-red-500/30",
-  medium: "bg-orange-500/20 text-orange-400 border-orange-500/30",
-  low:    "bg-blue-500/20 text-blue-400 border-blue-500/30",
+  high:   "bg-neg/20 text-neg border-neg/30",
+  medium: "bg-warn/20 text-warn border-warn/30",
+  low:    "bg-info/20 text-info border-info/30",
 };
 
-const CURRENCY_FLAGS: Record<string, string> = {
-  USD: "🇺🇸", EUR: "🇪🇺", GBP: "🇬🇧", JPY: "🇯🇵",
-  AUD: "🇦🇺", CAD: "🇨🇦", CHF: "🇨🇭", NZD: "🇳🇿",
-};
 
 function EventCard({ event }: { event: any }) {
   const date = new Date(event.date);
@@ -26,12 +22,12 @@ function EventCard({ event }: { event: any }) {
   return (
     <div className={`border rounded-lg p-4 transition-colors hover:bg-muted/10 ${
       today ? "border-primary/40 bg-primary/5" :
-      tomorrow ? "border-orange-500/30 bg-orange-500/5" :
+      tomorrow ? "border-warn/30 bg-warn/5" :
       past ? "border-border/30 opacity-50" : "border-border"
     }`}>
       <div className="flex items-start gap-4">
         <div className="shrink-0 text-center">
-          <div className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded mb-1 ${today ? "bg-primary/20 text-primary" : tomorrow ? "bg-orange-500/20 text-orange-400" : "bg-muted text-muted-foreground"}`}>
+          <div className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded mb-1 ${today ? "bg-primary/20 text-primary" : tomorrow ? "bg-warn/20 text-warn" : "bg-muted text-muted-foreground"}`}>
             {today ? "TODAY" : tomorrow ? "TOMORROW" : format(date, "EEE")}
           </div>
           <div className="text-sm font-bold font-mono">{format(date, "HH:mm")}</div>
@@ -46,10 +42,10 @@ function EventCard({ event }: { event: any }) {
             </span>
           </div>
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
-            <span>{CURRENCY_FLAGS[event.currency] || "🌐"} {event.currency}</span>
+            <span>{event.currency}</span>
             {event.forecast && <span>Forecast: <strong className="text-foreground">{event.forecast}</strong></span>}
             {event.previous && <span>Previous: {event.previous}</span>}
-            {event.actual && <span>Actual: <strong className={parseFloat(event.actual) > parseFloat(event.forecast || "0") ? "text-green-400" : "text-red-400"}>{event.actual}</strong></span>}
+            {event.actual && <span>Actual: <strong className={parseFloat(event.actual) > parseFloat(event.forecast || "0") ? "text-pos" : "text-neg"}>{event.actual}</strong></span>}
           </div>
         </div>
 
@@ -92,7 +88,7 @@ export default function Calendar() {
           </motion.h1>
           <div className="flex items-center gap-3">
             {highCount > 0 && (
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-semibold">
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neg/10 border border-neg/30 text-neg text-xs font-semibold">
                 <AlertTriangle className="w-3.5 h-3.5" />
                 {highCount} high impact upcoming
               </div>
@@ -111,7 +107,7 @@ export default function Calendar() {
               {(["all", "high", "medium"] as const).map(f => (
                 <button key={f} onClick={() => setFilter(f)} data-testid={`filter-${f}`}
                   className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all capitalize ${filter === f ? "bg-primary text-primary-foreground" : "bg-muted/50 text-muted-foreground hover:text-foreground"}`}>
-                  {f === "all" ? "All Events" : f === "high" ? "🔴 High Impact" : "🟠 Medium Impact"}
+                  {f === "all" ? "All Events" : f === "high" ? "High Impact" : "Medium Impact"}
                 </button>
               ))}
             </div>

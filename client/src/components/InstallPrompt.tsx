@@ -37,24 +37,24 @@ export function InstallPrompt({ mode = "modal", onDismiss }: InstallPromptProps)
   const steps: { icon: React.ReactNode; text: string }[] =
     platform === "ios"
       ? [
-          { icon: <Share className="w-4 h-4 text-blue-400 shrink-0" />,     text: 'Tap the Share button at the bottom of Safari (the box with an arrow pointing up)' },
-          { icon: <Plus  className="w-4 h-4 text-blue-400 shrink-0" />,     text: 'Scroll down and tap "Add to Home Screen"' },
-          { icon: <span className="text-base leading-none shrink-0">📱</span>, text: 'Tap "Add" — TradeAI will appear on your home screen like a native app' },
+          { icon: <Share className="w-4 h-4 text-info shrink-0" />,     text: 'Tap the Share button at the bottom of Safari (the box with an arrow pointing up)' },
+          { icon: <Plus  className="w-4 h-4 text-info shrink-0" />,     text: 'Scroll down and tap "Add to Home Screen"' },
+          { icon: <Smartphone className="w-4 h-4 text-info shrink-0" aria-hidden="true" />, text: 'Tap "Add" — Trade Depot will appear on your home screen like a native app' },
         ]
       : platform === "android"
       ? [
-          { icon: <MoreVertical className="w-4 h-4 text-green-400 shrink-0" />, text: 'Tap the three-dot menu in Chrome (top right corner)' },
-          { icon: <Plus className="w-4 h-4 text-green-400 shrink-0" />,         text: 'Tap "Add to Home screen" or "Install app"' },
-          { icon: <span className="text-base leading-none shrink-0">📱</span>,   text: 'Tap "Add" — TradeAI will appear as a full-screen app' },
+          { icon: <MoreVertical className="w-4 h-4 text-pos shrink-0" />, text: 'Tap the three-dot menu in Chrome (top right corner)' },
+          { icon: <Plus className="w-4 h-4 text-pos shrink-0" />,         text: 'Tap "Add to Home screen" or "Install app"' },
+          { icon: <Smartphone className="w-4 h-4 text-info shrink-0" aria-hidden="true" />,   text: 'Tap "Add" — Trade Depot will appear as a full-screen app' },
         ]
       : [
-          { icon: <Chrome className="w-4 h-4 text-blue-400 shrink-0" />, text: 'In Chrome or Edge, look for the install icon (⊕) in the address bar' },
-          { icon: <Plus className="w-4 h-4 text-blue-400 shrink-0" />,   text: 'Click "Install TradeAI" and confirm' },
-          { icon: <Monitor className="w-4 h-4 text-blue-400 shrink-0" />, text: 'The app opens in its own window, no browser chrome — works offline too' },
+          { icon: <Chrome className="w-4 h-4 text-info shrink-0" />, text: 'In Chrome or Edge, look for the install icon (⊕) in the address bar' },
+          { icon: <Plus className="w-4 h-4 text-info shrink-0" />,   text: 'Click "Install Trade Depot" and confirm' },
+          { icon: <Monitor className="w-4 h-4 text-info shrink-0" />, text: 'The app opens in its own window, no browser chrome — works offline too' },
         ];
 
-  const platformColor = platform === "ios" ? "text-blue-400" : platform === "android" ? "text-green-400" : "text-primary";
-  const platformBg    = platform === "ios" ? "bg-blue-500/10 border-blue-500/20" : platform === "android" ? "bg-green-500/10 border-green-500/20" : "bg-primary/10 border-primary/20";
+  const platformColor = platform === "ios" ? "text-info" : platform === "android" ? "text-pos" : "text-primary";
+  const platformBg    = platform === "ios" ? "bg-info/10 border-info/20" : platform === "android" ? "bg-pos/10 border-pos/20" : "bg-primary/10 border-primary/20";
 
   if (mode === "banner") {
     return (
@@ -66,7 +66,7 @@ export function InstallPrompt({ mode = "modal", onDismiss }: InstallPromptProps)
       >
         <Smartphone className="w-5 h-5 text-primary shrink-0" />
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold">Install TradeAI on your device</p>
+          <p className="text-sm font-semibold">Install Trade Depot on your device</p>
           <p className="text-xs text-muted-foreground">
             {platform === "ios"
               ? "Tap Share → Add to Home Screen in Safari for the full app experience"
@@ -98,8 +98,8 @@ export function InstallPrompt({ mode = "modal", onDismiss }: InstallPromptProps)
         <div className={cn("px-5 pt-5 pb-4 border-b border-border", platformBg)}>
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg shadow-primary/20 shrink-0">
-                <Smartphone className="w-6 h-6 text-white" />
+              <div className="w-12 h-12 rounded-2xl bg-primary flex items-center justify-center shadow-lg shrink-0">
+                <Smartphone className="w-6 h-6 text-foreground" />
               </div>
               <div>
                 <p className="font-bold text-base">Add to Home Screen</p>
@@ -115,7 +115,7 @@ export function InstallPrompt({ mode = "modal", onDismiss }: InstallPromptProps)
             </button>
           </div>
           <p className="text-sm text-muted-foreground mt-3 leading-relaxed">
-            Save <strong className="text-foreground">TradeAI</strong> to your home screen for a full-screen, app-like experience — no browser bar, works offline.
+            Save <strong className="text-foreground">Trade Depot</strong> to your home screen for a full-screen, app-like experience — no browser bar, works offline.
           </p>
         </div>
 

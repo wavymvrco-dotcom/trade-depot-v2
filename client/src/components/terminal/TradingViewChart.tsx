@@ -1,4 +1,5 @@
 import { useEffect, useRef, memo } from 'react';
+import { tvTheme, tvGridColor, tvBackground } from "@/lib/theme";
 
 export const TradingViewChart = memo(function TradingViewChart({ symbol = "EURUSD" }: { symbol?: string }) {
   const container = useRef<HTMLDivElement>(null);
@@ -17,7 +18,7 @@ export const TradingViewChart = memo(function TradingViewChart({ symbol = "EURUS
             width: "100%",
             height: "100%",
             locale: "en",
-            colorTheme: "dark",
+            colorTheme: tvTheme(),
             autosize: true,
             showVolume: false,
             showMA: false,

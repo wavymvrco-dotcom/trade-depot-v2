@@ -65,3 +65,20 @@ Newest at the bottom. Format: date — decision — why.
   /strategy and /tdci (linked from the Lab placeholder until Phase 1 replaces them), /health (linked from Admin;
   the route itself stays open so users don't lose their own score), /marketplace (hidden, per Marco).
 - The app tour was rewritten for the five hubs, with copy that makes no performance claims.
+
+## 2026-11-06 — Research Journal across the whole app
+
+- Marco asked that the inside of the app match the landing page. The shadcn color variables now map to the
+  Research Journal tokens (light default, warm dark variant via `html.dark`, chosen in the top bar; stored as
+  `td_theme`, so everyone starts on light). Fraunces for h1/h2 only (small labels stay in Inter); IBM Plex Mono
+  replaces JetBrains Mono.
+- A one-off codemod replaced ~1,300 hard-coded palette classes in 35 files with semantic tokens that follow the
+  theme: `pos` (gains), `neg` (losses), `warn` (caution), `info` (information), `on-strong` (text on solid fills).
+  Gradients became solid fills; colored glows were removed; chart hexes use the same tokens. TradingView widgets
+  read the current theme when they load.
+- User-facing name changed from "TradeAI" to "Trade Depot"; emoji removed (the design system uses none).
+- Landing page rebuilt from `docs/design/landing-a3.dc.html` (also received as a zip export; same design).
+  Films load from `VITE_FILMS_CDN_URL` (the client-side name for the sheet's `FILMS_CDN_URL`); missing films show
+  the labeled placeholder frame from the design.
+- The 14% prop-challenge statistic is cited as the sheet gives it (FPFX Technology via Finance Magnates, 2026);
+  it has not been independently checked here.

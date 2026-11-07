@@ -32,9 +32,9 @@ export default function ForgotPassword() {
   };
 
   return (
-    <div className="min-h-screen bg-[#070710] text-white flex flex-col items-center justify-center px-4">
+    <div className="min-h-screen bg-background text-foreground flex flex-col items-center justify-center px-4">
       <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] bg-cyan-500/5 rounded-full blur-[100px]" />
+        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] bg-info/5 rounded-full blur-[100px]" />
       </div>
 
       <motion.div
@@ -44,30 +44,30 @@ export default function ForgotPassword() {
       >
         {/* Logo */}
         <div className="flex items-center justify-center gap-2.5 mb-10">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center shadow-xl shadow-cyan-500/30">
-            <LineChart className="w-5 h-5 text-white" />
+          <div className="w-9 h-9 rounded-xl bg-info/10 flex items-center justify-center shadow-xl">
+            <LineChart className="w-5 h-5 text-foreground" />
           </div>
-          <span className="font-bold text-lg">TradeAI <span className="text-cyan-400">Terminal</span></span>
+          <span className="font-display font-semibold text-xl">Trade Depot</span>
         </div>
 
         {!sent ? (
-          <div className="bg-white/[0.03] border border-white/10 rounded-2xl p-8">
+          <div className="bg-white/[0.03] border border-foreground/10 rounded-2xl p-8">
             <div className="mb-6">
               <h1 className="text-xl font-bold mb-1">Forgot your password?</h1>
-              <p className="text-sm text-white/40">Enter your email and we'll send you a reset link.</p>
+              <p className="text-sm text-foreground/40">Enter your email and we'll send you a reset link.</p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-1.5">
-                <Label className="text-xs text-white/60">Email address</Label>
+                <Label className="text-xs text-foreground/60">Email address</Label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-foreground/30" />
                   <Input
                     type="email"
                     value={email}
                     onChange={e => setEmail(e.target.value)}
                     placeholder="you@example.com"
-                    className="pl-9 bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:border-cyan-500/50"
+                    className="pl-9 bg-foreground/5 border-foreground/10 text-foreground placeholder:text-foreground/20 focus:border-info/50"
                     required
                   />
                 </div>
@@ -75,28 +75,28 @@ export default function ForgotPassword() {
               <Button
                 type="submit"
                 disabled={loading || !email.trim()}
-                className="w-full bg-cyan-500 hover:bg-cyan-400 text-black font-semibold"
+                className="w-full bg-info hover:bg-info text-foreground font-semibold"
               >
                 {loading ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Sending…</> : "Send reset link"}
               </Button>
             </form>
           </div>
         ) : (
-          <div className="bg-white/[0.03] border border-white/10 rounded-2xl p-8 text-center">
-            <div className="w-14 h-14 rounded-2xl bg-green-500/10 border border-green-500/20 flex items-center justify-center mx-auto mb-4">
-              <CheckCircle2 className="w-7 h-7 text-green-400" />
+          <div className="bg-white/[0.03] border border-foreground/10 rounded-2xl p-8 text-center">
+            <div className="w-14 h-14 rounded-2xl bg-pos/10 border border-pos/20 flex items-center justify-center mx-auto mb-4">
+              <CheckCircle2 className="w-7 h-7 text-pos" />
             </div>
             <h2 className="font-bold text-lg mb-2">Check your inbox</h2>
-            <p className="text-sm text-white/40 mb-6">
-              If an account exists for <span className="text-white/70">{email}</span>, you'll receive a password reset link shortly.
+            <p className="text-sm text-foreground/40 mb-6">
+              If an account exists for <span className="text-foreground/70">{email}</span>, you'll receive a password reset link shortly.
             </p>
-            <p className="text-xs text-white/25">Didn't get it? Check your spam folder or try again in a few minutes.</p>
+            <p className="text-xs text-foreground/25">Didn't get it? Check your spam folder or try again in a few minutes.</p>
           </div>
         )}
 
         <div className="mt-6 text-center">
           <Link href="/auth">
-            <button className="flex items-center gap-1.5 text-xs text-white/30 hover:text-white/60 transition-colors mx-auto">
+            <button className="flex items-center gap-1.5 text-xs text-foreground/30 hover:text-foreground/60 transition-colors mx-auto">
               <ArrowLeft className="w-3.5 h-3.5" /> Back to login
             </button>
           </Link>

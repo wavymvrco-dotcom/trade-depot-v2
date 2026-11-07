@@ -39,12 +39,12 @@ function PLCalendarHeatmap({ trades }: { trades: TradeJournal[] }) {
 
   const getColor = (pl: number | undefined) => {
     if (pl === undefined) return "bg-muted/30";
-    if (pl > 200) return "bg-green-500";
-    if (pl > 50) return "bg-green-400/70";
-    if (pl > 0) return "bg-green-300/50";
-    if (pl < -200) return "bg-red-500";
-    if (pl < -50) return "bg-red-400/70";
-    if (pl < 0) return "bg-red-300/50";
+    if (pl > 200) return "bg-pos";
+    if (pl > 50) return "bg-pos/70";
+    if (pl > 0) return "bg-pos/50";
+    if (pl < -200) return "bg-neg";
+    if (pl < -50) return "bg-neg/70";
+    if (pl < 0) return "bg-neg/50";
     return "bg-muted/40";
   };
 
@@ -88,20 +88,20 @@ function PLCalendarHeatmap({ trades }: { trades: TradeJournal[] }) {
         ))}
       </div>
       <div className="flex items-center gap-4 mt-3 text-[10px] text-muted-foreground">
-        <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-sm bg-green-500" /> Large gain</div>
-        <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-sm bg-green-300/50" /> Small gain</div>
-        <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-sm bg-red-300/50" /> Small loss</div>
-        <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-sm bg-red-500" /> Large loss</div>
+        <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-sm bg-pos" /> Large gain</div>
+        <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-sm bg-pos/50" /> Small gain</div>
+        <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-sm bg-neg/50" /> Small loss</div>
+        <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-sm bg-neg" /> Large loss</div>
       </div>
     </div>
   );
 }
 const EMOTIONS = [
-  { id: "confident", label: "Confident", icon: Smile, color: "text-green-400" },
-  { id: "neutral", label: "Neutral", icon: Meh, color: "text-yellow-400" },
-  { id: "anxious", label: "Anxious", icon: Frown, color: "text-red-400" },
-  { id: "greedy", label: "Greedy", icon: AlertTriangle, color: "text-orange-400" },
-  { id: "fomo", label: "FOMO", icon: Clock, color: "text-violet-400" },
+  { id: "confident", label: "Confident", icon: Smile, color: "text-pos" },
+  { id: "neutral", label: "Neutral", icon: Meh, color: "text-warn" },
+  { id: "anxious", label: "Anxious", icon: Frown, color: "text-neg" },
+  { id: "greedy", label: "Greedy", icon: AlertTriangle, color: "text-warn" },
+  { id: "fomo", label: "FOMO", icon: Clock, color: "text-info" },
 ];
 
 type FormState = {
@@ -249,10 +249,10 @@ export default function Journal() {
             <MetricCard label="Total Trades" value={String(closed.length)} sub={`${trades.filter(t=>t.outcome==="open").length} open`} />
             <MetricCard label="Win Rate" value={winRate === "—" ? "—" : `${winRate}%`}
               sub={`${wins.length}W / ${closed.length - wins.length}L`}
-              color={Number(winRate) >= 50 ? "text-green-400" : "text-red-400"} />
+              color={Number(winRate) >= 50 ? "text-pos" : "text-neg"} />
             <MetricCard label="Total P&L" value={totalPL === 0 ? "$0.00" : `${totalPL >= 0 ? "+" : ""}$${totalPL.toFixed(2)}`}
               sub={`${totalPips >= 0 ? "+" : ""}${totalPips.toFixed(1)} pips`}
-              color={totalPL > 0 ? "text-green-400" : totalPL < 0 ? "text-red-400" : ""} />
+              color={totalPL > 0 ? "text-pos" : totalPL < 0 ? "text-neg" : ""} />
             <MetricCard label="Avg Risk:Reward" value={avgRR === "—" ? "—" : `1:${avgRR}`}
               sub={Number(avgRR) >= 2 ? "Excellent" : Number(avgRR) >= 1 ? "Good" : "Below target"} />
           </div>
@@ -268,7 +268,7 @@ export default function Journal() {
                   <YAxis tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" tickFormatter={v => `$${v}`} />
                   <Tooltip formatter={(v: any) => [`$${Number(v).toFixed(2)}`, "P&L"]} contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", fontSize: "11px" }} />
                   <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeDasharray="4 4" />
-                  <Line type="monotone" dataKey="pl" stroke={totalPL >= 0 ? "#22c55e" : "#ef4444"} strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="pl" stroke={totalPL >= 0 ? "var(--rj-pos)" : "var(--rj-neg)"} strokeWidth={2} dot={false} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -313,7 +313,7 @@ export default function Journal() {
                       {["long","short"].map(d => (
                         <button key={d} onClick={() => f("direction", d)} className={cn("flex-1 py-1.5 rounded-md text-xs font-medium border transition-all capitalize",
                           form.direction === d
-                            ? d === "long" ? "border-green-500 bg-green-500/10 text-green-400" : "border-red-500 bg-red-500/10 text-red-400"
+                            ? d === "long" ? "border-pos bg-pos/10 text-pos" : "border-neg bg-neg/10 text-neg"
                             : "border-border text-muted-foreground hover:text-foreground")}>
                           {d === "long" ? "▲ Long" : "▼ Short"}
                         </button>
@@ -344,7 +344,7 @@ export default function Journal() {
                 {form.entryPrice && form.exitPrice && (
                   <div className="bg-muted/30 rounded-lg p-3 text-xs border border-border">
                     {(() => { const r = calcPL(form as any); if (!r) return null;
-                      return <p>Estimated: <span className={r.pl >= 0 ? "text-green-400 font-bold" : "text-red-400 font-bold"}>{r.pl >= 0 ? "+" : ""}${r.pl}</span> ({r.pips >= 0 ? "+" : ""}{r.pips} pips)</p>;
+                      return <p>Estimated: <span className={r.pl >= 0 ? "text-pos font-bold" : "text-neg font-bold"}>{r.pl >= 0 ? "+" : ""}${r.pl}</span> ({r.pips >= 0 ? "+" : ""}{r.pips} pips)</p>;
                     })()}
                   </div>
                 )}
@@ -400,10 +400,10 @@ export default function Journal() {
                   >
                     {/* Direction indicator */}
                     <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
-                      trade.direction === "long" ? "bg-green-500/10" : "bg-red-500/10")}>
+                      trade.direction === "long" ? "bg-pos/10" : "bg-neg/10")}>
                       {trade.direction === "long"
-                        ? <TrendingUp className="w-4 h-4 text-green-400" />
-                        : <TrendingDown className="w-4 h-4 text-red-400" />}
+                        ? <TrendingUp className="w-4 h-4 text-pos" />
+                        : <TrendingDown className="w-4 h-4 text-neg" />}
                     </div>
 
                     {/* Main info */}
@@ -411,11 +411,11 @@ export default function Journal() {
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-bold text-sm">{trade.symbol}</span>
                         <span className={cn("text-[10px] px-1.5 py-0.5 rounded font-semibold",
-                          trade.mode === "paper" ? "bg-blue-500/10 text-blue-400" : "bg-amber-500/10 text-amber-400")}>
+                          trade.mode === "paper" ? "bg-info/10 text-info" : "bg-warn/10 text-warn")}>
                           {trade.mode.toUpperCase()}
                         </span>
                         <span className={cn("text-[10px] px-1.5 py-0.5 rounded font-semibold",
-                          isWin ? "bg-green-500/10 text-green-400" : isLoss ? "bg-red-500/10 text-red-400" : "bg-muted text-muted-foreground")}>
+                          isWin ? "bg-pos/10 text-pos" : isLoss ? "bg-neg/10 text-neg" : "bg-muted text-muted-foreground")}>
                           {isOpen ? "OPEN" : isWin ? "WIN" : isLoss ? "LOSS" : "B/E"}
                         </span>
                         {emotion && <span title={emotion.label}><emotion.icon className={cn("w-3.5 h-3.5", emotion.color)} /></span>}
@@ -432,21 +432,21 @@ export default function Journal() {
                     {/* P&L */}
                     <div className="text-right shrink-0">
                       {trade.profitLoss != null && (
-                        <p className={cn("font-bold text-sm", trade.profitLoss > 0 ? "text-green-400" : trade.profitLoss < 0 ? "text-red-400" : "text-muted-foreground")}>
+                        <p className={cn("font-bold text-sm", trade.profitLoss > 0 ? "text-pos" : trade.profitLoss < 0 ? "text-neg" : "text-muted-foreground")}>
                           {trade.profitLoss > 0 ? "+" : ""}${trade.profitLoss.toFixed(2)}
                         </p>
                       )}
                       {trade.pips != null && (
-                        <p className={cn("text-[11px]", trade.pips > 0 ? "text-green-400/70" : "text-red-400/70")}>
+                        <p className={cn("text-[11px]", trade.pips > 0 ? "text-pos/70" : "text-neg/70")}>
                           {trade.pips > 0 ? "+" : ""}{trade.pips.toFixed(1)} pips
                         </p>
                       )}
-                      {isOpen && <p className="text-[11px] text-amber-400">open</p>}
+                      {isOpen && <p className="text-[11px] text-warn">open</p>}
                     </div>
 
                     {/* Delete */}
                     <button onClick={() => deleteMut.mutate(trade.id)}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-red-400 shrink-0"
+                      className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-neg shrink-0"
                       data-testid={`button-delete-trade-${trade.id}`}>
                       <Trash2 className="w-4 h-4" />
                     </button>

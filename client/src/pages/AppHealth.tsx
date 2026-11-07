@@ -46,11 +46,11 @@ const SECTION_LINKS: Record<string, string> = {
 };
 
 const GRADE_COLORS: Record<string, { ring: string; text: string; bg: string; border: string; bar: string }> = {
-  A: { ring: "stroke-green-400",  text: "text-green-400",  bg: "bg-green-400/10",  border: "border-green-400/30", bar: "bg-green-400" },
-  B: { ring: "stroke-blue-400",   text: "text-blue-400",   bg: "bg-blue-400/10",   border: "border-blue-400/30",  bar: "bg-blue-400" },
-  C: { ring: "stroke-yellow-400", text: "text-yellow-400", bg: "bg-yellow-400/10", border: "border-yellow-400/30", bar: "bg-yellow-400" },
-  D: { ring: "stroke-orange-400", text: "text-orange-400", bg: "bg-orange-400/10", border: "border-orange-400/30", bar: "bg-orange-400" },
-  F: { ring: "stroke-red-400",    text: "text-red-400",    bg: "bg-red-400/10",    border: "border-red-400/30",   bar: "bg-red-400" },
+  A: { ring: "stroke-pos",  text: "text-pos",  bg: "bg-pos/10",  border: "border-pos/30", bar: "bg-pos" },
+  B: { ring: "stroke-info",   text: "text-info",   bg: "bg-info/10",   border: "border-info/30",  bar: "bg-info" },
+  C: { ring: "stroke-warn", text: "text-warn", bg: "bg-warn/10", border: "border-warn/30", bar: "bg-warn" },
+  D: { ring: "stroke-warn", text: "text-warn", bg: "bg-warn/10", border: "border-warn/30", bar: "bg-warn" },
+  F: { ring: "stroke-neg",    text: "text-neg",    bg: "bg-neg/10",    border: "border-neg/30",   bar: "bg-neg" },
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -178,7 +178,7 @@ function SectionCard({ section, idx }: { section: ScoreSection; idx: number }) {
               )}
 
               {section.improvements.length === 0 && (
-                <div className="flex items-center gap-2 text-green-400 text-xs">
+                <div className="flex items-center gap-2 text-pos text-xs">
                   <CheckCircle2 className="w-4 h-4" />
                   This area is performing at its best. Keep it up!
                 </div>
@@ -230,7 +230,7 @@ export default function AppHealth() {
     ? criticalCount >= 2 ? "Needs significant work — critical issues in multiple areas."
     : criticalCount === 1 ? "One critical area needs your immediate attention."
     : poorCount >= 2 ? "Room for improvement in several areas."
-    : excellentCount >= 6 ? "Excellent overall — you're using TradeAI at a high level."
+    : excellentCount >= 6 ? "Excellent overall — you're using Trade Depot at a high level."
     : "Good foundation — keep building your habits and configuration."
     : null;
 
@@ -337,15 +337,15 @@ export default function AppHealth() {
 
                     <div className="flex flex-wrap gap-3 justify-center sm:justify-start pt-1">
                       <div className="text-center">
-                        <p className="text-lg font-bold text-green-400">{excellentCount}</p>
+                        <p className="text-lg font-bold text-pos">{excellentCount}</p>
                         <p className="text-[10px] text-muted-foreground uppercase">Excellent</p>
                       </div>
                       <div className="text-center">
-                        <p className="text-lg font-bold text-yellow-400">{poorCount}</p>
+                        <p className="text-lg font-bold text-warn">{poorCount}</p>
                         <p className="text-[10px] text-muted-foreground uppercase">Need Work</p>
                       </div>
                       <div className="text-center">
-                        <p className="text-lg font-bold text-red-400">{criticalCount}</p>
+                        <p className="text-lg font-bold text-neg">{criticalCount}</p>
                         <p className="text-[10px] text-muted-foreground uppercase">Critical</p>
                       </div>
                     </div>

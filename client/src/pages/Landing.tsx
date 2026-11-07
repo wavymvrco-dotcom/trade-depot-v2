@@ -1,363 +1,308 @@
+// Copyright © 2026 [OWNER ENTITY]. All rights reserved. Proprietary and confidential.
+// Public landing page — Research Journal "A3 · Console + system reel"
+// (reference: docs/design/landing-a3.dc.html; structure: build sheet §17.2).
+
+import { useRef, useState } from "react";
 import { Link } from "wouter";
-import { motion } from "framer-motion";
-import {
-  LineChart, Bot, Shield, Newspaper, BookMarked, Store,
-  BarChart2, Zap, ArrowRight, Star, TrendingUp,
-  Brain, Clock, Globe, ChevronRight, Sparkles, Lock,
-  Activity, Target, Users,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { landing } from "@/content/landing";
+import { filmFor, type Film } from "@/content/films";
+import { FilmPlayer } from "@/components/films/FilmPlayer";
+import { StatusBadge, type Status } from "@/components/lab/StatusBadge";
 
-const FEATURES = [
-  {
-    icon: Zap,
-    color: "text-yellow-400",
-    bg: "bg-yellow-400/10",
-    border: "border-yellow-400/20",
-    title: "AI Signal Engine",
-    desc: "5 AI providers (GPT-4o, Claude 3.5, Gemini, Groq, Perplexity) generate confluence-based entry signals with confidence scores, stop-loss, and take-profit levels.",
-  },
-  {
-    icon: Shield,
-    color: "text-blue-400",
-    bg: "bg-blue-400/10",
-    border: "border-blue-400/20",
-    title: "Intelligent Risk Management",
-    desc: "Per-trade lot sizing, daily loss limits, max drawdown guards, session-based trading hours, and off-hours AI autonomy controls.",
-  },
-  {
-    icon: Newspaper,
-    color: "text-green-400",
-    bg: "bg-green-400/10",
-    border: "border-green-400/20",
-    title: "News Intelligence",
-    desc: "Real-time news filtered by your instruments (forex, stocks, crypto, bonds) with AI sentiment analysis — bullish/bearish scores and urgency ratings per article.",
-  },
-  {
-    icon: Brain,
-    color: "text-purple-400",
-    bg: "bg-purple-400/10",
-    border: "border-purple-400/20",
-    title: "AI Trade Grading",
-    desc: "Every closed trade gets an A+ to F grade from your AI coach. Identifies recurring mistakes (FOMO, revenge trading, oversize) and builds a personal knowledge base.",
-  },
-  {
-    icon: BookMarked,
-    color: "text-orange-400",
-    bg: "bg-orange-400/10",
-    border: "border-orange-400/20",
-    title: "Trade Journal",
-    desc: "Log every trade with emotions, notes, and outcomes. GitHub-style P&L heatmap, equity curve, and CSV export for external analysis.",
-  },
-  {
-    icon: Store,
-    color: "text-pink-400",
-    bg: "bg-pink-400/10",
-    border: "border-pink-400/20",
-    title: "Strategy Marketplace",
-    desc: "Publish your edge, discover community strategies, one-click copy to your profile. Sorted by win rate, return, and community votes.",
-  },
+const t = landing.en;
+
+const EXAMPLE_ROWS: { name: string; status: Status; label: string; vault: string; shadow: string; dim?: boolean }[] = [
+  { name: "London Breakout", status: "licensed", label: "Licensed", vault: "+9.1R", shadow: "31 d" },
+  { name: "Asia Range Fade", status: "shadow", label: "Shadow", vault: "+4.6R", shadow: "18 d" },
+  { name: "NY Open Momentum", status: "arena", label: "Arena", vault: "—", shadow: "—" },
+  { name: "Gold Mean Revert", status: "rejected", label: "Rejected", vault: "−2.3R", shadow: "—", dim: true },
 ];
 
-const STEPS = [
-  {
-    n: "01",
-    icon: Brain,
-    title: "Connect your AI",
-    desc: "Paste your API key for OpenAI, Anthropic, Google Gemini, Groq, or Perplexity. The AI analyzes live prices, your strategy, and the knowledge base.",
-  },
-  {
-    n: "02",
-    icon: Target,
-    title: "Configure your edge",
-    desc: "Set your trading style, risk %, R:R ratio, active sessions, and instrument preferences. The terminal personalizes everything to your system.",
-  },
-  {
-    n: "03",
-    icon: TrendingUp,
-    title: "Trade, review, improve",
-    desc: "Get real-time signals, execute trades, receive AI graded reviews, and watch your knowledge base grow smarter with every position.",
-  },
-];
+const section = "px-4 md:px-12 lg:px-24 py-12 md:py-24 border-t border-rule";
+const inner = "max-w-[1248px] mx-auto";
+const eyebrow = "text-[13px] tracking-[0.14em] text-muted-foreground font-semibold";
+const btn = "inline-flex items-center justify-center min-h-[44px] px-5 rounded-md bg-primary text-primary-foreground font-medium hover:opacity-90";
 
-const STATS = [
-  { label: "AI Providers", value: "5", icon: Brain },
-  { label: "Trading Tools", value: "13", icon: BarChart2 },
-  { label: "Free in Beta", value: "100%", icon: Sparkles },
-  { label: "Uptime", value: "99.9%", icon: Activity },
-];
+function Console() {
+  return (
+    <div className="bg-card border border-border rounded-[14px] shadow-[0_16px_40px_rgba(26,26,26,0.07)] overflow-hidden w-full">
+      <div className="flex justify-between items-center px-5 py-4 border-b border-border">
+        <span className="font-semibold text-[15px]">{t.hero.console.title}</span>
+        <span className="font-mono text-xs text-muted-foreground">{t.hero.console.label}</span>
+      </div>
+      {/* Table on wider screens, stacked cards on phones */}
+      <table className="hidden sm:table w-full text-sm">
+        <caption className="sr-only">{t.hero.console.title} ({t.hero.console.label})</caption>
+        <thead>
+          <tr className="text-xs text-muted-foreground border-b border-border">
+            {t.hero.console.cols.map((c, i) => (
+              <th key={c} scope="col" className={`font-normal text-left py-2.5 ${i === 0 ? "pl-5 w-[40%]" : ""}`}>{c}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {EXAMPLE_ROWS.map((r, i) => (
+            <tr key={r.name} className={i < EXAMPLE_ROWS.length - 1 ? "border-b border-border/60" : ""}>
+              <th scope="row" className={`text-left font-semibold pl-5 py-3.5 ${r.dim ? "text-muted-foreground" : ""}`}>{r.name}</th>
+              <td><StatusBadge status={r.status} label={r.label} /></td>
+              <td className={`font-mono ${r.dim ? "text-muted-foreground" : ""}`}>{r.vault}</td>
+              <td className={`font-mono ${r.dim ? "text-muted-foreground" : ""}`}>{r.shadow}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <ul className="sm:hidden divide-y divide-border/60">
+        {EXAMPLE_ROWS.map(r => (
+          <li key={r.name} className="px-5 py-3.5 flex flex-col gap-1.5">
+            <div className="flex justify-between items-center gap-2">
+              <span className={`font-semibold ${r.dim ? "text-muted-foreground" : ""}`}>{r.name}</span>
+              <StatusBadge status={r.status} label={r.label} />
+            </div>
+            <div className="flex gap-4 text-xs text-muted-foreground">
+              <span>Vault <span className="font-mono text-foreground">{r.vault}</span></span>
+              <span>Shadow <span className="font-mono text-foreground">{r.shadow}</span></span>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function Reel() {
+  const [sel, setSel] = useState(0);
+  const tabs = useRef<(HTMLButtonElement | null)[]>([]);
+  const systems = t.reel.systems;
+  const active = systems[sel];
+  const pick = (i: number) => { setSel(i); tabs.current[i]?.focus(); };
+  const onKey = (e: React.KeyboardEvent, i: number) => {
+    const n = systems.length;
+    const next = e.key === "ArrowRight" ? (i + 1) % n : e.key === "ArrowLeft" ? (i - 1 + n) % n
+      : e.key === "Home" ? 0 : e.key === "End" ? n - 1 : -1;
+    if (next >= 0) { e.preventDefault(); pick(next); }
+  };
+
+  return (
+    <section id="reel" aria-labelledby="reel-title" className="px-4 md:px-12 lg:px-24 pb-12 md:pb-24">
+      <div className={`${inner} bg-card border border-border rounded-2xl p-5 md:p-7 flex flex-col gap-6`}>
+        <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4">
+          <h2 id="reel-title" className="text-[28px] md:text-[34px] m-0">{t.reel.title}</h2>
+          <div role="tablist" aria-label="Systems" className="flex gap-2 overflow-x-auto no-scrollbar -mx-1 px-1">
+            {systems.map((s, i) => (
+              <button key={s.id} ref={el => { tabs.current[i] = el; }}
+                type="button" role="tab" id={`reel-tab-${s.id}`}
+                aria-selected={i === sel} aria-controls="reel-panel" tabIndex={i === sel ? 0 : -1}
+                onClick={() => setSel(i)} onKeyDown={e => onKey(e, i)}
+                className={`min-h-[44px] px-4 rounded-full border text-sm whitespace-nowrap transition-colors ${i === sel
+                  ? "bg-primary border-primary text-primary-foreground font-semibold"
+                  : "bg-card border-rule text-foreground font-medium hover:border-primary"}`}>
+                {s.name}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div id="reel-panel" role="tabpanel" aria-labelledby={`reel-tab-${active.id}`} className="flex flex-col xl:flex-row gap-6 xl:gap-8 xl:items-stretch">
+          <FilmPlayer film={filmFor(active.id as Film["system"])} code={active.code} className="w-full xl:basis-[760px] xl:shrink-0 aspect-video xl:aspect-auto xl:h-[428px]" />
+          <div className="flex-1 flex flex-col gap-3.5 justify-center">
+            <p className={`${eyebrow} m-0`}>{active.step}</p>
+            <h3 className="text-[26px] md:text-[32px] leading-[1.12] m-0">{active.headline}</h3>
+            <p className="text-base leading-relaxed text-ink-2 m-0">{active.body}</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
 
 export default function Landing() {
   return (
-    <div className="min-h-screen bg-[#070710] text-white overflow-x-hidden">
-      {/* ── Nav ── */}
-      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-white/5 bg-[#070710]/80 backdrop-blur-xl">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/30">
-              <LineChart className="w-4.5 h-4.5 text-white" style={{ width: 18, height: 18 }} />
-            </div>
-            <span className="font-bold text-lg tracking-tight">TradeAI <span className="text-cyan-400">Terminal</span></span>
+    <div className="h-screen overflow-y-auto bg-background text-foreground font-sans">
+      <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 bg-card px-3 py-2 rounded-md z-50">Skip to content</a>
+
+      {/* 1. Top bar */}
+      <header className="border-b border-rule px-4 md:px-12 lg:px-24 py-4 md:py-6">
+        <nav aria-label="Main" className={`${inner} flex justify-between items-center gap-4`}>
+          <span className="font-display text-[22px] md:text-[26px] font-semibold">Trade Depot</span>
+          <div className="flex gap-5 lg:gap-8 text-[15px] items-center">
+            <a href="#reel" className="hidden md:inline text-ink-2 hover:text-primary">{t.nav.systems}</a>
+            <a href="#prop" className="hidden md:inline text-ink-2 hover:text-primary">{t.nav.prop}</a>
+            <a href="#pricing" className="hidden md:inline text-ink-2 hover:text-primary">{t.nav.pricing}</a>
+            <Link href="/auth" className="text-ink-2 hover:text-primary min-h-[44px] inline-flex items-center">{t.nav.signIn}</Link>
+            <Link href="/auth?mode=register" className={btn}>{t.nav.start}</Link>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="hidden sm:flex items-center gap-1.5 text-xs font-medium bg-green-500/10 text-green-400 border border-green-500/20 rounded-full px-3 py-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-              Free Beta
-            </span>
-            <Link href="/auth">
-              <Button variant="ghost" size="sm" className="text-white/70 hover:text-white text-sm">Log in</Button>
-            </Link>
-            <Link href="/auth">
-              <Button size="sm" className="bg-cyan-500 hover:bg-cyan-400 text-black font-semibold shadow-lg shadow-cyan-500/25 text-sm px-4">
-                Get started free
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </nav>
+        </nav>
+      </header>
 
-      {/* ── Hero ── */}
-      <section className="relative pt-32 pb-24 px-4 sm:px-6 overflow-hidden">
-        {/* Background glow */}
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-cyan-500/5 rounded-full blur-[120px]" />
-          <div className="absolute top-20 left-1/4 w-[300px] h-[300px] bg-blue-500/5 rounded-full blur-[80px]" />
-          <div className="absolute top-20 right-1/4 w-[300px] h-[300px] bg-purple-500/5 rounded-full blur-[80px]" />
-        </div>
-
-        <div className="max-w-4xl mx-auto text-center relative">
-          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-            <div className="inline-flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-4 py-1.5 mb-8 text-sm">
-              <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-              <span className="text-white/70">Now in open beta — </span>
-              <span className="text-cyan-400 font-semibold">100% free until launch</span>
+      <main id="main">
+        {/* 2. Hero */}
+        <section className="px-4 md:px-12 lg:px-24 pt-10 md:pt-14 pb-10 md:pb-12">
+          <div className={`${inner} flex flex-col xl:flex-row gap-10 xl:gap-16 xl:items-center`}>
+            <div className="flex-1 flex flex-col gap-5">
+              <p className={`${eyebrow} m-0`}>{t.hero.eyebrow}</p>
+              <h1 className="m-0 text-[40px] md:text-[56px] lg:text-[64px] leading-[1.03]">{t.hero.title}</h1>
+              <p className="m-0 text-[17px] md:text-[19px] leading-[1.55] text-ink-2 max-w-[540px]">{t.hero.body}</p>
+              <Link href="/auth?mode=register" className={`${btn} self-start px-[22px]`}>{t.hero.cta}</Link>
             </div>
-          </motion.div>
+            <div className="w-full max-w-[640px] xl:basis-[600px] xl:shrink-0"><Console /></div>
+          </div>
+        </section>
 
-          <motion.h1
-            initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.1 }}
-            className="text-5xl sm:text-6xl lg:text-7xl font-bold leading-[1.05] tracking-tight mb-6"
-          >
-            Trade smarter with{" "}
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400">
-              AI you control
-            </span>
-          </motion.h1>
+        {/* 3. System reel */}
+        <Reel />
 
-          <motion.p
-            initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.2 }}
-            className="text-lg sm:text-xl text-white/50 max-w-2xl mx-auto mb-10 leading-relaxed"
-          >
-            A professional forex terminal with 5 AI providers, real-time signals, intelligent risk management, AI trade grading, and a growing strategy marketplace — in one sleek platform.
-          </motion.p>
+        {/* 4. The problem */}
+        <section className={section} aria-labelledby="problem-title">
+          <div className={inner}>
+            <h2 id="problem-title" className="text-[32px] md:text-[40px] m-0 mb-8 md:mb-12">{t.problem.title}</h2>
+            <div className="grid md:grid-cols-3 gap-4 md:gap-6">
+              {t.problem.cards.map(c => (
+                <article key={c.title} className="bg-card border border-border rounded-xl p-6">
+                  <h3 className="text-[22px] m-0 mb-2">{c.title}</h3>
+                  <p className="m-0 text-ink-2 leading-relaxed">{c.body}</p>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
 
-          <motion.div
-            initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.3 }}
-            className="flex flex-col sm:flex-row gap-3 justify-center mb-16"
-          >
-            <Link href="/auth">
-              <Button size="lg" className="bg-cyan-500 hover:bg-cyan-400 text-black font-bold shadow-xl shadow-cyan-500/30 text-base px-8 h-12 gap-2 group">
-                Start trading free
-                <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
-              </Button>
-            </Link>
-            <a href="#features">
-              <Button size="lg" variant="outline" className="border-white/10 text-white/70 hover:bg-white/5 hover:text-white text-base px-8 h-12">
-                See all features
-              </Button>
-            </a>
-          </motion.div>
+        {/* 5. The loop */}
+        <section className={section} aria-labelledby="loop-title">
+          <div className={inner}>
+            <h2 id="loop-title" className="text-[32px] md:text-[40px] m-0 mb-8 md:mb-12">{t.loop.title}</h2>
+            <ol className="grid sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-8 list-none p-0 m-0">
+              {t.loop.stages.map((s, i) => (
+                <li key={s.name} className="border-t border-rule pt-4">
+                  <span className="font-mono text-xs text-muted-foreground">{String(i + 1).padStart(2, "0")}</span>
+                  <h3 className="text-xl m-0 mt-1 mb-1.5">{s.name}</h3>
+                  <p className="m-0 text-ink-2 text-[15px] leading-relaxed">{s.body}</p>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </section>
 
-          {/* Stats row */}
-          <motion.div
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5, delay: 0.45 }}
-            className="grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-2xl mx-auto"
-          >
-            {STATS.map(({ label, value, icon: Icon }) => (
-              <div key={label} className="bg-white/[0.03] border border-white/[0.07] rounded-xl p-4">
-                <Icon className="w-4 h-4 text-cyan-400 mb-2 mx-auto" />
-                <div className="text-2xl font-bold text-white">{value}</div>
-                <div className="text-xs text-white/40 mt-0.5">{label}</div>
+        {/* 6. Prop traders */}
+        <section id="prop" className={section} aria-labelledby="prop-title">
+          <div className={`${inner} flex flex-col lg:flex-row gap-10 lg:gap-16 lg:items-center`}>
+            <div className="flex-1 flex flex-col gap-4">
+              <p className={`${eyebrow} m-0`}>{t.prop.eyebrow}</p>
+              <h2 id="prop-title" className="text-[32px] md:text-[40px] m-0">{t.prop.title}</h2>
+              <p className="m-0 text-ink-2 text-[17px] leading-relaxed max-w-[560px]">{t.prop.body}</p>
+              <figure className="m-0 mt-2 flex items-baseline gap-3">
+                <span className="font-mono text-4xl">{t.prop.stat}</span>
+                <figcaption className="text-ink-2">{t.prop.statLabel}<br /><cite className="text-xs text-muted-foreground not-italic">{t.prop.statSource}</cite></figcaption>
+              </figure>
+            </div>
+            <div className="lg:basis-[440px] lg:shrink-0 bg-card border border-border rounded-2xl p-6 flex flex-col gap-4">
+              <div className="flex justify-between items-center">
+                <span className="font-semibold">{t.prop.card.title}</span>
+                <span className="font-mono text-xs text-muted-foreground">{t.prop.card.label}</span>
               </div>
-            ))}
-          </motion.div>
-        </div>
-
-        {/* Terminal preview mockup */}
-        <motion.div
-          initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 0.5 }}
-          className="max-w-5xl mx-auto mt-16 relative"
-        >
-          <div className="absolute inset-0 bg-gradient-to-t from-[#070710] via-transparent to-transparent z-10 pointer-events-none" style={{ top: "60%" }} />
-          <div className="rounded-2xl border border-white/10 bg-[#0d0d1a] overflow-hidden shadow-2xl shadow-black/60">
-            <div className="flex items-center gap-2 px-4 py-3 border-b border-white/5 bg-white/[0.02]">
-              <div className="w-3 h-3 rounded-full bg-red-500/60" />
-              <div className="w-3 h-3 rounded-full bg-yellow-500/60" />
-              <div className="w-3 h-3 rounded-full bg-green-500/60" />
-              <div className="ml-3 flex-1 bg-white/5 rounded px-3 py-1 text-xs text-white/20">tradeai.terminal</div>
-            </div>
-            <div className="flex h-64 sm:h-80">
-              {/* Sidebar preview */}
-              <div className="w-14 border-r border-white/5 bg-white/[0.02] flex flex-col items-center gap-2 py-4">
-                {[LineChart, BarChart2, Newspaper, Shield, Bot, BookMarked].map((Icon, i) => (
-                  <div key={i} className={cn("w-9 h-9 rounded-lg flex items-center justify-center", i === 0 ? "bg-cyan-500/20 text-cyan-400" : "text-white/20")}>
-                    <Icon className="w-4 h-4" />
-                  </div>
+              <div className="bg-secondary rounded-xl p-5">
+                <span className="font-mono text-4xl">{t.prop.card.range}</span>
+                <p className="m-0 text-sm text-muted-foreground mt-1">{t.prop.card.rangeLabel}</p>
+              </div>
+              <dl className="m-0 text-sm divide-y divide-border">
+                {t.prop.card.rows.map(([k, v]) => (
+                  <div key={k} className="flex justify-between py-2"><dt className="text-muted-foreground">{k}</dt><dd className="m-0 font-mono">{v}</dd></div>
                 ))}
+              </dl>
+            </div>
+          </div>
+        </section>
+
+        {/* 7. License / Proof of Process */}
+        <section className={section} aria-labelledby="license-title">
+          <div className={`${inner} flex flex-col lg:flex-row-reverse gap-10 lg:gap-16 lg:items-center`}>
+            <div className="flex-1 flex flex-col gap-4">
+              <p className={`${eyebrow} m-0`}>{t.license.eyebrow}</p>
+              <h2 id="license-title" className="text-[32px] md:text-[40px] m-0">{t.license.title}</h2>
+              <p className="m-0 text-ink-2 text-[17px] leading-relaxed max-w-[560px]">{t.license.body}</p>
+            </div>
+            <div className="lg:basis-[440px] lg:shrink-0 bg-card border border-border rounded-2xl p-6 flex flex-col gap-4">
+              <div className="flex justify-between items-center gap-3">
+                <span className="font-display text-2xl">{t.license.card.name}</span>
+                <span className="font-mono text-xs text-muted-foreground">{t.license.card.label}</span>
               </div>
-              {/* Content preview */}
-              <div className="flex-1 p-4 space-y-3">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="h-5 w-32 rounded bg-white/5" />
-                  <div className="h-5 w-20 rounded bg-cyan-500/10 border border-cyan-500/20" />
-                  <div className="ml-auto h-5 w-24 rounded bg-green-500/10 border border-green-500/20" />
-                </div>
-                <div className="grid grid-cols-3 gap-3">
-                  {[...Array(3)].map((_, i) => (
-                    <div key={i} className="bg-white/[0.03] border border-white/5 rounded-lg p-3 space-y-2">
-                      <div className="h-3 w-16 rounded bg-white/5" />
-                      <div className="h-5 w-24 rounded bg-white/10" />
-                      <div className={cn("h-2 w-12 rounded", i === 0 ? "bg-green-500/30" : i === 1 ? "bg-red-500/30" : "bg-yellow-500/30")} />
-                    </div>
-                  ))}
-                </div>
-                <div className="bg-white/[0.03] border border-white/5 rounded-lg p-3 flex items-center gap-3">
-                  <div className="w-8 h-8 rounded bg-cyan-500/20 flex items-center justify-center">
-                    <Zap className="w-4 h-4 text-cyan-400" />
-                  </div>
-                  <div className="flex-1 space-y-1.5">
-                    <div className="h-3 w-40 rounded bg-white/10" />
-                    <div className="h-2 w-64 rounded bg-white/5" />
-                  </div>
-                  <div className="h-7 w-20 rounded-lg bg-cyan-500/20 border border-cyan-500/30" />
-                </div>
-                <div className="bg-white/[0.03] border border-white/5 rounded-lg p-3 h-20 flex items-end gap-1 px-4">
-                  {[40, 55, 35, 70, 45, 80, 60, 75, 50, 90, 65, 85].map((h, i) => (
-                    <div key={i} className="flex-1 rounded-sm" style={{ height: `${h}%`, background: h > 65 ? "rgba(34,197,94,0.4)" : "rgba(239,68,68,0.3)" }} />
-                  ))}
-                </div>
-              </div>
+              <StatusBadge status="licensed" />
+              <dl className="m-0 text-sm divide-y divide-border">
+                {t.license.card.rows.map(([k, v]) => (
+                  <div key={k} className="flex justify-between gap-4 py-2"><dt className="text-muted-foreground">{k}</dt><dd className="m-0 font-mono text-right">{v}</dd></div>
+                ))}
+              </dl>
             </div>
           </div>
-        </motion.div>
-      </section>
+        </section>
 
-      {/* ── Features ── */}
-      <section id="features" className="py-24 px-4 sm:px-6">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-16">
-            <div className="inline-flex items-center gap-2 text-xs font-semibold text-cyan-400 uppercase tracking-widest mb-4">
-              <span className="w-8 h-px bg-cyan-400/40" />
-              Everything you need
-              <span className="w-8 h-px bg-cyan-400/40" />
-            </div>
-            <h2 className="text-3xl sm:text-4xl font-bold mb-4">Professional tools. AI-powered edge.</h2>
-            <p className="text-white/40 text-lg max-w-xl mx-auto">Built for serious traders who want systematic, data-driven decision making — not guesswork.</p>
+        {/* 8. Markets */}
+        <section className={section} aria-labelledby="markets-title">
+          <div className={inner}>
+            <h2 id="markets-title" className="text-[32px] md:text-[40px] m-0 mb-8">{t.markets.title}</h2>
+            <ul className="grid grid-cols-2 md:grid-cols-4 gap-4 list-none p-0 m-0">
+              {t.markets.items.map(m => (
+                <li key={m.name} className="bg-card border border-border rounded-xl p-5 flex justify-between items-center gap-2">
+                  <span className="font-medium">{m.name}</span>
+                  <StatusBadge status={m.status === "Live" ? "passed" : "arena"} label={m.status} />
+                </li>
+              ))}
+            </ul>
           </div>
+        </section>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {FEATURES.map((f, i) => (
-              <motion.div
-                key={f.title}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.08 }}
-                className={cn("group rounded-2xl border p-6 bg-white/[0.02] hover:bg-white/[0.04] transition-all duration-300", f.border)}
-              >
-                <div className={cn("w-11 h-11 rounded-xl flex items-center justify-center mb-4", f.bg)}>
-                  <f.icon className={cn("w-5 h-5", f.color)} />
-                </div>
-                <h3 className="font-bold text-base mb-2 text-white">{f.title}</h3>
-                <p className="text-sm text-white/40 leading-relaxed">{f.desc}</p>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── How it works ── */}
-      <section className="py-24 px-4 sm:px-6 border-y border-white/5 bg-white/[0.01]">
-        <div className="max-w-5xl mx-auto">
-          <div className="text-center mb-16">
-            <div className="inline-flex items-center gap-2 text-xs font-semibold text-purple-400 uppercase tracking-widest mb-4">
-              <span className="w-8 h-px bg-purple-400/40" />
-              Three steps
-              <span className="w-8 h-px bg-purple-400/40" />
+        {/* 9. Learn */}
+        <section className={section} aria-labelledby="learn-title">
+          <div className={inner}>
+            <h2 id="learn-title" className="text-[32px] md:text-[40px] m-0 mb-8">{t.learn.title}</h2>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {t.learn.guides.map(g => (
+                <article key={g.title} lang={g.lang === "ES" ? "es" : "en"} className="bg-card border border-border rounded-xl p-5 flex flex-col gap-2">
+                  <span className="font-mono text-xs text-muted-foreground">{g.lang}</span>
+                  <h3 className="text-lg m-0">{g.title}</h3>
+                  <p className="m-0 text-sm text-ink-2 leading-relaxed">{g.body}</p>
+                </article>
+              ))}
             </div>
-            <h2 className="text-3xl sm:text-4xl font-bold mb-4">Up and running in minutes</h2>
-            <p className="text-white/40 text-lg max-w-xl mx-auto">No complex setup. No broker requirement to start. Just connect an AI key and trade.</p>
           </div>
+        </section>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {STEPS.map((s, i) => (
-              <motion.div
-                key={s.n}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.1 }}
-                className="relative"
-              >
-                {i < STEPS.length - 1 && (
-                  <div className="hidden md:block absolute top-6 left-[calc(100%+16px)] w-[calc(100%-32px)] h-px bg-gradient-to-r from-white/10 to-transparent" />
-                )}
-                <div className="text-5xl font-black text-white/[0.04] mb-4 leading-none">{s.n}</div>
-                <div className="w-12 h-12 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center mb-4">
-                  <s.icon className="w-6 h-6 text-purple-400" />
-                </div>
-                <h3 className="font-bold text-lg mb-2">{s.title}</h3>
-                <p className="text-white/40 text-sm leading-relaxed">{s.desc}</p>
-              </motion.div>
-            ))}
+        {/* 10. Pricing */}
+        <section id="pricing" className={section} aria-labelledby="pricing-title">
+          <div className={inner}>
+            <h2 id="pricing-title" className="text-[32px] md:text-[40px] m-0 mb-8">{t.pricing.title}</h2>
+            <div className="grid md:grid-cols-2 gap-4 md:gap-6 max-w-[880px]">
+              {t.pricing.plans.map(p => (
+                <article key={p.name} className="bg-card border border-border rounded-2xl p-6 md:p-8 flex flex-col gap-4">
+                  <h3 className="text-2xl m-0">{p.name}</h3>
+                  <span className="font-mono text-3xl">{p.price}</span>
+                  <ul className="m-0 pl-5 text-ink-2 space-y-1.5">
+                    {p.features.map(f => <li key={f}>{f}</li>)}
+                  </ul>
+                  <Link href="/auth?mode=register" className={`${btn} self-start mt-auto`}>{t.nav.start}</Link>
+                </article>
+              ))}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* ── CTA ── */}
-      <section className="py-24 px-4 sm:px-6 border-t border-white/5">
-        <div className="max-w-3xl mx-auto text-center">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.97 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            viewport={{ once: true }}
-            className="bg-gradient-to-b from-cyan-500/10 to-blue-500/5 border border-cyan-500/20 rounded-3xl p-12"
-          >
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center mx-auto mb-6 shadow-2xl shadow-cyan-500/30">
-              <LineChart className="w-8 h-8 text-white" />
-            </div>
-            <h2 className="text-3xl sm:text-4xl font-bold mb-4">Ready to trade with AI?</h2>
-            <p className="text-white/40 text-lg mb-8">
-              Join traders already using TradeAI Terminal. Free during beta — no card needed.
-            </p>
-            <Link href="/auth">
-              <Button size="lg" className="bg-cyan-500 hover:bg-cyan-400 text-black font-bold shadow-xl shadow-cyan-500/30 text-base px-10 h-12 gap-2 group">
-                Create free account
-                <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
-              </Button>
-            </Link>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* ── Footer ── */}
-      <footer className="border-t border-white/5 py-12 px-4 sm:px-6">
-        <div className="max-w-6xl mx-auto">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
-            <div className="flex items-center gap-2.5">
-              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center">
-                <LineChart className="w-3.5 h-3.5 text-white" />
-              </div>
-              <span className="font-bold text-sm text-white/70">TradeAI Terminal</span>
-            </div>
-            <div className="flex items-center gap-6 text-sm text-white/30">
-              <Link href="/terms" className="hover:text-white/60 transition-colors">Terms of Service</Link>
-              <Link href="/privacy" className="hover:text-white/60 transition-colors">Privacy Policy</Link>
-              <Link href="/auth" className="hover:text-white/60 transition-colors">Log in</Link>
-            </div>
-            <p className="text-xs text-white/20">© 2026 TradeAI Terminal. All rights reserved.</p>
+        {/* 11. Final CTA */}
+        <section className={`${section} text-center`} aria-labelledby="final-title">
+          <div className={`${inner} flex flex-col items-center gap-6`}>
+            <h2 id="final-title" className="text-[34px] md:text-[48px] m-0">{t.final.title}</h2>
+            <Link href="/auth?mode=register" className={btn}>{t.final.cta}</Link>
           </div>
+        </section>
+      </main>
+
+      {/* 12. Footer */}
+      <footer className="border-t border-rule px-4 md:px-12 lg:px-24 py-10 pb-16">
+        <div className={`${inner} flex flex-col gap-4 text-sm text-muted-foreground`}>
+          <div className="flex gap-6">
+            <Link href="/terms" className="hover:text-primary min-h-[44px] inline-flex items-center">{t.footer.links.terms}</Link>
+            <Link href="/privacy" className="hover:text-primary min-h-[44px] inline-flex items-center">{t.footer.links.privacy}</Link>
+            <Link href="/auth" className="hover:text-primary min-h-[44px] inline-flex items-center">{t.footer.links.signIn}</Link>
+          </div>
+          <p className="m-0 max-w-[760px] leading-relaxed">{t.footer.disclaimer}</p>
+          <p className="m-0">{t.footer.copyright}</p>
         </div>
       </footer>
     </div>

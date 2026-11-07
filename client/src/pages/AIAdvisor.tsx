@@ -16,25 +16,25 @@ import { Badge } from "@/components/ui/badge";
 type Tab = "signals" | "brain" | "reviews" | "report";
 
 const CATEGORY_META: Record<string, { label: string; color: string; icon: typeof Zap }> = {
-  entry_pattern:    { label: "Entry Pattern",    color: "bg-blue-500/15 text-blue-400 border-blue-500/20",   icon: Target },
-  risk_rule:        { label: "Risk Rule",         color: "bg-amber-500/15 text-amber-400 border-amber-500/20", icon: Shield },
-  pair_behavior:    { label: "Pair Behavior",     color: "bg-violet-500/15 text-violet-400 border-violet-500/20", icon: Activity },
-  psychology:       { label: "Psychology",        color: "bg-rose-500/15 text-rose-400 border-rose-500/20",   icon: Brain },
-  market_mechanics: { label: "Market Mechanics",  color: "bg-green-500/15 text-green-400 border-green-500/20", icon: BarChart2 },
+  entry_pattern:    { label: "Entry Pattern",    color: "bg-info/15 text-info border-info/20",   icon: Target },
+  risk_rule:        { label: "Risk Rule",         color: "bg-warn/15 text-warn border-warn/20", icon: Shield },
+  pair_behavior:    { label: "Pair Behavior",     color: "bg-info/15 text-info border-info/20", icon: Activity },
+  psychology:       { label: "Psychology",        color: "bg-neg/15 text-neg border-neg/20",   icon: Brain },
+  market_mechanics: { label: "Market Mechanics",  color: "bg-pos/15 text-pos border-pos/20", icon: BarChart2 },
   learned:          { label: "AI Learned",        color: "bg-primary/15 text-primary border-primary/20",      icon: Zap },
 };
 
 const GRADE_META: Record<string, { color: string; bg: string }> = {
-  "A+": { color: "text-green-400",  bg: "bg-green-500/15 border-green-500/30" },
-  "A":  { color: "text-green-400",  bg: "bg-green-500/10 border-green-500/20" },
-  "B":  { color: "text-blue-400",   bg: "bg-blue-500/10 border-blue-500/20"   },
-  "C":  { color: "text-amber-400",  bg: "bg-amber-500/10 border-amber-500/20" },
-  "D":  { color: "text-orange-400", bg: "bg-orange-500/10 border-orange-500/20" },
-  "F":  { color: "text-red-400",    bg: "bg-red-500/10 border-red-500/20"     },
+  "A+": { color: "text-pos",  bg: "bg-pos/15 border-pos/30" },
+  "A":  { color: "text-pos",  bg: "bg-pos/10 border-pos/20" },
+  "B":  { color: "text-info",   bg: "bg-info/10 border-info/20"   },
+  "C":  { color: "text-warn",  bg: "bg-warn/10 border-warn/20" },
+  "D":  { color: "text-warn", bg: "bg-warn/10 border-warn/20" },
+  "F":  { color: "text-neg",    bg: "bg-neg/10 border-neg/20"     },
 };
 
 function ConfidenceBar({ value }: { value: number }) {
-  const color = value >= 85 ? "bg-green-500" : value >= 75 ? "bg-blue-500" : value >= 65 ? "bg-amber-500" : "bg-red-500";
+  const color = value >= 85 ? "bg-pos" : value >= 75 ? "bg-info" : value >= 65 ? "bg-warn" : "bg-neg";
   return (
     <div className="flex items-center gap-2">
       <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
@@ -111,9 +111,9 @@ function SignalsTab() {
                     <div className={cn(
                       "px-2.5 py-0.5 rounded-md text-xs font-bold border shrink-0",
                       sig.action.includes("BUY")
-                        ? "bg-green-500/15 text-green-400 border-green-500/30"
+                        ? "bg-pos/15 text-pos border-pos/30"
                         : sig.action.includes("SELL")
-                        ? "bg-red-500/15 text-red-400 border-red-500/30"
+                        ? "bg-neg/15 text-neg border-neg/30"
                         : "bg-muted text-muted-foreground border-border"
                     )}>
                       {sig.action.includes("BUY") ? <><ArrowUpRight className="w-3 h-3 inline mr-0.5" />{sig.action}</> : sig.action.includes("SELL") ? <><ArrowDownRight className="w-3 h-3 inline mr-0.5" />{sig.action}</> : <><Minus className="w-3 h-3 inline mr-0.5" />HOLD</>}
@@ -123,7 +123,7 @@ function SignalsTab() {
                         title={`TDCI ${sig.tdciScore}/100 ${sig.tdciDirection} at signal time`}
                         className={cn("text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border shrink-0",
                           (sig.tdciDirection === "LONG") === sig.action.includes("BUY") && sig.tdciDirection !== "NEUTRAL"
-                            ? "text-primary border-primary/30 bg-primary/10" : "text-amber-500 border-amber-500/30 bg-amber-500/10")}
+                            ? "text-primary border-primary/30 bg-primary/10" : "text-warn border-warn/30 bg-warn/10")}
                       >
                         TDCI {sig.tdciScore}
                       </span>
@@ -133,7 +133,7 @@ function SignalsTab() {
                         ? <ConfidenceBar value={sig.confidence} />
                         : <span className="text-[10px] text-muted-foreground">{sig.source === "rules" ? "TDCI rule signal" : sig.source === "tradingview" ? "TradingView alert" : "—"}</span>}
                       {sig.outcome && (
-                        <span className={cn("text-[9px] font-semibold", sig.outcome === "TP_HIT" ? "text-green-400" : sig.outcome === "SL_HIT" ? "text-red-400" : "text-muted-foreground")}>
+                        <span className={cn("text-[9px] font-semibold", sig.outcome === "TP_HIT" ? "text-pos" : sig.outcome === "SL_HIT" ? "text-neg" : "text-muted-foreground")}>
                           {sig.outcome.replace("_", " ")}
                         </span>
                       )}
@@ -177,15 +177,15 @@ function SignalsTab() {
                           </div>
                         )}
                         {sig.stopLoss && (
-                          <div className="bg-red-500/5 rounded-lg p-2.5 border border-red-500/10">
-                            <p className="text-[9px] text-red-400 uppercase mb-0.5">Stop Loss</p>
-                            <p className="text-sm font-mono font-bold text-red-400">{sig.stopLoss}</p>
+                          <div className="bg-neg/5 rounded-lg p-2.5 border border-neg/10">
+                            <p className="text-[9px] text-neg uppercase mb-0.5">Stop Loss</p>
+                            <p className="text-sm font-mono font-bold text-neg">{sig.stopLoss}</p>
                           </div>
                         )}
                         {sig.takeProfit && (
-                          <div className="bg-green-500/5 rounded-lg p-2.5 border border-green-500/10">
-                            <p className="text-[9px] text-green-400 uppercase mb-0.5">Take Profit</p>
-                            <p className="text-sm font-mono font-bold text-green-400">{sig.takeProfit}</p>
+                          <div className="bg-pos/5 rounded-lg p-2.5 border border-pos/10">
+                            <p className="text-[9px] text-pos uppercase mb-0.5">Take Profit</p>
+                            <p className="text-sm font-mono font-bold text-pos">{sig.takeProfit}</p>
                           </div>
                         )}
                       </div>
@@ -240,8 +240,8 @@ function BrainTab() {
           <p className="text-2xl font-bold text-primary">{knowledge.length}</p>
           <p className="text-[10px] text-muted-foreground mt-0.5">Total Lessons</p>
         </div>
-        <div className="bg-green-500/5 border border-green-500/20 rounded-xl p-3 text-center">
-          <p className="text-2xl font-bold text-green-400">{expertCount}</p>
+        <div className="bg-pos/5 border border-pos/20 rounded-xl p-3 text-center">
+          <p className="text-2xl font-bold text-pos">{expertCount}</p>
           <p className="text-[10px] text-muted-foreground mt-0.5">Expert Rules</p>
         </div>
         <div className="bg-primary/5 border border-primary/20 rounded-xl p-3 text-center">
@@ -375,14 +375,14 @@ export function ReviewsTab() {
             <p className="text-2xl font-bold">{avgGrade}</p>
             <p className="text-[10px] text-muted-foreground mt-0.5">Avg Score</p>
           </div>
-          <div className="bg-green-500/5 border border-green-500/20 rounded-xl p-3 text-center">
-            <p className="text-2xl font-bold text-green-400">
+          <div className="bg-pos/5 border border-pos/20 rounded-xl p-3 text-center">
+            <p className="text-2xl font-bold text-pos">
               {reviews.filter((r: any) => ["A+", "A"].includes(r.grade)).length}
             </p>
             <p className="text-[10px] text-muted-foreground mt-0.5">A Grades</p>
           </div>
-          <div className="bg-red-500/5 border border-red-500/20 rounded-xl p-3 text-center">
-            <p className="text-2xl font-bold text-red-400">
+          <div className="bg-neg/5 border border-neg/20 rounded-xl p-3 text-center">
+            <p className="text-2xl font-bold text-neg">
               {reviews.filter((r: any) => ["D", "F"].includes(r.grade)).length}
             </p>
             <p className="text-[10px] text-muted-foreground mt-0.5">Need Work</p>
@@ -391,15 +391,15 @@ export function ReviewsTab() {
       )}
 
       {Object.keys(mistakeCounts).length > 0 && (
-        <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-4">
-          <p className="text-xs font-semibold text-amber-400 mb-3 flex items-center gap-1.5">
+        <div className="bg-warn/5 border border-warn/20 rounded-xl p-4">
+          <p className="text-xs font-semibold text-warn mb-3 flex items-center gap-1.5">
             <AlertTriangle className="w-3.5 h-3.5" /> Recurring Mistakes
           </p>
           <div className="flex flex-wrap gap-2">
             {Object.entries(mistakeCounts).sort(([,a],[,b]) => b-a).map(([type, count]) => (
-              <div key={type} className="flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/20 rounded-lg px-2.5 py-1">
-                <span className="text-xs text-amber-400">{MISTAKE_LABELS[type] ?? type}</span>
-                <span className="text-[10px] font-bold text-amber-300 bg-amber-500/20 rounded px-1">{count}×</span>
+              <div key={type} className="flex items-center gap-1.5 bg-warn/10 border border-warn/20 rounded-lg px-2.5 py-1">
+                <span className="text-xs text-warn">{MISTAKE_LABELS[type] ?? type}</span>
+                <span className="text-[10px] font-bold text-warn bg-warn/20 rounded px-1">{count}×</span>
               </div>
             ))}
           </div>
@@ -437,11 +437,11 @@ export function ReviewsTab() {
                       <span className="font-bold text-sm font-mono">{r.symbol}</span>
                       <span className={cn(
                         "text-[10px] px-1.5 py-0.5 rounded border",
-                        r.direction === "long" ? "bg-green-500/10 text-green-400 border-green-500/20" : "bg-red-500/10 text-red-400 border-red-500/20"
+                        r.direction === "long" ? "bg-pos/10 text-pos border-pos/20" : "bg-neg/10 text-neg border-neg/20"
                       )}>
                         {r.direction === "long" ? "↑ LONG" : "↓ SHORT"}
                       </span>
-                      <span className={cn("text-xs font-bold", r.profit >= 0 ? "text-green-400" : "text-red-400")}>
+                      <span className={cn("text-xs font-bold", r.profit >= 0 ? "text-pos" : "text-neg")}>
                         {r.profit >= 0 ? "+" : ""}${r.profit.toFixed(2)}
                       </span>
                       {r.pips != null && (
@@ -458,25 +458,25 @@ export function ReviewsTab() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                   {r.strengths?.length > 0 && (
-                    <div className="bg-green-500/5 border border-green-500/15 rounded-lg p-2.5">
-                      <p className="text-[9px] text-green-400 font-semibold mb-1.5 flex items-center gap-1">
+                    <div className="bg-pos/5 border border-pos/15 rounded-lg p-2.5">
+                      <p className="text-[9px] text-pos font-semibold mb-1.5 flex items-center gap-1">
                         <CheckCircle2 className="w-3 h-3" /> Strengths
                       </p>
                       <ul className="space-y-0.5">
                         {r.strengths.map((s: string, i: number) => (
-                          <li key={i} className="text-[10px] text-green-300">{s}</li>
+                          <li key={i} className="text-[10px] text-pos">{s}</li>
                         ))}
                       </ul>
                     </div>
                   )}
                   {r.improvements?.length > 0 && (
-                    <div className="bg-amber-500/5 border border-amber-500/15 rounded-lg p-2.5">
-                      <p className="text-[9px] text-amber-400 font-semibold mb-1.5 flex items-center gap-1">
+                    <div className="bg-warn/5 border border-warn/15 rounded-lg p-2.5">
+                      <p className="text-[9px] text-warn font-semibold mb-1.5 flex items-center gap-1">
                         <Lightbulb className="w-3 h-3" /> Improvements
                       </p>
                       <ul className="space-y-0.5">
                         {r.improvements.map((s: string, i: number) => (
-                          <li key={i} className="text-[10px] text-amber-300">{s}</li>
+                          <li key={i} className="text-[10px] text-warn">{s}</li>
                         ))}
                       </ul>
                     </div>

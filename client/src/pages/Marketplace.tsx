@@ -16,10 +16,10 @@ import {
 } from "lucide-react";
 
 const STYLE_COLORS: Record<string, string> = {
-  scalping: "text-orange-400 bg-orange-400/10 border-orange-400/20",
-  swing: "text-blue-400 bg-blue-400/10 border-blue-400/20",
-  position: "text-purple-400 bg-purple-400/10 border-purple-400/20",
-  daytrading: "text-green-400 bg-green-400/10 border-green-400/20",
+  scalping: "text-warn bg-warn/10 border-warn/20",
+  swing: "text-info bg-info/10 border-info/20",
+  position: "text-info bg-info/10 border-info/20",
+  daytrading: "text-pos bg-pos/10 border-pos/20",
 };
 
 const SORT_OPTIONS = [
@@ -42,7 +42,7 @@ function StarRating({ value, onChange, readonly }: { value: number; onChange?: (
           onMouseEnter={() => !readonly && setHovered(n)}
           className={cn("transition-colors", readonly ? "cursor-default" : "cursor-pointer")}
         >
-          <Star className={cn("w-3.5 h-3.5", (hovered || value) >= n ? "fill-amber-400 text-amber-400" : "text-muted-foreground/40")} />
+          <Star className={cn("w-3.5 h-3.5", (hovered || value) >= n ? "fill-warn text-warn" : "text-muted-foreground/40")} />
         </button>
       ))}
     </div>
@@ -88,8 +88,8 @@ function ListingDetailModal({ listing, onClose, onCopy, onVote, currentUserId }:
         <div className="p-5 space-y-4">
           <div className="grid grid-cols-4 gap-2 bg-muted/30 rounded-xl p-3">
             <StatPill label="Risk" value={`${listing.riskPercent}%`} />
-            <StatPill label="Win Rate" value={listing.winRate ? `${listing.winRate}%` : "—"} color={listing.winRate > 55 ? "text-green-400" : ""} />
-            <StatPill label="Return" value={listing.totalReturn ? `${listing.totalReturn > 0 ? "+" : ""}${listing.totalReturn}%` : "—"} color={listing.totalReturn > 0 ? "text-green-400" : listing.totalReturn < 0 ? "text-red-400" : ""} />
+            <StatPill label="Win Rate" value={listing.winRate ? `${listing.winRate}%` : "—"} color={listing.winRate > 55 ? "text-pos" : ""} />
+            <StatPill label="Return" value={listing.totalReturn ? `${listing.totalReturn > 0 ? "+" : ""}${listing.totalReturn}%` : "—"} color={listing.totalReturn > 0 ? "text-pos" : listing.totalReturn < 0 ? "text-neg" : ""} />
             <StatPill label="Copies" value={String(listing.copyCount || 0)} />
           </div>
 
@@ -149,20 +149,20 @@ function ListingCard({ listing, onVote, onCopy, onDelete, onView, currentUserId,
       initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
       className={cn(
         "group relative bg-card/50 border rounded-xl overflow-hidden hover:border-primary/40 transition-all duration-200 cursor-pointer",
-        featured ? "border-amber-400/40 shadow-md shadow-amber-400/5" : "border-border"
+        featured ? "border-warn/40 shadow-md " : "border-border"
       )}
       onClick={onView}
       data-testid={`listing-card-${listing.id}`}
     >
       {featured && (
-        <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-amber-400/60 via-amber-400 to-amber-400/60" />
+        <div className="absolute top-0 left-0 right-0 h-0.5 bg-warn/60" />
       )}
 
       <div className="p-4">
         <div className="flex items-start justify-between mb-2">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5 mb-1">
-              {featured && <Award className="w-3.5 h-3.5 text-amber-400 shrink-0" />}
+              {featured && <Award className="w-3.5 h-3.5 text-warn shrink-0" />}
               <span className={cn("text-[10px] px-2 py-0.5 rounded-full border font-semibold uppercase", STYLE_COLORS[listing.style] || "text-muted-foreground bg-muted border-border")}>
                 {listing.style}
               </span>
@@ -195,8 +195,8 @@ function ListingCard({ listing, onVote, onCopy, onDelete, onView, currentUserId,
 
         <div className="grid grid-cols-4 gap-1 py-2.5 border-y border-border mb-3">
           <StatPill label="Risk" value={`${listing.riskPercent}%`} />
-          <StatPill label="Win%" value={winRate ? `${winRate}%` : "—"} color={winRate > 55 ? "text-green-400" : ""} />
-          <StatPill label="Return" value={totalReturn ? `${totalReturn > 0 ? "+" : ""}${totalReturn}%` : "—"} color={totalReturn > 0 ? "text-green-400" : totalReturn < 0 ? "text-red-400" : ""} />
+          <StatPill label="Win%" value={winRate ? `${winRate}%` : "—"} color={winRate > 55 ? "text-pos" : ""} />
+          <StatPill label="Return" value={totalReturn ? `${totalReturn > 0 ? "+" : ""}${totalReturn}%` : "—"} color={totalReturn > 0 ? "text-pos" : totalReturn < 0 ? "text-neg" : ""} />
           <StatPill label="Copies" value={String(listing.copyCount || 0)} />
         </div>
 
@@ -386,7 +386,7 @@ export default function Marketplace() {
           {featured.length > 0 && (
             <div>
               <div className="flex items-center gap-2 mb-3">
-                <Sparkles className="w-4 h-4 text-amber-400" />
+                <Sparkles className="w-4 h-4 text-warn" />
                 <h2 className="text-sm font-semibold">Featured Strategies</h2>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">

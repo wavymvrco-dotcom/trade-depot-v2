@@ -17,7 +17,8 @@ function isStandalone() {
 }
 
 export default function Auth() {
-  const [mode, setMode] = useState<"login" | "register">("login");
+  const [mode, setMode] = useState<"login" | "register">(() =>
+    new URLSearchParams(window.location.search).get("mode") === "register" ? "register" : "login");
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -75,10 +76,10 @@ export default function Auth() {
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-md z-10">
         {/* Logo */}
         <div className="flex flex-col items-center mb-8">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center mb-4 shadow-2xl shadow-primary/30">
-            <LineChart className="w-8 h-8 text-white" />
+          <div className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center mb-4 shadow-2xl">
+            <LineChart className="w-8 h-8 text-foreground" />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight">TradeAI Terminal</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Trade Depot</h1>
           <p className="text-muted-foreground text-sm mt-1">Autonomous AI-powered trading</p>
         </div>
 

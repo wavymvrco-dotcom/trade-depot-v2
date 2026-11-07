@@ -1,4 +1,5 @@
 import { useEffect, useRef, memo } from 'react';
+import { tvTheme, tvGridColor, tvBackground } from "@/lib/theme";
 
 export const TradingViewCalendar = memo(function TradingViewCalendar() {
   const container = useRef<HTMLDivElement>(null);
@@ -12,7 +13,7 @@ export const TradingViewCalendar = memo(function TradingViewCalendar() {
         <div class="tradingview-widget-container__widget" style="height:calc(100% - 32px);width:100%"></div>
         <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-events.js" async>
           ${JSON.stringify({
-            colorTheme: "dark",
+            colorTheme: tvTheme(),
             isTransparent: true,
             width: "100%",
             height: "100%",

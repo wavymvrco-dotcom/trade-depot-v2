@@ -25,7 +25,7 @@ const SECTIONS = [
   },
   {
     title: "6. Third-Party Services",
-    body: `TradeAI Terminal integrates with third-party services including AI providers (OpenAI, Anthropic, Google, Groq, Perplexity), market data providers (Twelve Data, Polygon), broker APIs (OANDA, MT5), and payment processing (Stripe). When you use these integrations, data is shared with those services according to their respective privacy policies. We encourage you to review those policies.`,
+    body: `Trade Depot integrates with third-party services including AI providers (OpenAI, Anthropic, Google, Groq, Perplexity), market data providers (Twelve Data, Polygon), broker APIs (OANDA, MT5), and payment processing (Stripe). When you use these integrations, data is shared with those services according to their respective privacy policies. We encourage you to review those policies.`,
   },
   {
     title: "7. Data Retention",
@@ -37,7 +37,7 @@ const SECTIONS = [
   },
   {
     title: "9. Children's Privacy",
-    body: `TradeAI Terminal is not intended for use by individuals under the age of 18. We do not knowingly collect personal information from minors. If you believe a minor has provided us with personal information, please contact us immediately.`,
+    body: `Trade Depot is not intended for use by individuals under the age of 18. We do not knowingly collect personal information from minors. If you believe a minor has provided us with personal information, please contact us immediately.`,
   },
   {
     title: "10. Push Notifications",
@@ -55,20 +55,20 @@ const SECTIONS = [
 
 export default function Privacy() {
   return (
-    <div className="min-h-screen bg-[#070710] text-white">
+    <div className="min-h-screen bg-background text-foreground">
       {/* Nav */}
-      <nav className="border-b border-white/5 bg-[#070710]/80 backdrop-blur-xl">
+      <nav className="border-b border-foreground/5 bg-background/80 backdrop-blur-xl">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <Link href="/landing">
             <div className="flex items-center gap-2.5 cursor-pointer">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center">
-                <LineChart className="w-4 h-4 text-white" />
+              <div className="w-8 h-8 rounded-lg bg-info/10 flex items-center justify-center">
+                <LineChart className="w-4 h-4 text-foreground" />
               </div>
-              <span className="font-bold text-sm">TradeAI <span className="text-cyan-400">Terminal</span></span>
+              <span className="font-display font-semibold text-base">Trade Depot</span>
             </div>
           </Link>
           <Link href="/landing">
-            <Button variant="ghost" size="sm" className="gap-2 text-white/50 hover:text-white text-xs">
+            <Button variant="ghost" size="sm" className="gap-2 text-foreground/50 hover:text-foreground text-xs">
               <ArrowLeft className="w-3.5 h-3.5" /> Back
             </Button>
           </Link>
@@ -78,24 +78,24 @@ export default function Privacy() {
       {/* Content */}
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-16">
         <div className="mb-12">
-          <p className="text-xs font-semibold text-cyan-400 uppercase tracking-widest mb-3">Legal</p>
+          <p className="text-xs font-semibold text-info uppercase tracking-widest mb-3">Legal</p>
           <h1 className="text-4xl font-bold mb-4">Privacy Policy</h1>
-          <p className="text-white/40 text-sm">Last updated: March 25, 2026</p>
+          <p className="text-foreground/40 text-sm">Last updated: March 25, 2026</p>
         </div>
 
         <div className="space-y-8">
           {SECTIONS.map((s) => (
             <div key={s.title}>
-              <h2 className="text-lg font-bold text-white mb-3">{s.title}</h2>
-              <p className="text-white/50 leading-relaxed text-sm">{s.body}</p>
+              <h2 className="text-lg font-bold text-foreground mb-3">{s.title}</h2>
+              <p className="text-foreground/50 leading-relaxed text-sm">{s.body}</p>
             </div>
           ))}
         </div>
 
-        <div className="mt-16 pt-8 border-t border-white/5 flex flex-col sm:flex-row gap-4 items-center justify-between text-sm text-white/30">
-          <Link href="/terms" className="hover:text-white/60 transition-colors">View Terms of Service →</Link>
+        <div className="mt-16 pt-8 border-t border-foreground/5 flex flex-col sm:flex-row gap-4 items-center justify-between text-sm text-foreground/30">
+          <Link href="/terms" className="hover:text-foreground/60 transition-colors">View Terms of Service →</Link>
           <Link href="/landing">
-            <Button variant="outline" size="sm" className="border-white/10 text-white/50 hover:text-white text-xs">
+            <Button variant="outline" size="sm" className="border-foreground/10 text-foreground/50 hover:text-foreground text-xs">
               Back to Home
             </Button>
           </Link>

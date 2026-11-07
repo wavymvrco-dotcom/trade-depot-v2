@@ -107,14 +107,14 @@ function DashboardTab({ stats }: { stats: AdminStats | null }) {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-        <StatCard label="Total Users" value={stats.totalUsers} sub={`${stats.recentUsers} new this week`} icon={Users} color="bg-blue-500/10 text-blue-400" />
-        <StatCard label="Total Trades" value={stats.totalTrades} icon={BarChart2} color="bg-green-500/10 text-green-400" />
-        <StatCard label="AI Signals" value={stats.totalSignals} icon={Zap} color="bg-purple-500/10 text-purple-400" />
-        <StatCard label="Journal Entries" value={stats.totalJournalEntries} icon={BookOpen} color="bg-yellow-500/10 text-yellow-400" />
-        <StatCard label="Price Alerts" value={stats.totalAlerts} icon={Bell} color="bg-orange-500/10 text-orange-400" />
-        <StatCard label="Marketplace" value={stats.totalMarketplaceListings} icon={Store} color="bg-cyan-500/10 text-cyan-400" />
-        <StatCard label="Admins" value={stats.admins} icon={Crown} color="bg-amber-500/10 text-amber-400" />
-        <StatCard label="Banned Users" value={stats.banned} icon={Ban} color="bg-red-500/10 text-red-400" />
+        <StatCard label="Total Users" value={stats.totalUsers} sub={`${stats.recentUsers} new this week`} icon={Users} color="bg-info/10 text-info" />
+        <StatCard label="Total Trades" value={stats.totalTrades} icon={BarChart2} color="bg-pos/10 text-pos" />
+        <StatCard label="AI Signals" value={stats.totalSignals} icon={Zap} color="bg-info/10 text-info" />
+        <StatCard label="Journal Entries" value={stats.totalJournalEntries} icon={BookOpen} color="bg-warn/10 text-warn" />
+        <StatCard label="Price Alerts" value={stats.totalAlerts} icon={Bell} color="bg-warn/10 text-warn" />
+        <StatCard label="Marketplace" value={stats.totalMarketplaceListings} icon={Store} color="bg-info/10 text-info" />
+        <StatCard label="Admins" value={stats.admins} icon={Crown} color="bg-warn/10 text-warn" />
+        <StatCard label="Banned Users" value={stats.banned} icon={Ban} color="bg-neg/10 text-neg" />
       </div>
 
       <div className="bg-card/40 border border-border rounded-xl p-5 space-y-3">
@@ -196,43 +196,43 @@ function UsersTab({ currentUserId }: { currentUserId: string }) {
           {filtered.map(u => (
             <div key={u.id} data-testid={`admin-user-row-${u.id}`} className={cn(
               "bg-card/50 border rounded-xl p-4 flex flex-col sm:flex-row sm:items-center gap-3",
-              u.isBanned ? "border-red-500/30 bg-red-500/5" : "border-border"
+              u.isBanned ? "border-neg/30 bg-neg/5" : "border-border"
             )}>
               <div className="flex items-center gap-3 flex-1 min-w-0">
                 <div className={cn(
                   "w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold shrink-0",
-                  u.isAdmin ? "bg-amber-500/20 text-amber-400" : "bg-muted text-muted-foreground"
+                  u.isAdmin ? "bg-warn/20 text-warn" : "bg-muted text-muted-foreground"
                 )}>
                   {u.username[0]?.toUpperCase()}
                 </div>
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-semibold text-sm">{u.username}</span>
-                    {u.isAdmin && <span className="text-[10px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded font-bold">ADMIN</span>}
-                    {u.isBanned && <span className="text-[10px] bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded font-bold">BANNED</span>}
+                    {u.isAdmin && <span className="text-[10px] bg-warn/20 text-warn px-1.5 py-0.5 rounded font-bold">ADMIN</span>}
+                    {u.isBanned && <span className="text-[10px] bg-neg/20 text-neg px-1.5 py-0.5 rounded font-bold">BANNED</span>}
                     {u.id === currentUserId && <span className="text-[10px] bg-primary/20 text-primary px-1.5 py-0.5 rounded font-bold">YOU</span>}
                   </div>
                   <div className="flex gap-3 mt-0.5 flex-wrap">
                     <span className="text-[10px] text-muted-foreground">{u.closedTrades} trades · {u.openPositions} open</span>
-                    <span className={cn("text-[10px] font-mono", u.totalPL >= 0 ? "text-green-400" : "text-red-400")}>
+                    <span className={cn("text-[10px] font-mono", u.totalPL >= 0 ? "text-pos" : "text-neg")}>
                       {u.totalPL >= 0 ? "+" : ""}${u.totalPL.toFixed(2)} P&L
                     </span>
                     <span className="text-[10px] text-muted-foreground">{u.signalCount} signals</span>
                     {u.createdAt && <span className="text-[10px] text-muted-foreground">Joined {format(new Date(u.createdAt), "MMM d, yyyy")}</span>}
                   </div>
-                  {u.isBanned && u.banReason && <p className="text-[10px] text-red-400 mt-0.5">Reason: {u.banReason}</p>}
+                  {u.isBanned && u.banReason && <p className="text-[10px] text-neg mt-0.5">Reason: {u.banReason}</p>}
                 </div>
               </div>
 
               <div className="flex items-center gap-1.5 flex-wrap shrink-0">
                 {u.isBanned ? (
-                  <Button size="sm" variant="outline" className="text-green-400 border-green-500/30 hover:bg-green-500/10 text-xs h-7"
+                  <Button size="sm" variant="outline" className="text-pos border-pos/30 hover:bg-pos/10 text-xs h-7"
                     disabled={!!working} onClick={() => action(`/api/admin/users/${u.id}/unban`, "PATCH", undefined, `${u.username} unbanned`)}
                     data-testid={`button-unban-${u.id}`}>
                     <Unlock className="w-3 h-3 mr-1" /> Unban
                   </Button>
                 ) : (
-                  <Button size="sm" variant="outline" className="text-red-400 border-red-500/30 hover:bg-red-500/10 text-xs h-7"
+                  <Button size="sm" variant="outline" className="text-neg border-neg/30 hover:bg-neg/10 text-xs h-7"
                     disabled={!!working} onClick={() => { setBanDialog({ user: u }); setBanReason(""); }}
                     data-testid={`button-ban-${u.id}`}>
                     <Ban className="w-3 h-3 mr-1" /> Ban
@@ -244,7 +244,7 @@ function UsersTab({ currentUserId }: { currentUserId: string }) {
                   <Key className="w-3 h-3 mr-1" /> Reset PW
                 </Button>
                 {!u.isAdmin ? (
-                  <Button size="sm" variant="outline" className="text-amber-400 border-amber-500/30 hover:bg-amber-500/10 text-xs h-7"
+                  <Button size="sm" variant="outline" className="text-warn border-warn/30 hover:bg-warn/10 text-xs h-7"
                     disabled={!!working || u.id === currentUserId}
                     onClick={() => action(`/api/admin/users/${u.id}/make-admin`, "PATCH", undefined, `${u.username} is now admin`)}
                     data-testid={`button-make-admin-${u.id}`}>
@@ -258,7 +258,7 @@ function UsersTab({ currentUserId }: { currentUserId: string }) {
                     <ShieldOff className="w-3 h-3 mr-1" /> Revoke Admin
                   </Button>
                 )}
-                <Button size="sm" variant="outline" className="text-red-400 border-red-500/30 hover:bg-red-500/10 text-xs h-7"
+                <Button size="sm" variant="outline" className="text-neg border-neg/30 hover:bg-neg/10 text-xs h-7"
                   disabled={!!working || u.id === currentUserId}
                   onClick={() => setDeleteDialog({ user: u })}
                   data-testid={`button-delete-user-${u.id}`}>
@@ -275,7 +275,7 @@ function UsersTab({ currentUserId }: { currentUserId: string }) {
       <Dialog open={!!banDialog} onOpenChange={() => setBanDialog(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-red-400"><Ban className="w-4 h-4" /> Ban {banDialog?.user.username}?</DialogTitle>
+            <DialogTitle className="flex items-center gap-2 text-neg"><Ban className="w-4 h-4" /> Ban {banDialog?.user.username}?</DialogTitle>
             <DialogDescription>This will prevent the user from accessing the platform.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
@@ -317,7 +317,7 @@ function UsersTab({ currentUserId }: { currentUserId: string }) {
       <Dialog open={!!deleteDialog} onOpenChange={() => setDeleteDialog(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-red-400"><Trash2 className="w-4 h-4" /> Delete {deleteDialog?.user.username}?</DialogTitle>
+            <DialogTitle className="flex items-center gap-2 text-neg"><Trash2 className="w-4 h-4" /> Delete {deleteDialog?.user.username}?</DialogTitle>
             <DialogDescription>This is permanent and cannot be undone. All of this user's data will remain in the database but their account will be removed.</DialogDescription>
           </DialogHeader>
           <div className="flex gap-2 justify-end pt-2">
@@ -378,14 +378,14 @@ function TradesTab() {
           <p className="text-[10px] text-muted-foreground font-mono uppercase">{filtered.length} trades</p>
           {filtered.map(p => (
             <div key={p.id} className="bg-card/50 border border-border rounded-xl p-3 flex items-center gap-3 flex-wrap">
-              <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center shrink-0", p.type === "buy" ? "bg-green-500/10" : "bg-red-500/10")}>
-                {p.type === "buy" ? <TrendingUp className="w-4 h-4 text-green-400" /> : <TrendingDown className="w-4 h-4 text-red-400" />}
+              <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center shrink-0", p.type === "buy" ? "bg-pos/10" : "bg-neg/10")}>
+                {p.type === "buy" ? <TrendingUp className="w-4 h-4 text-pos" /> : <TrendingDown className="w-4 h-4 text-neg" />}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-bold text-sm">{p.symbol}</span>
-                  <span className={cn("text-[10px] uppercase font-bold px-1.5 py-0.5 rounded", p.type === "buy" ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400")}>{p.type}</span>
-                  <span className={cn("text-[10px] px-1.5 py-0.5 rounded font-mono", p.status === "open" ? "bg-blue-500/20 text-blue-400" : "bg-muted text-muted-foreground")}>{p.status}</span>
+                  <span className={cn("text-[10px] uppercase font-bold px-1.5 py-0.5 rounded", p.type === "buy" ? "bg-pos/20 text-pos" : "bg-neg/20 text-neg")}>{p.type}</span>
+                  <span className={cn("text-[10px] px-1.5 py-0.5 rounded font-mono", p.status === "open" ? "bg-info/20 text-info" : "bg-muted text-muted-foreground")}>{p.status}</span>
                 </div>
                 <div className="flex gap-3 mt-0.5 text-[10px] text-muted-foreground flex-wrap">
                   <span>@{p.username}</span>
@@ -393,7 +393,7 @@ function TradesTab() {
                   {p.openedAt && <span>{format(new Date(p.openedAt), "MMM d HH:mm")}</span>}
                 </div>
               </div>
-              <span className={cn("font-bold text-sm font-mono shrink-0", p.profit >= 0 ? "text-green-400" : "text-red-400")}>
+              <span className={cn("font-bold text-sm font-mono shrink-0", p.profit >= 0 ? "text-pos" : "text-neg")}>
                 {p.profit >= 0 ? "+" : ""}${p.profit?.toFixed(2)}
               </span>
             </div>
@@ -427,13 +427,13 @@ function SignalsTab() {
   );
 
   const statusColor = (s: string) =>
-    s === "executed" ? "text-green-400 bg-green-500/20" :
-    s === "pending"  ? "text-blue-400 bg-blue-500/20" :
+    s === "executed" ? "text-pos bg-pos/20" :
+    s === "pending"  ? "text-info bg-info/20" :
     s === "dismissed"? "text-muted-foreground bg-muted" :
-    "text-orange-400 bg-orange-500/20";
+    "text-warn bg-warn/20";
 
   const outcomeColor = (o: string | null) =>
-    o === "TP_HIT" ? "text-green-400" : o === "SL_HIT" ? "text-red-400" : "text-muted-foreground";
+    o === "TP_HIT" ? "text-pos" : o === "SL_HIT" ? "text-neg" : "text-muted-foreground";
 
   return (
     <div className="space-y-4">
@@ -452,13 +452,13 @@ function SignalsTab() {
           <p className="text-[10px] text-muted-foreground font-mono uppercase">{filtered.length} signals</p>
           {filtered.map(s => (
             <div key={s.id} className="bg-card/50 border border-border rounded-xl p-3 flex items-center gap-3 flex-wrap">
-              <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center shrink-0", s.action === "BUY" ? "bg-green-500/10" : "bg-red-500/10")}>
-                <Zap className={cn("w-4 h-4", s.action === "BUY" ? "text-green-400" : "text-red-400")} />
+              <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center shrink-0", s.action === "BUY" ? "bg-pos/10" : "bg-neg/10")}>
+                <Zap className={cn("w-4 h-4", s.action === "BUY" ? "text-pos" : "text-neg")} />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-bold text-sm">{s.symbol}</span>
-                  <span className={cn("text-[10px] uppercase font-bold px-1.5 py-0.5 rounded", s.action === "BUY" ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400")}>{s.action}</span>
+                  <span className={cn("text-[10px] uppercase font-bold px-1.5 py-0.5 rounded", s.action === "BUY" ? "bg-pos/20 text-pos" : "bg-neg/20 text-neg")}>{s.action}</span>
                   <span className={cn("text-[10px] px-1.5 py-0.5 rounded font-mono", statusColor(s.status))}>{s.status}</span>
                   {s.outcome && <span className={cn("text-[10px] font-mono", outcomeColor(s.outcome))}>{s.outcome}</span>}
                 </div>
@@ -532,7 +532,7 @@ function MarketplaceTab() {
                   {l.createdAt && <span>{format(new Date(l.createdAt), "MMM d, yyyy")}</span>}
                 </div>
               </div>
-              <Button size="sm" variant="outline" className="text-red-400 border-red-500/30 hover:bg-red-500/10 text-xs h-7 shrink-0"
+              <Button size="sm" variant="outline" className="text-neg border-neg/30 hover:bg-neg/10 text-xs h-7 shrink-0"
                 onClick={() => setDeleteId(l.id)} data-testid={`button-delete-listing-${l.id}`}>
                 <Trash2 className="w-3 h-3" />
               </Button>
@@ -545,7 +545,7 @@ function MarketplaceTab() {
       <Dialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle className="text-red-400">Remove Listing?</DialogTitle>
+            <DialogTitle className="text-neg">Remove Listing?</DialogTitle>
             <DialogDescription>This will permanently remove the strategy from the marketplace.</DialogDescription>
           </DialogHeader>
           <div className="flex gap-2 justify-end pt-2">
@@ -582,17 +582,17 @@ function BroadcastTab() {
   };
 
   const TYPE_OPTIONS = [
-    { value: "info",   label: "Info",    color: "text-blue-400" },
-    { value: "signal", label: "Signal",  color: "text-purple-400" },
-    { value: "alert",  label: "Alert",   color: "text-orange-400" },
-    { value: "trade",  label: "Trade",   color: "text-green-400" },
+    { value: "info",   label: "Info",    color: "text-info" },
+    { value: "signal", label: "Signal",  color: "text-info" },
+    { value: "alert",  label: "Alert",   color: "text-warn" },
+    { value: "trade",  label: "Trade",   color: "text-pos" },
   ];
 
   return (
     <div className="max-w-lg space-y-5">
-      <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 flex gap-3">
-        <AlertTriangle className="w-4 h-4 text-yellow-400 shrink-0 mt-0.5" />
-        <p className="text-xs text-yellow-400">This sends an in-app notification to <strong>every registered user</strong>. Use for important announcements, maintenance notices, or platform updates.</p>
+      <div className="bg-warn/10 border border-warn/30 rounded-xl p-4 flex gap-3">
+        <AlertTriangle className="w-4 h-4 text-warn shrink-0 mt-0.5" />
+        <p className="text-xs text-warn">This sends an in-app notification to <strong>every registered user</strong>. Use for important announcements, maintenance notices, or platform updates.</p>
       </div>
 
       <div className="space-y-3">
@@ -641,7 +641,7 @@ function BroadcastTab() {
       </div>
 
       {lastSent && (
-        <div className="flex items-center gap-2 text-green-400 text-sm p-3 bg-green-500/10 border border-green-500/30 rounded-xl">
+        <div className="flex items-center gap-2 text-pos text-sm p-3 bg-pos/10 border border-pos/30 rounded-xl">
           <CheckCircle2 className="w-4 h-4 shrink-0" />
           Sent "{lastSent.title}" to {lastSent.sent} users
         </div>
@@ -698,12 +698,12 @@ export default function Admin() {
 
           {/* Header */}
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center">
-              <Shield className="w-5 h-5 text-amber-400" />
+            <div className="w-10 h-10 rounded-xl bg-warn/20 border border-warn/30 flex items-center justify-center">
+              <Shield className="w-5 h-5 text-warn" />
             </div>
             <div>
               <h1 className="text-xl font-bold">Admin Panel</h1>
-              <p className="text-xs text-muted-foreground">Logged in as <strong className="text-amber-400">{user.username}</strong> · Full platform access</p>
+              <p className="text-xs text-muted-foreground">Logged in as <strong className="text-warn">{user.username}</strong> · Full platform access</p>
             </div>
             <Link href="/health" className="ml-auto text-sm underline min-h-[44px] flex items-center">App Health Score</Link>
           </div>

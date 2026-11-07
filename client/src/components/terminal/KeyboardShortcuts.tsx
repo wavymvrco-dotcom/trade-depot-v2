@@ -61,14 +61,8 @@ export function KeyboardShortcuts({ open: controlledOpen, onOpenChange }: Props)
       // Theme toggle
       if (key === "d") {
         e.preventDefault();
-        const isDark = !document.documentElement.classList.contains("light");
-        if (isDark) {
-          document.documentElement.classList.add("light");
-          localStorage.setItem("tradeai_theme", "light");
-        } else {
-          document.documentElement.classList.remove("light");
-          localStorage.setItem("tradeai_theme", "dark");
-        }
+        const dark = document.documentElement.classList.toggle("dark");
+        try { localStorage.setItem("td_theme", dark ? "dark" : "light"); } catch {}
         return;
       }
 

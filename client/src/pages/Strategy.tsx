@@ -127,10 +127,10 @@ interface AnalysisResult {
 }
 
 const VERDICT_CONFIG = {
-  strong:   { label: "Strategy Looks Solid",     color: "text-green-400",  bg: "bg-green-500/10  border-green-500/30",  icon: CheckCircle2 },
-  adequate: { label: "Workable — Improvements Suggested", color: "text-yellow-400", bg: "bg-yellow-500/10 border-yellow-500/30", icon: AlertTriangle },
-  risky:    { label: "High Risk — Likely Unprofitable",   color: "text-orange-400", bg: "bg-orange-500/10 border-orange-500/30", icon: AlertTriangle },
-  flawed:   { label: "Critical Flaws Detected",  color: "text-red-400",    bg: "bg-red-500/10    border-red-500/30",    icon: XCircle },
+  strong:   { label: "Strategy Looks Solid",     color: "text-pos",  bg: "bg-pos/10  border-pos/30",  icon: CheckCircle2 },
+  adequate: { label: "Workable — Improvements Suggested", color: "text-warn", bg: "bg-warn/10 border-warn/30", icon: AlertTriangle },
+  risky:    { label: "High Risk — Likely Unprofitable",   color: "text-warn", bg: "bg-warn/10 border-warn/30", icon: AlertTriangle },
+  flawed:   { label: "Critical Flaws Detected",  color: "text-neg",    bg: "bg-neg/10    border-neg/30",    icon: XCircle },
 };
 
 function StrategyAnalysisPanel({
@@ -228,23 +228,23 @@ function StrategyAnalysisPanel({
                     <div key={i} data-testid={`issue-card-${i}`} className="rounded-lg border overflow-hidden">
                       <button
                         className={`w-full flex items-center gap-3 p-3 text-left hover:bg-muted/20 transition-colors ${
-                          issue.severity === "critical" ? "border-red-500/30 bg-red-500/5" :
-                          issue.severity === "warning"  ? "border-yellow-500/30 bg-yellow-500/5" :
-                          "border-blue-500/30 bg-blue-500/5"
+                          issue.severity === "critical" ? "border-neg/30 bg-neg/5" :
+                          issue.severity === "warning"  ? "border-warn/30 bg-warn/5" :
+                          "border-info/30 bg-info/5"
                         }`}
                         onClick={() => setExpandedIssue(expandedIssue === i ? null : i)}
                       >
                         {issue.severity === "critical"
-                          ? <XCircle className="w-4 h-4 text-red-400 shrink-0" />
+                          ? <XCircle className="w-4 h-4 text-neg shrink-0" />
                           : issue.severity === "warning"
-                          ? <AlertTriangle className="w-4 h-4 text-yellow-400 shrink-0" />
-                          : <Info className="w-4 h-4 text-blue-400 shrink-0" />}
+                          ? <AlertTriangle className="w-4 h-4 text-warn shrink-0" />
+                          : <Info className="w-4 h-4 text-info shrink-0" />}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${
-                              issue.severity === "critical" ? "bg-red-500/20 text-red-400" :
-                              issue.severity === "warning"  ? "bg-yellow-500/20 text-yellow-400" :
-                              "bg-blue-500/20 text-blue-400"
+                              issue.severity === "critical" ? "bg-neg/20 text-neg" :
+                              issue.severity === "warning"  ? "bg-warn/20 text-warn" :
+                              "bg-info/20 text-info"
                             }`}>{issue.severity}</span>
                             <span className="text-xs font-semibold capitalize">{issue.field.replace(/([A-Z])/g, ' $1').trim()}</span>
                           </div>
@@ -293,7 +293,7 @@ function StrategyAnalysisPanel({
                         className="w-full flex items-center gap-3 p-3 text-left hover:bg-muted/10 transition-colors bg-card/30"
                         onClick={() => setExpandedAlt(expandedAlt === i ? null : i)}
                       >
-                        <TrendingUp className="w-4 h-4 text-green-400 shrink-0" />
+                        <TrendingUp className="w-4 h-4 text-pos shrink-0" />
                         <div className="flex-1 min-w-0">
                           <p className="text-xs font-bold">{alt.name}</p>
                           <p className="text-[10px] text-muted-foreground">{STYLE_LABELS[alt.style]} · {(alt.riskPercent)}% risk · 1:{alt.rrRatio} R:R · Max {alt.maxPositions} positions</p>
@@ -304,8 +304,8 @@ function StrategyAnalysisPanel({
                         <div className="px-4 py-3 bg-muted/10 border-t border-border/50 space-y-3">
                           <p className="text-xs text-muted-foreground leading-relaxed">{alt.rationale}</p>
                           <div className="flex items-start gap-2">
-                            <BarChart2 className="w-3.5 h-3.5 text-green-400 shrink-0 mt-0.5" />
-                            <p className="text-xs text-green-400 leading-relaxed">{alt.historicalEdge}</p>
+                            <BarChart2 className="w-3.5 h-3.5 text-pos shrink-0 mt-0.5" />
+                            <p className="text-xs text-pos leading-relaxed">{alt.historicalEdge}</p>
                           </div>
                           <p className="text-[10px] font-mono text-muted-foreground border-t border-border/30 pt-2">AI Instructions: <span className="text-foreground">{alt.description}</span></p>
                           <Button
@@ -324,7 +324,7 @@ function StrategyAnalysisPanel({
               )}
 
               {result.issues.length === 0 && result.alternatives.length === 0 && (
-                <div className="flex items-center gap-2 text-green-400 text-xs p-2 rounded-lg bg-green-500/5 border border-green-500/20">
+                <div className="flex items-center gap-2 text-pos text-xs p-2 rounded-lg bg-pos/5 border border-pos/20">
                   <CheckCircle2 className="w-4 h-4" />
                   Your strategy is well-configured. No critical changes recommended.
                 </div>
@@ -412,18 +412,18 @@ function ForecastPanel({ style, goal, accountSize }: { style: string; goal: stri
                 data-testid={`forecast-card-${f.symbol}`}
                 className={`rounded-lg border p-3 ${
                   f.bias === "BULLISH"
-                    ? "border-green-500/30 bg-green-500/5"
-                    : "border-red-500/30 bg-red-500/5"
+                    ? "border-pos/30 bg-pos/5"
+                    : "border-neg/30 bg-neg/5"
                 }`}
               >
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
                     {f.bias === "BULLISH"
-                      ? <TrendingUp className="w-4 h-4 text-green-500" />
-                      : <TrendingDown className="w-4 h-4 text-red-400" />}
+                      ? <TrendingUp className="w-4 h-4 text-pos" />
+                      : <TrendingDown className="w-4 h-4 text-neg" />}
                     <span className="font-bold font-mono text-sm">{f.symbol}</span>
                     <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                      f.bias === "BULLISH" ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400"
+                      f.bias === "BULLISH" ? "bg-pos/20 text-pos" : "bg-neg/20 text-neg"
                     }`}>
                       {f.bias}
                     </span>
@@ -484,7 +484,7 @@ function RiskPanel({
               { label: "Risk Per Trade", value: `$${riskDollars.toFixed(2)}`, sub: `${riskPercent}% of capital`, color: "text-foreground" },
               { label: "Recommended Lots", value: lots.toFixed(2), sub: `${category} lot`, color: lots < 0.05 ? "text-muted-foreground" : "text-primary" },
               { label: "Max Loss / Trade", value: `$${actualRisk.toFixed(2)}`, sub: `${meta.defaultStop} pip stop`, color: "text-destructive" },
-              { label: "Max Portfolio Risk", value: `$${maxConcurrentRisk.toFixed(2)}`, sub: `${maxConcurrentPct.toFixed(1)}% if all ${maxPositions} open`, color: maxConcurrentPct > 10 ? "text-orange-400" : "text-foreground" },
+              { label: "Max Portfolio Risk", value: `$${maxConcurrentRisk.toFixed(2)}`, sub: `${maxConcurrentPct.toFixed(1)}% if all ${maxPositions} open`, color: maxConcurrentPct > 10 ? "text-warn" : "text-foreground" },
             ].map((item, i) => (
               <div key={i} className="bg-background/50 rounded-lg p-3 border border-border/50">
                 <p className="text-[10px] text-muted-foreground font-mono uppercase tracking-wider mb-1">{item.label}</p>
@@ -500,14 +500,14 @@ function RiskPanel({
               <div
                 className={`h-full rounded-full transition-all duration-500 ${
                   maxConcurrentPct > 15 ? "bg-destructive" :
-                  maxConcurrentPct > 8 ? "bg-orange-400" : "bg-green-500"
+                  maxConcurrentPct > 8 ? "bg-warn" : "bg-pos"
                 }`}
                 style={{ width: `${Math.min(100, maxConcurrentPct * 4)}%` }}
               />
             </div>
             <div className="flex justify-between text-[10px] text-muted-foreground mt-1 font-mono">
               <span>0%</span>
-              <span className={maxConcurrentPct > 8 ? "text-orange-400 font-bold" : "text-green-500 font-bold"}>
+              <span className={maxConcurrentPct > 8 ? "text-warn font-bold" : "text-pos font-bold"}>
                 {maxConcurrentPct.toFixed(1)}% at risk
               </span>
               <span>25%+</span>
@@ -530,8 +530,8 @@ function RiskPanel({
                   w.level === "error"
                     ? "bg-destructive/10 border-destructive/30 text-destructive"
                     : w.level === "warn"
-                    ? "bg-orange-500/10 border-orange-500/30 text-orange-400"
-                    : "bg-blue-500/10 border-blue-500/30 text-blue-400"
+                    ? "bg-warn/10 border-warn/30 text-warn"
+                    : "bg-info/10 border-info/30 text-info"
                 }`}
               >
                 <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
@@ -543,7 +543,7 @@ function RiskPanel({
       )}
 
       {warnings.length === 0 && (
-        <div className="flex items-center gap-2 p-3 rounded-lg border border-green-500/30 bg-green-500/5 text-green-400 text-xs">
+        <div className="flex items-center gap-2 p-3 rounded-lg border border-pos/30 bg-pos/5 text-pos text-xs">
           <CheckCircle2 className="w-4 h-4 shrink-0" />
           Risk parameters look healthy. Your position sizing is appropriate for this account size.
         </div>
@@ -607,7 +607,7 @@ export default function Strategy() {
       toast({
         title: "Strategy Saved",
         description: "Your AI strategy profile has been saved and is now active.",
-        className: "border-green-500/50",
+        className: "border-pos/50",
       });
       setActiveTab("active");
     } catch (e: any) {
@@ -661,7 +661,7 @@ export default function Strategy() {
             {activeTab === "active" && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
                 {/* Hero */}
-                <div className="bg-gradient-to-br from-card/80 to-card border border-border rounded-xl p-6 md:p-8 flex flex-col md:flex-row items-center gap-8 relative overflow-hidden">
+                <div className="from-card/80 border border-border rounded-xl p-6 md:p-8 flex flex-col md:flex-row items-center gap-8 relative overflow-hidden">
                   <div className="absolute top-0 right-0 w-96 h-96 bg-primary/5 rounded-full blur-[100px] pointer-events-none" />
                   <div className="relative">
                     <div className="w-28 h-28 rounded-full border-4 border-primary/20 flex items-center justify-center relative z-10 bg-background/50">
@@ -698,7 +698,7 @@ export default function Strategy() {
                   {[
                     { label: "Open Positions", value: String(positions.length), color: "text-accent" },
                     { label: "Win Rate (All Time)", value: history.length > 0 ? `${winRate}%` : "—", color: "text-primary" },
-                    { label: "Total P/L (Closed)", value: history.length > 0 ? `${totalPL >= 0 ? "+" : ""}$${totalPL.toFixed(2)}` : "—", color: totalPL >= 0 ? "text-green-500" : "text-destructive" },
+                    { label: "Total P/L (Closed)", value: history.length > 0 ? `${totalPL >= 0 ? "+" : ""}$${totalPL.toFixed(2)}` : "—", color: totalPL >= 0 ? "text-pos" : "text-destructive" },
                     { label: "Trades Closed", value: String(history.length), color: "text-foreground" },
                   ].map((stat, i) => (
                     <div key={i} className="bg-card/40 border border-border rounded-lg p-4 text-center">
@@ -740,7 +740,7 @@ export default function Strategy() {
                   {/* Trading logic */}
                   <div className="bg-card/40 border border-border rounded-lg overflow-hidden">
                     <div className="bg-card/60 p-4 border-b border-border flex items-center gap-2">
-                      <CheckCircle2 className="w-4 h-4 text-green-500" />
+                      <CheckCircle2 className="w-4 h-4 text-pos" />
                       <h3 className="font-bold">Trading Logic</h3>
                     </div>
                     {[

@@ -1,3 +1,4 @@
+import { tvTheme, tvGridColor, tvBackground } from "@/lib/theme";
 import { useState, useRef, useEffect, memo, useCallback } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { motion, AnimatePresence } from "framer-motion";
@@ -44,15 +45,15 @@ const TradingViewChart = memo(function TradingViewChart({ symbol, timeframe }: {
       symbol: tvSymbol(symbol),
       interval: TV_TF[timeframe] || "60",
       timezone: "Etc/UTC",
-      theme: "dark",
+      theme: tvTheme(),
       style: "1",
       locale: "en",
       enable_publishing: false,
       hide_top_toolbar: false,
       hide_legend: false,
       save_image: false,
-      backgroundColor: "rgba(19, 23, 34, 1)",
-      gridColor: "rgba(255,255,255,0.05)",
+      backgroundColor: tvBackground(),
+      gridColor: tvGridColor(),
       allow_symbol_change: false,
     });
     wrapper.appendChild(script);
@@ -87,7 +88,7 @@ const TechnicalAnalysisWidget = memo(function TechnicalAnalysisWidget({ symbol, 
       showIntervalTabs: true,
       displayMode: "multiple",
       locale: "en",
-      colorTheme: "dark",
+      colorTheme: tvTheme(),
     });
     wrapper.appendChild(script);
     container.current.appendChild(wrapper);
@@ -265,7 +266,7 @@ export default function Analysis() {
           {/* Chart column */}
           <div className="flex-1 flex flex-col min-h-0">
             {/* Primary chart */}
-            <div className={cn("bg-[#131722]", showSecondChart ? "flex-1 min-h-[200px]" : "flex-1 min-h-[300px] lg:min-h-0")}>
+            <div className={cn("bg-background", showSecondChart ? "flex-1 min-h-[200px]" : "flex-1 min-h-[300px] lg:min-h-0")}>
               {activeTab === "chart"
                 ? <TradingViewChart symbol={symbol} timeframe={timeframe} />
                 : <TechnicalAnalysisWidget symbol={symbol} timeframe={timeframe} />
@@ -297,7 +298,7 @@ export default function Analysis() {
 
             {/* Second chart */}
             {showSecondChart && (
-              <div className="flex-1 bg-[#131722] min-h-[200px]">
+              <div className="flex-1 bg-background min-h-[200px]">
                 <TradingViewChart symbol={secondSymbol} timeframe={timeframe} />
               </div>
             )}
@@ -318,7 +319,7 @@ export default function Analysis() {
                     title="Copy analysis"
                     data-testid="copy-analysis-btn"
                   >
-                    {copied ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
+                    {copied ? <Check className="w-4 h-4 text-pos" /> : <Copy className="w-4 h-4" />}
                   </button>
                 )}
               </div>
