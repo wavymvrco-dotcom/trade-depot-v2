@@ -295,7 +295,7 @@ function UserMenuPopover() {
 // The five hubs. A hub is active on its own path and on the older pages it now contains.
 export const HUBS = [
   { icon: LayoutDashboard, label: "Terminal",    path: "/",            match: ["/", "/analysis", "/trade", "/news", "/calendar", "/alerts"] },
-  { icon: FlaskConical,    label: "Lab",         path: "/lab",         match: ["/lab", "/strategy", "/tdci"] },
+  { icon: FlaskConical,    label: "Lab",         path: "/lab",         match: ["/lab"] },
   { icon: BarChart2,       label: "Performance", path: "/performance", match: ["/performance", "/analytics", "/journal"] },
   { icon: GraduationCap,   label: "Learn",       path: "/learn",       match: ["/learn", "/ai"] },
   { icon: Settings,        label: "Settings",    path: "/settings",    match: ["/settings"] },
@@ -329,7 +329,7 @@ function AppLayoutShell({ children }: { children: React.ReactNode }) {
 
   const navItems = [
     ...HUBS,
-    ...((user as any)?.isAdmin ? [{ icon: Shield, label: "Admin Panel", path: "/admin", match: ["/admin", "/health"] }] : []),
+    ...((user as any)?.isAdmin ? [{ icon: Shield, label: "Admin Panel", path: "/admin", match: ["/admin", "/health", "/admin/tdci"] }] : []),
   ];
   const isActive = (match: string[]) => match.includes(location);
 

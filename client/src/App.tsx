@@ -19,7 +19,6 @@ const Pricing = lazy(() => import("@/pages/Pricing"));
 const Onboarding    = lazy(() => import("@/pages/Onboarding"));
 const Analysis      = lazy(() => import("@/pages/Analysis"));
 const Settings      = lazy(() => import("@/pages/Settings"));
-const Strategy      = lazy(() => import("@/pages/Strategy"));
 const Alerts        = lazy(() => import("@/pages/Alerts"));
 const Marketplace   = lazy(() => import("@/pages/Marketplace"));
 const PublicProfile = lazy(() => import("@/pages/PublicProfile"));
@@ -98,9 +97,12 @@ function Router() {
       <Route path="/ai"><Redirect to="/learn?tab=advisor" replace /></Route>
       <Route path="/news"><Redirect to="/?panel=news" replace /></Route>
       <Route path="/calendar"><Redirect to="/?panel=calendar" replace /></Route>
-      {/* Still reachable from a hub (Terminal, Lab) until Phase 1 replaces them */}
+      {/* The Lab replaces the Strategy and TDCI pages (Phase 1). Calibration tools stay for admins. */}
+      <Route path="/strategy"><Redirect to="/lab" replace /></Route>
+      <Route path="/tdci"><Redirect to="/lab" replace /></Route>
+      <Route path="/admin/tdci"><Suspense fallback={<Loader />}><Tdci /></Suspense></Route>
+      {/* Still reachable from the Terminal panel */}
       <Route path="/analysis"><Suspense fallback={<Loader />}><Analysis /></Suspense></Route>
-      <Route path="/strategy"><Suspense fallback={<Loader />}><Strategy /></Suspense></Route>
       <Route path="/alerts"><Suspense fallback={<Loader />}><Alerts /></Suspense></Route>
       <Route path="/settings"><Suspense fallback={<Loader />}><Settings /></Suspense></Route>
       <Route path="/marketplace"><Suspense fallback={<Loader />}><Marketplace /></Suspense></Route>
@@ -109,7 +111,6 @@ function Router() {
       <Route path="/admin"><Suspense fallback={<Loader />}><Admin /></Suspense></Route>
       <Route path="/pricing"><Suspense fallback={<Loader />}><Pricing /></Suspense></Route>
       <Route path="/trade"><Suspense fallback={<Loader />}><Trade /></Suspense></Route>
-      <Route path="/tdci"><Suspense fallback={<Loader />}><Tdci /></Suspense></Route>
       <Route component={NotFound} />
     </Switch>
   );

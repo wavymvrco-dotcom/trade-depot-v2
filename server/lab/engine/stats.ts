@@ -83,7 +83,8 @@ export function moments(xs: ArrayLike<number>) {
 }
 
 /** Per-trade Sharpe ratio: mean(r) / std(r). */
-export const sharpe = (rs: ArrayLike<number>) => { const s = std(rs); return s > 0 ? mean(rs) / s : 0; };
+/** Per-trade Sharpe. Zero when the spread is (numerically) zero, e.g. every trade hit the same target. */
+export const sharpe = (rs: ArrayLike<number>) => { const s = std(rs); return s > 1e-9 ? mean(rs) / s : 0; };
 
 export const EULER_GAMMA = 0.5772156649015329;
 

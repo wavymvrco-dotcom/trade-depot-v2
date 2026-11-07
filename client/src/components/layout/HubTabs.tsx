@@ -9,14 +9,15 @@ import { AppLayout } from "./AppLayout";
 
 export interface HubTab { id: string; label: string; render: () => ReactNode }
 
-export function HubTabs({ title, tabs }: { title: string; tabs: HubTab[] }) {
+export function HubTabs({ title, tabs, footer }: { title: string; tabs: HubTab[]; footer?: ReactNode }) {
   const search = useSearch();
   const [location, setLocation] = useLocation();
   const requested = new URLSearchParams(search).get("tab");
   const active = tabs.find(t => t.id === requested) ?? tabs[0];
   const refs = useRef<(HTMLButtonElement | null)[]>([]);
 
-  const select = (id: string) => setLocation(`${location}?tab=${id}`, { replace: true });
+  // Keep other query parameters (e.g. the selected run) when switching tabs
+  const select = (id: string) => { const q = new URLSearchParams(search); q.set("tab", id); setLocation(`${location}?${q.toString()}`, { replace: true }); };
   const onKey = (e: React.KeyboardEvent, i: number) => {
     const n = tabs.length;
     const next = e.key === "ArrowRight" ? (i + 1) % n : e.key === "ArrowLeft" ? (i - 1 + n) % n
@@ -59,6 +60,7 @@ export function HubTabs({ title, tabs }: { title: string; tabs: HubTab[] }) {
             {active.render()}
           </Suspense>
         </div>
+        {footer}
       </div>
     </AppLayout>
   );

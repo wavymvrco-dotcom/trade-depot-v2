@@ -128,3 +128,12 @@ Newest at the bottom. Format: date — decision — why.
 - **Shadow decisions** are recorded only when the candidate or the incumbent acts (both flat = nothing to compare).
   Market data is fetched once per (symbol, style) per bar for all strategies; on weekends the check repeats each minute
   but the candle cache makes it a no-op request at most every few minutes.
+
+## 2026-11-06 — Phase 1 UI and real-data findings
+
+- The Lab replaces the Strategy and TDCI pages (they redirect to /lab); TDCI calibration stays for admins at
+  /admin/tdci because calibrations still seed Gen Zero. The Analytics Backtest tab is removed.
+- Per-trade Sharpe is 0 when its spread is numerically zero (every trade hit the same target); otherwise one such
+  candidate made the luck adjustment meaningless (variance 19,193). After the fix a real run gave variance 0.10.
+- First real runs (swing, 3–4 majors, 128 × 40): all Scrapped — vault negative and likely luck. This matches the
+  earlier calibration finding that the current TDCI layers show no proven edge. The Lab is reporting it honestly.

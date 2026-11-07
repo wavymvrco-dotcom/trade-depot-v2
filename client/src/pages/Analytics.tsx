@@ -1122,7 +1122,6 @@ export default function Analytics() {
             {[
               { id: "overview", label: "Overview" },
               { id: "risk", label: "Risk" },
-              { id: "backtest", label: "Backtest" },
               { id: "correlation", label: "Correlation" },
               { id: "sessions", label: "Sessions" },
               { id: "leaderboard", label: "Leaderboard" },
