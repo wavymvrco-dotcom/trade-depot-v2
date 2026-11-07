@@ -9,3 +9,4 @@ vite.config.ts.*
 !.env.example
 .neon
 packages/layer-kit/dist
+films/build
