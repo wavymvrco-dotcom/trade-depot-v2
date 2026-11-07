@@ -141,12 +141,18 @@ async function processLicense(lic: LicenseRow, all: LicenseRow[], ctx: Awaited<R
   const attr = c.act ? attribution(c.x, genome.w, lic.layers as string[]).top : null;
   const inserted = await db.insert(shadowTrades).values({
     licenseId: lic.id, symbol, signalTime: ctx.p[i].time, side: c.act ? actName(c.act) : null, score: c.score,
-    status: c.act ? "pending" : "pending", incumbentAction: actName(ic.act), attribution: attr as any,
+    status: "pending", incumbentAction: actName(ic.act), attribution: attr as any,
   }).onConflictDoNothing().returning();
   if (!inserted.length) return; // already decided this bar (another worker tick)
 
-  // 3. Live: place the real order now (market, next bar's open), inside the normal trade guard
-  if (c.act && mayTradeLive(lic as any)) {
+  // 3. Live: place the real order now (market, next bar's open), inside the normal trade guard.
+  // Only for a fresh signal: after a restart or a weekend the newest closed bar can be old.
+  const barCloseMs = parseTime(ctx.p[i].time) + ctx.barMs;
+  const fresh = Date.now() - barCloseMs <= 2 * ctx.barMs;
+  if (c.act && mayTradeLive(lic as any) && !fresh) {
+    console.log(`[live] license ${lic.id} ${symbol}: signal on ${ctx.p[i].time} is stale; no order placed`);
+  }
+  if (c.act && mayTradeLive(lic as any) && fresh) {
     const settings = await storage.getUserSettings(lic.userId);
     const risk = self.spec?.risk.riskPercentPerTrade ?? 1;
     const stopDist = STOP_GRID[genome.stopIdx] * ctx.pAtr[i];
@@ -198,7 +204,8 @@ async function judge(lic: LicenseRow) {
     await saveEvidence(lic.id, { kind: "live", ...v, trades: rs.length, updatedAt: new Date().toISOString() });
     if (v.tripped) {
       // Demote; open positions are left for the user to decide (one-tap close in the Lab)
-      await transition(lic.id, "tripwire", v.reason!, v, { liveSince: null });
+      // Back to Shadow: the Shadow clock restarts, so graduation needs fresh evidence
+      await transition(lic.id, "tripwire", v.reason!, v, { liveSince: null, shadowStartedAt: new Date(), evidence: null });
       await notify(lic, "Tripwire: strategy pulled from Live", `${lic.name}: ${v.reason} It is back in Shadow Run. Open positions were not closed.`);
     }
   }

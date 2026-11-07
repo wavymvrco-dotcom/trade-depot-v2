@@ -70,7 +70,7 @@ export function ShadowTab() {
               <h3 id="ledger" className="font-display text-xl m-0 mb-1">Ledger</h3>
               <p className="text-sm text-muted-foreground m-0 mb-3">Every decision is written when it is made, beside what the incumbent would have done. Simulated (no money).</p>
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full min-w-[760px] text-sm">
                   <thead>
                     <tr className="text-xs text-muted-foreground border-b border-border">
                       {["Bar", "Pair", "This strategy", "Incumbent", "Result", "Why it took the trade"].map(h => <th key={h} scope="col" className="text-left font-normal py-2 pr-3">{h}</th>)}

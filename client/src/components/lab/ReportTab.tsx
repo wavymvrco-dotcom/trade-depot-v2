@@ -97,7 +97,7 @@ export function ReportTab() {
                   <Stat label="Belt" value={r.champion ? BELTS[r.champion.belt] ?? "—" : "—"} />
                 </dl>
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
+                  <table className="w-full min-w-[480px] text-sm">
                     <caption className="text-left text-sm font-medium mb-2">By pair (vault)</caption>
                     <thead><tr className="text-xs text-muted-foreground border-b border-border"><th scope="col" className="text-left font-normal py-2">Pair</th><th scope="col" className="text-right font-normal">Trades</th><th scope="col" className="text-right font-normal">Total</th><th scope="col" className="text-right font-normal">PF</th><th scope="col" className="text-right font-normal">Max DD</th></tr></thead>
                     <tbody className="font-mono">

@@ -18,7 +18,7 @@ const STYLE: Record<Status, { bg: string; fg: string; label: string }> = {
 export function StatusBadge({ status, label }: { status: Status; label?: string }) {
   const s = STYLE[status];
   return (
-    <span className="inline-block px-[9px] py-[3px] rounded-full text-xs font-semibold whitespace-nowrap"
+    <span className="inline-block w-fit px-[9px] py-[3px] rounded-full text-xs font-semibold whitespace-nowrap"
       style={{ background: s.bg, color: s.fg }}>
       {label ?? s.label}
     </span>

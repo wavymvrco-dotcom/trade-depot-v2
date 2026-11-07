@@ -137,3 +137,20 @@ Newest at the bottom. Format: date — decision — why.
   candidate made the luck adjustment meaningless (variance 19,193). After the fix a real run gave variance 0.10.
 - First real runs (swing, 3–4 majors, 128 × 40): all Scrapped — vault negative and likely luck. This matches the
   earlier calibration finding that the current TDCI layers show no proven edge. The Lab is reporting it honestly.
+
+## 2026-11-07 — Weekend bars, Live safety, Phase 1 verification
+
+- **The data feed quotes FX around the clock.** Twelve Data returned full Saturday and Sunday bars for EURUSD
+  (288 fifteen-minute bars per weekend day, moving like real ones: average range 5.7 bp vs 4.8 bp in trading hours),
+  about 27% of all bars. No forex broker fills orders then. Calibration, the Lab and Shadow Run were partly scoring a
+  closed market. Fix (build sheet §11A.3): `shared/sessions.ts` FX calendar (closed Fri 21:00 → Sun 21:00 UTC);
+  `fetchCandles` drops closed-market bars on read (the raw cache keeps everything) and asks for 45% more raw bars so
+  callers still get the history length they asked for. `TDCI_VERSION` → 2 so cached Lab environments rebuild.
+  **Consequence:** existing TDCI calibrations were computed with weekend bars; re-run "calibrate all" from
+  /admin/tdci. Holidays are not modelled yet.
+- **Live orders only on fresh signals:** a Live strategy places a real order only if its signal bar closed within
+  the last two bar lengths. Verified over a weekend: it decided on Friday 20:45's bar and placed nothing.
+- **Tripwire restarts the Shadow clock:** a demoted strategy needs fresh Shadow evidence to graduate again.
+- **Day-style finding:** with ~7 months of 15-minute history and real TDCI layers, evolution learns to barely trade
+  (losing less beats losing more), so no version reaches 30 validation trades and the run ends "no champion". Honest,
+  but a reason to give Day/Scalp more history (Twelve Data plan) or more pairs.

@@ -20,8 +20,9 @@ export default function Lab() {
         { id: "licenses", label: "Licenses", render: () => <LicensesTab /> },
       ]}
       footer={
-        <p className="shrink-0 border-t border-border px-4 md:px-6 py-2 text-xs text-muted-foreground m-0">
-          Early access. Lab results are simulated until a strategy is Live. Past and simulated performance does not guarantee future results. Not financial advice — you decide whether to go Live.
+        <p className="shrink-0 border-t border-border px-4 md:px-6 py-1.5 sm:py-2 text-[11px] sm:text-xs text-muted-foreground m-0">
+          <span className="sm:hidden">Early access · Simulated until Live · Not financial advice.</span>
+          <span className="hidden sm:inline">Early access. Lab results are simulated until a strategy is Live. Past and simulated performance does not guarantee future results. Not financial advice — you decide whether to go Live.</span>
         </p>
       }
     />

@@ -8,6 +8,7 @@
 import { ema, rsi, atr, type Candle } from "./indicators";
 import { calcProfit, getSymbolConfig, priceDecimals } from "@shared/pips";
 import { getCandles } from "./lab/service/data";
+import { dropClosedBars } from "@shared/sessions";
 
 export type { Candle } from "./indicators";
 
@@ -93,7 +94,11 @@ export async function fetchCandles(symbol: string, interval: string, outputsize:
   const pending = inflight.get(flightKey);
   if (pending) return pending;
 
-  const p = getCandles(symbol, interval, outputsize, apiKey).then(candles => {
+  // Some feeds quote FX through the weekend. Those bars are not tradeable, so they are dropped
+  // (shared/sessions.ts); ask for enough raw bars that `outputsize` remain afterwards.
+  const raw = Math.ceil(outputsize * 1.45);
+  const p = getCandles(symbol, interval, raw, apiKey).then(all => {
+    const candles = dropClosedBars(symbol, interval, all).slice(-outputsize);
     candleCache.set(key, { at: Date.now(), size: outputsize, data: candles });
     return candles;
   });
