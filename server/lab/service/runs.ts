@@ -22,6 +22,7 @@ import { mirrorModelFor } from "./mirror";
 import { userGenome, worstDrawdownWindows } from "./rewind";
 import { acceptedLayers } from "./forge";
 import { enqueueStorm } from "./storm";
+import { playbookFor, coreGenome } from "./playbook";
 import { withForgeLayers } from "../engine/forge/accept";
 
 export class LabError extends Error { constructor(message: string, public status = 400) { super(message); } }
@@ -125,6 +126,9 @@ export async function processRun(runId: string) {
     // Rewind (§10.3): Gen Zero "you", and the user's worst drawdown periods for the Vault Exam
     const userG = await userGenome(run.userId, style, envData).catch(() => null);
     const rewindWindows = await worstDrawdownWindows(run.userId, spec.symbols).catch(() => []);
+    // Phase 3: the user's own Playbook skills and the Core v1 genome join Gen Zero
+    const playbook = await playbookFor(run.userId, style, envData[0]?.layers ?? []).catch(() => []);
+    const core = await coreGenome(style, spec.symbols, extra).catch(() => null);
     const cal = await latestCalibration(spec.symbols[0], style).catch(() => null);
     const calRes = cal?.result as any;
     const prof = PROFILES[style];
@@ -135,7 +139,7 @@ export async function processRun(runId: string) {
     const result = await runLabAsync({
       envData, spec, seed: run.seed, population: cfg.population, generations: cfg.generations, episodes: cfg.episodes,
       successiveHalving: cfg.successiveHalving, ...defaultsFor(style, extra), calibrationWeights, userThreshold: settings?.tdciMinScore ?? null, mirror,
-      userGenome: userG, rewindWindows, priorTrials,
+      userGenome: userG, rewindWindows, priorTrials, playbook, coreGenome: core,
     }, {
       onProgress: p => { gen = p.generation; return setProgress({ ...p, phase: "Arena" }).then(() => {}); },
       isCancelled: async () => {

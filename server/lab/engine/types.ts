@@ -37,7 +37,15 @@ export interface Genome {
   threshold: number;  // integer THRESHOLD_MIN..THRESHOLD_MAX
   stopIdx: number;    // into STOP_GRID
   rrIdx: number;      // into RR_GRID
+  /**
+   * Phase 3 (Playbook): a gated genome — weights per market regime
+   * [calm, normal, trend, volatile]; null = use `w`. The regime at each bar picks the weights.
+   */
+  gates?: (number[] | null)[];
 }
+
+/** The weights a genome uses on a bar with this regime tag. */
+export const weightsFor = (g: Genome, tag: number) => g.gates?.[tag] ?? g.w;
 
 export type Grade = "licensed" | "probation" | "scrapped";
 export type Stage = "vault" | "shadow" | "live" | "retired";

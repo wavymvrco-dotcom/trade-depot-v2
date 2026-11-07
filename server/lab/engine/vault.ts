@@ -49,6 +49,8 @@ export interface VaultReport {
   sequence: { rs: number[]; tradesPerDay: number };
   /** Phase 2: the vault sequence run through the Blueprint's prop rules (if any). */
   prop: { status: "passed" | "failed" | "open"; reason: string | null; days: number; returnPct: number } | null;
+  /** Vault results by market regime at the signal bar (calm, normal, trend, volatile) — the Playbook's regime tags. */
+  perRegime: { tag: number; trades: number; totalR: number }[];
   /** Rewind (§10.3): the champion in the user's worst drawdown periods. Gated only when out-of-sample. */
   rewind: { symbol: string; from: string; to: string; trades: number; totalR: number; maxDD: number; inSample: boolean; breached: boolean }[];
   /** Hunter on the vault trades: total R under attack and the share of results kept. */
@@ -130,6 +132,10 @@ export function vaultExam(args: {
     luck: { dsr: r4(dsr), sr0: r4(sr0), sharpe: r4(sr), trials: args.trials, observations: vr.length, skew: r3(m.skew), kurt: r3(m.kurt), varianceOfSharpes: r4(varianceOfSharpes) },
     envelope: roundEnvelope(envelopeFor),
     rewind: rewindRes,
+    perRegime: [0, 1, 2, 3].map(tag => {
+      const ts = envs.flatMap((env, k) => base.perEnv[k].filter(t => env.tag[t.t] === tag));
+      return { tag, trades: ts.length, totalR: r3(ts.reduce((s, t) => s + t.r, 0)) };
+    }),
     sequence: { rs: merged.map(m => r4(m.t.r)), tradesPerDay: r3(tradesPerDay) },
     prop: propResult ? { status: propResult.status, reason: propResult.reason, days: propResult.days, returnPct: r3(propResult.equityPct) } : null,
     hunter: { totalR: r3(huntedR), keptPct: bs.totalR > 0 ? r3(Math.max(0, huntedR) / bs.totalR) : null, attacks },

@@ -57,6 +57,12 @@ export interface Env extends EnvData {
   timeMs(row: number): number;
 }
 
+/** Curriculum / Playbook regime of bar i: volatile, trend, calm or normal (§9.4). Shared by backtests and live. */
+export function regimeTagAt(ctx: TdciContext, i: number): number {
+  const ratio = ctx.pAtr[i] / ctx.pAtrAvg[i], adx = ctx.adx.adx[i];
+  return ratio > 1.6 ? TAG.volatile : adx >= 25 ? TAG.trend : ratio < 0.8 && adx < 20 ? TAG.calm : TAG.normal;
+}
+
 /** Compute layer values for every bar once. Uses only data available at each bar's close. */
 export function buildEnvData(ctx: TdciContext, cost: TradeCost): EnvData {
   const start = warmup(ctx);
@@ -70,8 +76,7 @@ export function buildEnvData(ctx: TdciContext, cost: TradeCost): EnvData {
     const lv = layerValues(ctx, i);
     for (let j = 0; j < L; j++) X[r * L + j] = lv.layers[layers[j]].value;
     g[r] = lv.regime.value;
-    const ratio = ctx.pAtr[i] / ctx.pAtrAvg[i], adx = ctx.adx.adx[i];
-    tag[r] = ratio > 1.6 ? TAG.volatile : adx >= 25 ? TAG.trend : ratio < 0.8 && adx < 20 ? TAG.calm : TAG.normal;
+    tag[r] = regimeTagAt(ctx, i);
     closeHour[r] = new Date(parseTime(ctx.p[i].time) + ctx.barMs).getUTCHours();
   }
   return {

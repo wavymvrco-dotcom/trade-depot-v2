@@ -230,3 +230,19 @@ Newest at the bottom. Format: date — decision — why.
   values). Limit: the prop rules' max drawdown in R if set, else the Vault's 99th-percentile drawdown. Pass = ≥ 95% of
   worlds under the limit. It is a stamp only — never a grade change, never imported by training (test-enforced).
   ~7 s for 200 worlds.
+
+## 2026-11-07 — Phase 3: Playbook, gated genomes, Core v1
+
+- **Playbook is per user.** A Licensed strategy becomes a skill tagged with the regimes (calm/normal/trend/volatile)
+  where its Vault result was positive with ≥ 5 trades. Only the owner's runs are seeded with it — seeding others'
+  runs would expose a strategy's settings through their reports.
+- **Gated genome:** optional per-regime weight sets; the regime at each bar (same function live and in backtests)
+  picks the weights. Evolved, hashed, examined and counted like any genome. Genomes without gates behave exactly as
+  before (same random draws).
+- **Gen Zero** gains up to 20% Playbook skills and gated mixtures, plus the Core genome.
+- **Core v1** pools the latest TDCI calibration ICs per layer across the eight pairs of one style, shrinks each
+  toward the mean by its standard error (|IC/t|), and averages over the Blueprint's pairs. Real result today: mostly
+  contrarian weights (pooled ICs slightly negative). Core v2 (gradient boosting) is not built: the sheet ships it only
+  if it beats v1 out of sample on ≥ 6 of 8 pairs, and v1 has no proven edge to beat yet.
+- Core is not yet the default for new users' live TDCI score: that would change what every new user sees, and the
+  pooled ICs come from calibrations that predate the weekend-bar fix. Re-run calibrations first, then decide.

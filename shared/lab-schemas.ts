@@ -72,6 +72,7 @@ export const genomeSchema = z.object({
   threshold: z.number().int().min(15).max(90),
   stopIdx: z.number().int().min(0).max(3),
   rrIdx: z.number().int().min(0).max(4),
+  gates: z.array(z.array(z.number().min(-1).max(1)).nullable()).length(4).optional(),
 });
 
 export const runBodySchema = z.object({

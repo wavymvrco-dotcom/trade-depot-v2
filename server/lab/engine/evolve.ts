@@ -34,8 +34,10 @@ export interface TrainConfig {
   calibrationWeights?: number[] | null;
   userThreshold?: number | null;
   hallOfFamePerGeneration?: number;
-  /** Extra Gen Zero members, e.g. the "you" genome fitted to the user's own entries (Rewind). */
+  /** Extra Gen Zero members, e.g. the "you" genome fitted to the user's own entries (Rewind), or Core. */
   extraSeeds?: Genome[];
+  /** Phase 3 Playbook: Licensed skills compatible with this Blueprint (same style and layers), with the regimes they work in. */
+  playbook?: { genome: Genome; regimeTags: number[] }[];
   /** Mirror cost model per env (Phase 2), or null to use the uniform cost multiplier. */
   mirror?: (MirrorEnvModel | null)[];
 }
@@ -72,7 +74,9 @@ const r3 = (v: number) => Math.round(v * 1000) / 1000;
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
 export function genomeHash(g: Genome) {
-  return createHash("sha256").update(JSON.stringify({ w: g.w.map(r3), threshold: g.threshold, stopIdx: g.stopIdx, rrIdx: g.rrIdx })).digest("hex");
+  const base: any = { w: g.w.map(r3), threshold: g.threshold, stopIdx: g.stopIdx, rrIdx: g.rrIdx };
+  if (g.gates) base.gates = g.gates.map(w => (w ? w.map(r3) : null));
+  return createHash("sha256").update(JSON.stringify(base)).digest("hex");
 }
 
 /** Grid bounds allowed by the Blueprint (maxStopAtr, minRr). */
@@ -89,12 +93,14 @@ export function gridBounds(spec: BlueprintSpec) {
 /** Clamp and round a genome into the valid space for this Blueprint. */
 export function normalizeGenome(g: Genome, spec: BlueprintSpec): Genome {
   const { stopHi, rrLo } = gridBounds(spec);
-  return {
+  const out: Genome = {
     w: g.w.map(v => r3(clamp(v, -1, 1))),
     threshold: Math.round(clamp(g.threshold, THRESHOLD_MIN, THRESHOLD_MAX)),
     stopIdx: clamp(Math.round(g.stopIdx), 0, stopHi),
     rrIdx: clamp(Math.round(g.rrIdx), rrLo, RR_GRID.length - 1),
   };
+  if (g.gates?.some(Boolean)) out.gates = g.gates.map(w => (w ? w.map(v => r3(clamp(v, -1, 1))) : null));
+  return out;
 }
 
 function genZero(cfg: TrainConfig, rand: Rng): Genome[] {
@@ -105,6 +111,17 @@ function genZero(cfg: TrainConfig, rand: Rng): Genome[] {
   if (cfg.calibrationWeights?.some(v => v !== 0)) pop.push({ w: [...cfg.calibrationWeights], threshold: 60, ...base });
   if (cfg.userThreshold != null) pop.push({ w: [...cfg.defaultWeights], threshold: cfg.userThreshold, ...base });
   for (const s of cfg.extraSeeds ?? []) if (s.w.length === cfg.defaultWeights.length && pop.length < cfg.population) pop.push(s);
+  // Playbook (§11.2): up to 20% of Gen Zero — the skills themselves, plus gated mixtures that use, in each
+  // regime, a skill that made money there in its own Vault
+  const skills = (cfg.playbook ?? []).filter(s => s.genome.w.length === cfg.defaultWeights.length);
+  const cap = Math.floor(cfg.population * 0.2);
+  let added = 0;
+  for (const s of skills) { if (added >= cap) break; pop.push({ ...s.genome, gates: undefined }); added++; }
+  for (let k = 0; skills.length >= 2 && added < cap && k < cap; k++, added++) {
+    const gates = [0, 1, 2, 3].map(t => { const fit = skills.filter(s => s.regimeTags.includes(t)); return fit.length ? rand.choice(fit).genome.w : null; });
+    const pick = rand.choice(skills).genome;
+    pop.push({ w: pick.w, threshold: pick.threshold, stopIdx: pick.stopIdx, rrIdx: pick.rrIdx, gates });
+  }
   while (pop.length < cfg.population) {
     pop.push({
       w: cfg.defaultWeights.map(v => v + rand.normal(0, 0.3)),
@@ -116,12 +133,15 @@ function genZero(cfg: TrainConfig, rand: Rng): Genome[] {
 }
 
 function crossover(a: Genome, b: Genome, rand: Rng): Genome {
-  return {
+  const child: Genome = {
     w: a.w.map((v, j) => (rand.next() < 0.5 ? v : b.w[j])),
     threshold: rand.next() < 0.5 ? a.threshold : b.threshold,
     stopIdx: rand.next() < 0.5 ? a.stopIdx : b.stopIdx,
     rrIdx: rand.next() < 0.5 ? a.rrIdx : b.rrIdx,
   };
+  // Gated parents: each regime's weights come whole from one parent (a gate is a unit, like a skill)
+  if (a.gates || b.gates) child.gates = [0, 1, 2, 3].map(t => (rand.next() < 0.5 ? a.gates?.[t] ?? null : b.gates?.[t] ?? null));
+  return child;
 }
 
 function mutate(g: Genome, rand: Rng): Genome {
@@ -132,7 +152,9 @@ function mutate(g: Genome, rand: Rng): Genome {
     return x;
   });
   const step = () => (rand.next() < 0.15 ? (rand.next() < 0.5 ? -1 : 1) : 0);
-  return { w, threshold: g.threshold + Math.round(rand.normal(0, 6)), stopIdx: g.stopIdx + step(), rrIdx: g.rrIdx + step() };
+  const out: Genome = { w, threshold: g.threshold + Math.round(rand.normal(0, 6)), stopIdx: g.stopIdx + step(), rrIdx: g.rrIdx + step() };
+  if (g.gates) out.gates = g.gates.map(gw => (gw ? gw.map(v => (rand.next() < 0.3 ? v + rand.normal(0, 0.25) : v)) : null));
+  return out;
 }
 
 // ─── Evaluation ───────────────────────────────────────────────────────────────

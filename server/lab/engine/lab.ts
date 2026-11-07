@@ -20,6 +20,9 @@ export interface LabInput {
   defaultWeights: number[]; defaultStop: number; defaultRr: number;
   calibrationWeights?: number[] | null;
   userThreshold?: number | null;
+  /** Phase 3: Playbook skills (the user's own Licensed strategies) and the Core genome for Gen Zero. */
+  playbook?: { genome: Genome; regimeTags: number[] }[];
+  coreGenome?: Genome | null;
   /** Trials from this user's earlier runs on the same data (same pairs, style and data day) — never reset (invariant 3). */
   priorTrials?: number;
   /** Phase 2 (Rewind): Gen Zero genome fitted to the user's entries, and their worst drawdown windows. */
@@ -66,7 +69,8 @@ function prepareLab(input: LabInput) {
     spec: input.spec, population, generations, episodes, seed: input.seed, successiveHalving,
     defaultWeights: input.defaultWeights, defaultStop: input.defaultStop, defaultRr: input.defaultRr,
     calibrationWeights: input.calibrationWeights, userThreshold: input.userThreshold, mirror: input.mirror,
-    extraSeeds: input.userGenome ? [input.userGenome] : [],
+    extraSeeds: [input.userGenome, input.coreGenome].filter((g): g is Genome => !!g),
+    playbook: input.playbook,
   });
   return { config: { population, generations, episodes, seed: input.seed, successiveHalving }, splits, vaultHashes, steps };
 }

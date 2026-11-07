@@ -586,3 +586,18 @@ export const forgeLayers = pgTable("forge_layers", {
   novelty: doublePrecision("novelty"),           // 1 − max |ρ| with existing layers
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => [index("forge_layers_style_idx").on(t.style, t.status), uniqueIndex("forge_layers_style_text_uq").on(t.style, t.text)]);
+
+// ─── Playbook (Phase 3): Licensed strategies as reusable skills (per user) ────
+export const playbookSkills = pgTable("playbook_skills", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  licenseId: varchar("license_id").notNull(),
+  name: text("name").notNull(),
+  style: text("style").notNull(),
+  layers: jsonb("layers").notNull(),             // layer keys in weight order (skills only seed runs with the same layers)
+  genome: jsonb("genome").notNull(),
+  regimeTags: jsonb("regime_tags").notNull(),    // regimes where its Vault result was positive
+  stats: jsonb("stats").notNull(),
+  provenance: jsonb("provenance").notNull(),     // run, vault hash, dates
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => [index("playbook_skills_user_idx").on(t.userId, t.style), uniqueIndex("playbook_skills_license_uq").on(t.licenseId)]);

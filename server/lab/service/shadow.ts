@@ -19,8 +19,8 @@ import { sendPushToUser } from "../../push";
 import { openTrade, sizeForRisk } from "../../execution";
 import { resolveTrade } from "../engine/outcomes";
 import { scoreRow, weightNorm, attribution } from "../engine/combine";
-import { STOP_GRID, RR_GRID, type BlueprintSpec, type Genome } from "../engine/types";
-import { nearestGrid } from "../engine/env";
+import { STOP_GRID, RR_GRID, weightsFor, type BlueprintSpec, type Genome } from "../engine/types";
+import { nearestGrid, regimeTagAt } from "../engine/env";
 import { expectationFrom } from "../engine/lab";
 import { judgeLive, judgeShadow } from "../engine/verdicts";
 import { mayTradeLive } from "../engine/license-rules";
@@ -52,7 +52,8 @@ async function decide(ctx: Awaited<ReturnType<typeof loadContext>>, i: number, d
   const lv = layerValues(ctx, i);
   const x: number[] = [];
   for (const k of d.layers) x.push(k.startsWith("forge:") ? await forgeValue(ctx, k, i) : (lv.layers as any)[k]?.value ?? 0);
-  const s = scoreRow(x, x.length, 0, lv.regime.value, d.genome.w, weightNorm(d.genome.w));
+  const w = weightsFor(d.genome, regimeTagAt(ctx, i)); // gated genomes pick weights by the live regime
+  const s = scoreRow(x, x.length, 0, lv.regime.value, w, weightNorm(w));
   let act: 1 | -1 | 0 = s.direction !== 0 && s.score >= d.genome.threshold ? s.direction : 0;
   const sess = d.spec?.constraints.sessionHoursUtc;
   if (act && sess) {
@@ -157,7 +158,7 @@ async function processLicense(lic: LicenseRow, all: LicenseRow[], ctx: Awaited<R
   const c = busy ? { act: 0 as const, score: null as number | null, x: [] as number[] } : await decide(ctx, i, self);
   const ic = await decide(ctx, i, inc);
   if (c.act === 0 && ic.act === 0) return; // nobody acts: nothing to record
-  const attr = c.act ? attribution(c.x, genome.w, lic.layers as string[]).top : null;
+  const attr = c.act ? attribution(c.x, weightsFor(genome, regimeTagAt(ctx, i)), lic.layers as string[]).top : null;
   const inserted = await db.insert(shadowTrades).values({
     licenseId: lic.id, symbol, signalTime: ctx.p[i].time, side: c.act ? actName(c.act) : null, score: c.score,
     status: "pending", incumbentAction: actName(ic.act), attribution: attr as any,

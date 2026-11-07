@@ -4,7 +4,7 @@
 // when the score clears the threshold, take the cached outcome, apply costs.
 
 import type { Env } from "./env";
-import type { BlueprintSpec, Genome, Trade } from "./types";
+import { weightsFor, type BlueprintSpec, type Genome, type Trade } from "./types";
 import { scoreRow, weightNorm } from "./combine";
 
 export interface RunOpts {
@@ -20,7 +20,8 @@ export interface RunResult { trades: Trade[]; died: boolean; deathReason?: "max_
 export function runGenome(env: Env, g: Genome, o: RunOpts): RunResult {
   const trades: Trade[] = [];
   const norm = weightNorm(g.w);
-  if (norm === 0) return { trades, died: false };
+  const gateNorms = g.gates?.map(w => (w ? weightNorm(w) : norm));
+  if (norm === 0 && !gateNorms?.some(n => n > 0)) return { trades, died: false };
   const out = env.outcomes(g.stopIdx, g.rrIdx);
   const c = o.constraints;
   const sess = c.sessionHoursUtc;
@@ -29,7 +30,8 @@ export function runGenome(env: Env, g: Genome, o: RunOpts): RunResult {
   const end = Math.min(o.to, env.n);
   for (let r = Math.max(0, o.from); r < end; r++) {
     if (r <= busyUntil) continue;
-    const s = scoreRow(env.X, env.L, r, env.g[r], g.w, norm);
+    const tag = env.tag[r];
+    const s = g.gates ? scoreRow(env.X, env.L, r, env.g[r], weightsFor(g, tag), gateNorms![tag]) : scoreRow(env.X, env.L, r, env.g[r], g.w, norm);
     if (s.direction === 0 || s.score < g.threshold) continue;
     if (sess) {
       const h = env.closeHour[r];

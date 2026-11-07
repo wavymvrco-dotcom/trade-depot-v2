@@ -23,6 +23,7 @@ import { publishLicense, unpublishLicense } from "../lab/service/license-pages";
 import { forgeArchive, enqueueForge, judgeAndRecord, FORGE_SYMBOLS } from "../lab/service/forge";
 import { getEnvData } from "../lab/service/envs";
 import { enqueueStorm } from "../lab/service/storm";
+import { addToPlaybook } from "../lab/service/playbook";
 import { validateLayer } from "../lab/engine/forge/dsl";
 const isLabStyle = (s: string): s is "scalp" | "day" | "swing" | "position" => ["scalp", "day", "swing", "position"].includes(s);
 import { TIERS, tierOf, monthKey } from "../lab/service/tiers";
@@ -196,7 +197,9 @@ export function register(app: Express) {
         const missing = ev?.checks.filter(c => !c.ok).map(c => c.label) ?? ["Shadow Run evidence"];
         throw new LabError(`Not ready to license yet: ${missing.join("; ")}.`, 409);
       }
-      res.json(await transition(lic.id, "graduate", "Licensed by the user after passing Shadow Run", ev));
+      const licensed = await transition(lic.id, "graduate", "Licensed by the user after passing Shadow Run", ev);
+      await addToPlaybook(licensed).catch(e => console.warn("[playbook]", e.message)); // becomes a reusable skill (§11.2)
+      res.json(licensed);
     } catch (e) { fail(res, e); }
   });
 
