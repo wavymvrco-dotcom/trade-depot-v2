@@ -1,8 +1,8 @@
 {
   "_about": "Voice-over and on-screen subtitles for each film. Each line is one subtitle; words in *asterisks* are highlighted. Timing comes from the recorded audio when films/vo/<id>/<n>.wav exists, otherwise from word count (2.6 words/s). Facts checked against server/lab/engine. Never mention profit.",
   "voice": {
-    "azure": "en-AU-WilliamNeural",
-    "style": "excited, warm, documentary",
+    "azure": "en-AU-NatashaNeural",
+    "style": "warm, bright, enthusiastic documentary",
     "rate": "+4%"
   },
   "arena": {

@@ -73,14 +73,14 @@ if hud_scene and os.path.isdir(HUD_DIR):
 
 # Voice-over: one sound strip per narration line, at the line start used when the film was built
 VO_DIR = os.path.join(ROOT, "vo", a.id)
-has_vo = os.path.isdir(VO_DIR) and any(f.endswith(".wav") for f in os.listdir(VO_DIR))
+has_vo = os.path.isdir(VO_DIR) and any(f.endswith((".wav", ".mp3")) for f in os.listdir(VO_DIR))
 if has_vo:
     sys.path.insert(0, os.path.dirname(__file__))
     import studio2
     _, lines, _ = studio2.narration(a.id)
     for L in lines:
-        wav = os.path.join(VO_DIR, f"{L['n']:02d}.wav")
-        if os.path.exists(wav):
+        wav = studio2.vo_file(a.id, L["n"])
+        if wav:
             strips.new_sound(f"vo{L['n']:02d}", wav, channel=3 + L["n"] % 2, frame_start=L["f0"])
 
 if a.label:

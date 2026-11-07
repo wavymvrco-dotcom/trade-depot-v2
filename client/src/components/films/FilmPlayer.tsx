@@ -68,7 +68,7 @@ export function FilmPlayer({ film, code, className = "" }: { film?: Film; code: 
         onPause={() => setPlaying(false)}
       >
         {film!.webmUrl && <source src={film!.webmUrl} type="video/webm" onError={() => {}} />}
-        {film!.mp4Url && <source src={film!.mp4Url} type="video/mp4" />}
+        {film!.mp4Url && <source src={film!.mp4Url} type="video/mp4" onError={() => setFailed(true)} />}
         {film!.captionsUrl && <track kind="captions" src={film!.captionsUrl} srcLang="en" label="English" />}
       </video>
       <figcaption className="sr-only">{film!.description}</figcaption>

@@ -585,16 +585,33 @@ def set_length(n):
     bpy.context.scene.frame_end = FRAMES
 
 
+def vo_file(film_id, n):
+    """The recorded line, if any (ElevenLabs gives MP3; Azure gives WAV)."""
+    for ext in ("mp3", "wav"):
+        p = _os.path.join(ROOT, "vo", film_id, f"{n:02d}.{ext}")
+        if _os.path.exists(p):
+            return p
+    return None
+
+
+def audio_seconds(path):
+    if path.endswith(".wav"):
+        with _wave.open(path) as w:
+            return w.getnframes() / w.getframerate()
+    import aud
+    snd = aud.Sound(path)
+    return snd.length / snd.specs[0]
+
+
 def narration(film_id):
     """Lines with start/end frames. Audio durations win over the word-count estimate."""
     data = _json.load(open(_os.path.join(ROOT, "narration.json"), encoding="utf-8"))[film_id]
     t = TITLE_S
     out = []
     for n, raw in enumerate(data["lines"]):
-        wav = _os.path.join(ROOT, "vo", film_id, f"{n:02d}.wav")
-        if _os.path.exists(wav):
-            with _wave.open(wav) as w:
-                dur = w.getnframes() / w.getframerate()
+        vo = vo_file(film_id, n)
+        if vo:
+            dur = audio_seconds(vo)
         else:
             dur = len(raw.replace("*", "").split()) / 2.6 + 0.2
         out.append({"n": n, "raw": raw, "start": t, "dur": dur, "f0": int(t * FPS) + 1, "f1": int((t + dur) * FPS) + 1})

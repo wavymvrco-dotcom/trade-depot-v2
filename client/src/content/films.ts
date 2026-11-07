@@ -1,9 +1,10 @@
 // Copyright © 2026 [OWNER ENTITY]. All rights reserved. Proprietary and confidential.
-// Film registry (build sheet §17.3). New films drop in by filling the URLs here;
-// no code changes. Files live in object storage behind a CDN, never in git or
-// the app bundle. A missing film falls back to its poster, then to a labeled
-// placeholder frame. Honesty rule: films show process, never profits or P&L. Films are narrated
+// Film registry (build sheet §17.3). Films come from a CDN when one is configured,
+// otherwise from the app's own /films folder (see films/blender/publish.sh).
+// A missing film falls back to its poster, then to a labeled placeholder frame. Honesty rule: films show process, never profits or P&L. Films are narrated
 // explainers with burned-in captions (they autoplay muted), built by films/blender/*.py.
+
+import published from "./films-published.json";
 
 export interface Film {
   id: string;
@@ -20,9 +21,19 @@ export interface Film {
   clickToPlay?: boolean;
 }
 
-/** Base URL of the film CDN (VITE_FILMS_CDN_URL, the client-side name for FILMS_CDN_URL). */
+/**
+ * Where films are served from: the film CDN when VITE_FILMS_CDN_URL is set, otherwise the
+ * app itself (client/public/films, added by films/blender/publish.sh). Without a CDN only
+ * films listed in films-published.json get URLs (MP4 + poster); the rest show their placeholder.
+ */
 const CDN = ((import.meta as any).env?.VITE_FILMS_CDN_URL as string | undefined)?.replace(/\/$/, "") ?? "";
-const at = (file: string) => (CDN ? `${CDN}/${file}` : undefined);
+const PUBLISHED = new Set<string>(published as string[]);
+const at = (file: string) => {
+  if (CDN) return `${CDN}/${file}`;
+  const id = file.split(".")[0];
+  if (!PUBLISHED.has(id) || file.endsWith(".webm")) return undefined;
+  return `/films/${file}`;
+};
 
 export const FILMS: Film[] = [
   { id: "arena", system: "arena", title: "The Arena", durationSec: 65,
