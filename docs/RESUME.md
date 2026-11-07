@@ -1,6 +1,6 @@
 # Where the build stands (paused 2026-11-06)
 
-Branch: `phase0-foundation` (all work committed; not pushed). `npm test` passes (52 tests).
+Branch: `phase0-foundation` (all work committed; not pushed). `npm test` passes (49 tests).
 
 ## Done
 - **Phase 0** complete: password fix, routes split, candle cache, pg-boss queue + worker process, VPS deploy
