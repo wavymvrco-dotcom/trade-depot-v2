@@ -1,20 +1,23 @@
 # Where the build stands (2026-11-07)
 
-Branch: `phase0-foundation` (PR #1). `npm test` passes.
+Branch: `phase0-foundation` (PR #1). `npm test` passes (75 tests).
 
 ## Phase 0 — complete
-## Phase 1 — complete except one live-market observation
-- Engine, service, API and Lab UI built and tested; honesty tests pass; demos in `docs/DEMOS.md`.
-- Verified on the running app with test data: Feasibility → Train → Arena → Vault Exam → report; Shadow Run tick
-  (decision + incumbent + attribution + evidence); Tripwire demotion (history + notification); stale-signal guard.
-- Mobile (375 px) and dark mode checked for /lab.
-- **Still to observe during market hours:** a Live strategy's real order passing the trade guard with `license_id`
-  and `risk_amount` recorded.
+## Phase 1 — complete (one live-market observation pending: a Live order through the trade guard)
+## Phase 2 — complete except multi-asset
+- Mirror (fills → pooled cost model → Arena costs; Settings opt-out), Hunter (Level 4, fragility penalty),
+  prop-firm rules + Challenge Odds, Rewind (Performance hub, Gen Zero "you", drawdown windows in the Vault),
+  Blueprint AI (parse + confirm + refine), License Pages (`/l/:slug` + PNG share image). Verified end to end on the
+  running app with test data (deleted afterwards).
 
-## To do before/alongside Phase 2
-- Re-run TDCI "calibrate all" (/admin/tdci): old calibrations include weekend bars.
+## Waiting on Marco — multi-asset (§11A, "with Phase 2")
+Needs decisions before building: market data for stocks/crypto (Twelve Data plan coverage, or a second provider),
+the broker for stocks/crypto (e.g. Alpaca) and an account to test with, and legal review per asset class before
+live trading (§11A.10). The Instrument model and broker-adapter interface (§11A.1, §11A.6) can be built as
+groundwork first.
+
+## Also pending
+- Re-run TDCI "calibrate all" at /admin/tdci (old calibrations include weekend bars).
 - From Marco: VPS, owner entity name, Pro limits.
 
-## Next: Phase 2 (build sheet §10)
-Mirror (execution_fills capture first), Hunter, Rewind, Blueprint AI, prop-firm rules, Challenge Odds, License Pages;
-stocks + crypto spot per §11A.9.
+## Next: Phase 3 (build sheet §11)
