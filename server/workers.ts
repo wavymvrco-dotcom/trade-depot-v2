@@ -8,6 +8,7 @@ import { startPushDigest } from "./push";
 import { startCalibrationWorker } from "./tdci-service";
 import { startLabRunWorker } from "./lab/service/runs";
 import { startShadowWorker } from "./lab/service/shadow";
+import { startProofWorker } from "./lab/service/proof";
 import { startMirrorWorker } from "./lab/service/mirror";
 import { startForgeWorker } from "./lab/service/forge";
 import { startStormWorker } from "./lab/service/storm";
@@ -24,6 +25,7 @@ export async function startBackgroundWorkers() {
   await startCalibrationWorker();
   await startLabRunWorker();
   startShadowWorker();
+  startProofWorker();
   await startMirrorWorker();
   await startForgeWorker();
   await startStormWorker();

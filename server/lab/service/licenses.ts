@@ -7,6 +7,7 @@ import { and, desc, eq } from "drizzle-orm";
 import { db } from "../../db";
 import { licenseEvents, strategyLicenses } from "@shared/schema";
 import { nextState, type LicenseAction } from "../engine/license-rules";
+import { appendProof, vaultCommitFor } from "./proof";
 import type { Grade, Stage } from "../engine/types";
 
 export type LicenseRow = typeof strategyLicenses.$inferSelect;
@@ -27,9 +28,11 @@ export async function licenseHistory(licenseId: string) {
 /** Create a strategy from a Vault Exam result (the only way a license row is born). */
 export async function createFromExam(values: Omit<typeof strategyLicenses.$inferInsert, "grade" | "stage">, passed: boolean, reason: string, data?: unknown) {
   const to = nextState(null, passed ? "exam_passed" : "exam_failed");
+  const vaultCommit = values.runId ? await vaultCommitFor(values.runId, values.genomeHash) : null;
   return db.transaction(async tx => {
     const [row] = await tx.insert(strategyLicenses).values({ ...values, grade: to.grade, stage: to.stage }).returning();
     await tx.insert(licenseEvents).values({ licenseId: row.id, fromGrade: null, fromStage: null, toGrade: to.grade, toStage: to.stage, reason, data: (data ?? null) as any });
+    await appendProof(`license:${row.id}`, "born", { licenseId: row.id, runId: row.runId, genomeHash: row.genomeHash, vaultHash: row.vaultHash ?? null, vaultCommit, to: `${to.grade}/${to.stage}`, reason, at: new Date().toISOString() }, tx);
     return row;
   });
 }
@@ -47,6 +50,7 @@ export async function transition(licenseId: string, action: LicenseAction, reaso
       .set({ ...extra, grade: to.grade, stage: to.stage, updatedAt: new Date() })
       .where(eq(strategyLicenses.id, licenseId)).returning();
     await tx.insert(licenseEvents).values({ licenseId, fromGrade: cur.grade, fromStage: cur.stage, toGrade: to.grade, toStage: to.stage, reason, data: (data ?? null) as any });
+    await appendProof(`license:${licenseId}`, "event", { from: `${cur.grade}/${cur.stage}`, to: `${to.grade}/${to.stage}`, reason, at: new Date().toISOString() }, tx);
     return row;
   });
 }

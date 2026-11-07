@@ -27,6 +27,7 @@ import { mayTradeLive } from "../engine/license-rules";
 import type { VaultReport } from "../engine/vault";
 import { saveEvidence, transition, type LicenseRow } from "./licenses";
 import { hiveRecord } from "./hive-fleet";
+import { appendProofSoft } from "./proof";
 
 const ACTIVE = { stages: ["shadow", "live"], grades: ["probation", "licensed"] };
 const lastProcessed = new Map<string, number>(); // `${symbol}:${style}` → open time (ms) of the last bar decided
@@ -152,6 +153,9 @@ async function processLicense(lic: LicenseRow, all: LicenseRow[], ctx: Awaited<R
     }
     if (!t.side && (t.incumbentAction === "FLAT" || upd.incumbentR != null)) upd.status = "flat";
     if (Object.keys(upd).length) await db.update(shadowTrades).set(upd).where(eq(shadowTrades.id, t.id));
+    if (upd.status === "closed" || upd.status === "flat") {
+      await appendProofSoft(`license:${lic.id}`, "outcome", { symbol, signalTime: t.signalTime, side: t.side, status: upd.status, exitTime: upd.exitTime ?? null, r: upd.r ?? null, incumbentR: upd.incumbentR ?? t.incumbentR ?? null });
+    }
   }
 
   // 2. Decide on the newest closed bar (once), unless a candidate position is still open on this symbol
@@ -168,6 +172,8 @@ async function processLicense(lic: LicenseRow, all: LicenseRow[], ctx: Awaited<R
     status: "pending", incumbentAction: actName(ic.act), attribution: attr as any,
   }).onConflictDoNothing().returning();
   if (!inserted.length) return; // already decided this bar (another worker tick)
+  // Proof of Process: the decision is chained now, before its outcome can be known
+  await appendProofSoft(`license:${lic.id}`, "decision", { symbol, signalTime: ctx.p[i].time, side: inserted[0].side, incumbentAction: inserted[0].incumbentAction, decidedAt: inserted[0].decidedAt.toISOString() });
 
   // 3. Live: place the real order now (market, next bar's open), inside the normal trade guard.
   // Only for a fresh signal: after a restart or a weekend the newest closed bar can be old.

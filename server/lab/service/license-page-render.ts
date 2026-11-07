@@ -66,12 +66,16 @@ ${eq.length > 1 ? `<svg viewBox="0 0 600 120" style="width:100%;height:auto;marg
 <p style="margin:0">${d.shadow.trades} closed trades on live prices without money${d.shadow.since ? `, since ${day(d.shadow.since)}` : ""}: <span class="mono">${fmtR(d.shadow.totalR)}</span>.</p></section>
 <section class="card" aria-labelledby="l"><h2 id="l">Live record</h2>
 <p style="margin:0">${d.live.trades ? `${d.live.trades} closed live trades${d.live.since ? ` since ${day(d.live.since)}` : ""}: <span class="mono">${fmtR(d.live.totalR)}</span>.` : "No closed live trades yet."}</p></section>
+<section class="card" aria-labelledby="pv"><h2 id="pv">Verify this record</h2>
+<p style="margin:0 0 12px">Every decision, result and grade change for this strategy is written to a tamper-evident chain the moment it happens, and each day is sealed with a single fingerprint. Your browser can check it here, without trusting us.</p>
+<button id="td-verify" type="button" data-slug="${esc(slug)}" style="min-height:44px;padding:0 18px;border-radius:999px;border:1px solid currentColor;background:transparent;font:inherit;cursor:pointer">Verify</button>
+<div id="td-verify-out" role="status" style="margin-top:12px"></div></section>
 <section class="card" aria-labelledby="h"><h2 id="h">History</h2><ol>
 ${d.events.map(e => `<li><span class="mono muted">${day(e.at)}</span> · <span class="mono">${esc(e.from ?? "created")} → ${esc(e.to)}</span>${e.tripwire ? " · <strong>Tripwire</strong>" : ""} — ${esc(e.reason)}</li>`).join("")}
 </ol></section>
 <footer>Every number on this page comes from records that cannot be edited after the fact: the Vault Exam report, Shadow Run decisions written when they were made, and live trades linked to this strategy. Strategy settings, position sizes and account details are never shown.<br>
 Trade Depot is a self-directed strategy testing tool, not investment advice. Simulated and historical results do not guarantee future performance. Trading involves substantial risk of loss.</footer>
-</main></body></html>`;
+</main><script src="/proof/verify.js" defer></script></body></html>`;
 }
 
 /** Share image (1200×630): grade seal and key numbers, rendered to PNG. */

@@ -614,3 +614,26 @@ export const hivePredictions = pgTable("hive_predictions", {
   logScore: doublePrecision("log_score"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => [primaryKey({ columns: [t.licenseId, t.symbol, t.barTime] }), index("hive_predictions_symbol_idx").on(t.symbol, t.barTime)]);
+
+// ─── Proof of Process (Phase 3, §11.10): append-only hash chains and daily seals ───
+export const proofEntries = pgTable("proof_entries", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),  // global order: leaves of the day's Merkle tree
+  subject: text("subject").notNull(),            // "run:<id>" or "license:<id>"
+  seq: integer("seq").notNull(),
+  kind: text("kind").notNull(),                  // vault_commit | born | event | decision | outcome
+  body: text("body").notNull(),                  // canonical JSON, exactly as hashed
+  prevHash: text("prev_hash").notNull(),
+  hash: text("hash").notNull(),
+  day: text("day").notNull(),                    // UTC YYYY-MM-DD
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => [uniqueIndex("proof_entries_subject_seq_uq").on(t.subject, t.seq), index("proof_entries_day_idx").on(t.day, t.id), uniqueIndex("proof_entries_hash_uq").on(t.hash)]);
+
+export const proofRoots = pgTable("proof_roots", {
+  day: text("day").primaryKey(),
+  count: integer("count").notNull(),
+  root: text("root").notNull(),
+  file: text("file").notNull(),                  // the text whose SHA-256 is timestamped
+  ots: text("ots"),                              // base64 .ots (OpenTimestamps), when anchoring is on
+  anchoredAt: timestamp("anchored_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});

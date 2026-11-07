@@ -6,6 +6,7 @@ import { randomInt, createHash } from "node:crypto";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "../../db";
 import { blueprints, labRuns, userSettings, vaultOpenings } from "@shared/schema";
+import { appendProof } from "./proof";
 import { blueprintSpecSchema } from "@shared/lab-schemas";
 import { PROFILES, type StyleKey } from "../../tdci";
 import { latestCalibration } from "../../tdci-service";
@@ -150,7 +151,11 @@ export async function processRun(runId: string) {
       claimVault: async (hash, vaultHashes) => {
         const vh = combinedVaultHash(vaultHashes);
         const ins = await db.insert(vaultOpenings).values({ runId, genomeHash: hash, vaultHash: vh }).onConflictDoNothing().returning();
-        if (ins.length) return true;
+        if (ins.length) {
+          // Proof of Process: commit the frozen genome and the vault data's fingerprint before the exam runs
+          await appendProof(`run:${runId}`, "vault_commit", { runId, genomeHash: hash, vaultHash: vh, at: new Date().toISOString() });
+          return true;
+        }
         // A retry after a crash re-runs the same deterministic exam; allowed only if no result was ever stored
         const [prev] = await db.select().from(vaultOpenings).where(and(eq(vaultOpenings.runId, runId), eq(vaultOpenings.genomeHash, hash)));
         const [cur] = await db.select({ result: labRuns.result }).from(labRuns).where(eq(labRuns.id, runId));

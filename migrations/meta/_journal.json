@@ -71,6 +71,13 @@
       "when": 1794042543129,
       "tag": "0009_hive",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1794043072303,
+      "tag": "0010_proof",
+      "breakpoints": true
     }
   ]
 }

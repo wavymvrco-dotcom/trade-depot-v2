@@ -57,6 +57,7 @@ export const PUBLIC_API = [
   /^\/api\/market\/(prices|status)$/,
   /^\/api\/push\/vapid-public-key$/,
   /^\/api\/billing\/publishable-key$/,
+  /^\/api\/proof\/(l\/[A-Za-z0-9_-]{6,32}|day\/\d{4}-\d{2}-\d{2}\.(txt|ots))$/,  // Proof of Process (public License Pages only)
 ];
 
 // Simple fixed-window limiter for auth endpoints (per IP)
