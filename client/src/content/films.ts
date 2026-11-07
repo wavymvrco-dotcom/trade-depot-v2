@@ -1,8 +1,10 @@
 // Copyright © 2026 [OWNER ENTITY]. All rights reserved. Proprietary and confidential.
-// Film registry (build sheet §17.3). New films drop in by filling the URLs here;
-// no code changes. Files live in object storage behind a CDN, never in git or
-// the app bundle. A missing film falls back to its poster, then to a labeled
-// placeholder frame. Honesty rule: films show process, never profits or P&L.
+// Film registry (build sheet §17.3). Films come from a CDN when one is configured,
+// otherwise from the app's own /films folder (see films/blender/publish.sh).
+// A missing film falls back to its poster, then to a labeled placeholder frame. Honesty rule: films show process, never profits or P&L. Films are narrated
+// explainers with burned-in captions (they autoplay muted), built by films/blender/*.py.
+
+import published from "./films-published.json";
 
 export interface Film {
   id: string;
@@ -19,40 +21,50 @@ export interface Film {
   clickToPlay?: boolean;
 }
 
-/** Base URL of the film CDN (VITE_FILMS_CDN_URL, the client-side name for FILMS_CDN_URL). */
+/**
+ * Where films are served from: the film CDN when VITE_FILMS_CDN_URL is set, otherwise the
+ * app itself (client/public/films, added by films/blender/publish.sh). Without a CDN only
+ * films listed in films-published.json get URLs (MP4 + poster); the rest show their placeholder.
+ */
 const CDN = ((import.meta as any).env?.VITE_FILMS_CDN_URL as string | undefined)?.replace(/\/$/, "") ?? "";
-const at = (file: string) => (CDN ? `${CDN}/${file}` : undefined);
+const PUBLISHED = new Set<string>(published as string[]);
+const at = (file: string) => {
+  if (CDN) return `${CDN}/${file}`;
+  const id = file.split(".")[0];
+  if (!PUBLISHED.has(id) || file.endsWith(".webm")) return undefined;
+  return `/films/${file}`;
+};
 
 export const FILMS: Film[] = [
-  { id: "arena", system: "arena", title: "Arena", durationSec: 20,
-    description: "Glowing agents race across terrain made of price charts; the weak fade to grey.",
+  { id: "arena", system: "arena", title: "The Arena", durationSec: 65,
+    description: "One strategy (a glowing probe) drives across candlestick price history; the view rises to 144 market worlds — currencies, stocks, gold, oil — all running at once; the weakest versions burst red, the strongest split and mutate over twelve generations, and the champion heads to the Vault Exam. Narrated, with on-screen captions.",
     posterUrl: at("arena.webp"), mp4Url: at("arena.mp4"), webmUrl: at("arena.webm") },
-  { id: "gauntlet", system: "gauntlet", title: "Gauntlet", durationSec: 20,
-    description: "A strategy crosses a corridor of hazards while a hunter drone strikes at its stop; a storm front rolls in.",
+  { id: "gauntlet", system: "gauntlet", title: "The Gauntlet", durationSec: 55,
+    description: "A red Hunter drone attacks a strategy on an AAPL chart with price gaps and spread blowouts aimed at its stop loss; then a storm sweeps 200 simulated worlds and a gauge shows 96% staying inside the drawdown limit against a 95% bar.",
     posterUrl: at("gauntlet.webp"), mp4Url: at("gauntlet.mp4"), webmUrl: at("gauntlet.webm") },
-  { id: "vault", system: "vault", title: "Vault Exam", durationSec: 20,
-    description: "A vault door opens once, one strategy enters, and the door seals behind it.",
+  { id: "vault", system: "vault", title: "The Vault Exam", durationSec: 53,
+    description: "The last 20% of price history is locked under glass; a vault door opens once; the strategy drives over candles revealed only as it passes, through five laser gates — costs doubled, luck adjustment, beats the default, drawdown, enough trades — then receives its grade and the door seals.",
     posterUrl: at("vault.webp"), mp4Url: at("vault.mp4"), webmUrl: at("vault.webm") },
-  { id: "shadow", system: "shadow", title: "Shadow Run", durationSec: 20,
-    description: "A translucent twin of the strategy trades beside a live chart, mirroring every decision.",
+  { id: "shadow", system: "shadow", title: "Shadow Run", durationSec: 46,
+    description: "On live gold prices, each decision (long, short or flat) is locked above the empty slot before the next candle appears; the current champion trades beside it; results drop into a permanent record and an evidence meter crosses the promotion line.",
     posterUrl: at("shadow.webp"), mp4Url: at("shadow.mp4"), webmUrl: at("shadow.webm") },
-  { id: "licensed", system: "licensed", title: "Licensed", durationSec: 20,
-    description: "A gold seal is stamped onto a strategy card and a timestamp locks into a chain.",
+  { id: "licensed", system: "licensed", title: "Licensed", durationSec: 41,
+    description: "A strategy plaque is stamped with a gold licence seal; below it a live chart sags until a wick touches a red tripwire laser; the alarm fires, the seal is pulled and the plaque returns to the Shadow Run rack.",
     posterUrl: at("licensed.webp"), mp4Url: at("licensed.mp4"), webmUrl: at("licensed.webm") },
-  { id: "mirror", system: "mirror", title: "Mirror", durationSec: 20,
-    description: "Order tickets land slightly off target; the small misses gather into a mirror that feeds the tests.",
+  { id: "mirror", system: "mirror", title: "Mirror", durationSec: 46,
+    description: "Order tickets for EURUSD, AAPL and crude oil land slightly off their target price on a 3D price ladder; the misses build a histogram of real trading costs on a mirror, blended with the same-broker average, and the model beams into the Arena.",
     posterUrl: at("mirror.webp"), mp4Url: at("mirror.mp4"), webmUrl: at("mirror.webm") },
-  { id: "forge", system: "forge", title: "Forge", durationSec: 20,
-    description: "Small blocks snap into trees; each is tested against a bar of light that rises after every try, and most dissolve.",
+  { id: "forge", system: "forge", title: "The Forge", durationSec: 47,
+    description: "Safe formula pieces snap into a tree that is tested inside a glass chamber; a red bar for the required score rises with every idea tried; columns for 109 ideas fall short — none accepted yet — and an empty slot waits for the first layer to earn its place.",
     posterUrl: at("forge.webp"), mp4Url: at("forge.mp4"), webmUrl: at("forge.webm") },
-  { id: "hive", system: "hive", title: "Playbook, Hive and Fleet", durationSec: 20,
-    description: "Licensed cards are shelved by market weather, small lights merge into one glow, and three cards balance on a plate.",
+  { id: "hive", system: "hive", title: "Playbook, Hive and Fleet", durationSec: 43,
+    description: "Licensed strategies shelve into calm, trending and volatile bays and seed new Arena runs; small orbs over a live S&P 500 chart are scored and merge into one Hive orb; three strategies balance on a platform that absorbs shocks.",
     posterUrl: at("hive.webp"), mp4Url: at("hive.mp4"), webmUrl: at("hive.webm") },
-  { id: "proof", system: "proof", title: "Proof of Process", durationSec: 20,
-    description: "Each decision links into a chain before its result appears; at midnight the day folds into one sealed block.",
+  { id: "proof", system: "proof", title: "Proof of Process", durationSec: 38,
+    description: "Each decision becomes a block with a fingerprint, chained before its outcome appears; editing one breaks every later link; at midnight the day folds into a single seal; a Verify button checks every link in the viewer’s browser.",
     posterUrl: at("proof.webp"), mp4Url: at("proof.mp4"), webmUrl: at("proof.webm") },
   { id: "overview", system: "overview", title: "Overview", durationSec: 90, clickToPlay: true,
-    description: "Every system in sequence: Arena, Gauntlet, Vault Exam, Shadow Run, Licensed, Mirror, Forge, Playbook and Hive, and Proof of Process.",
+    description: "Highlights from every system in order, with title cards: Arena, Gauntlet, Vault Exam, Shadow Run, Licensed, Mirror, Forge, Playbook and Hive, and Proof of Process.",
     posterUrl: at("overview.webp"), mp4Url: at("overview.mp4") },
 ];
 

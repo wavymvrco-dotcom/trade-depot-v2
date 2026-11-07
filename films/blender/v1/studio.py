@@ -165,11 +165,11 @@ def ribbon_point(cx, cy, u, seed, length=0.84, base=0.08, scale=1.0):
     return Vector((cx - length / 2 + u * length, cy, base + 0.16 + ribbon_height(u, seed) * scale))
 
 
-def tiles_mesh(name, centres, seeds, size=0.92, thick=0.06, ribbon_w=0.035, steps=96, length=0.84, scale=1.0):
+def tiles_mesh(name, centres, seeds, size=0.92, thick=0.06, ribbon_w=0.035, steps=96, length=0.84, scale=1.0, depth=None):
     """One mesh holding every slab, and one holding every ribbon (fast to render as two objects)."""
     slab_bm, rib_bm = bmesh.new(), bmesh.new()
     for (cx, cy), seed in zip(centres, seeds):
-        bmesh.ops.create_cube(slab_bm, size=1.0, matrix=_mat_trs((cx, cy, thick / 2), (size, size, thick)))
+        bmesh.ops.create_cube(slab_bm, size=1.0, matrix=_mat_trs((cx, cy, thick / 2), (size, depth or size, thick)))
         top, bot = [], []
         for i in range(steps + 1):
             u = i / steps
@@ -274,3 +274,98 @@ def camera_path(cam, tgt, keys):
 def save(path):
     bpy.ops.wm.save_as_mainfile(filepath=path, compress=True)
     print("saved", path)
+
+
+# ─── Bulk animation (many objects) ────────────────────────────────────────────
+
+def bulk(idb, path, index, frames, values, interp="LINEAR"):
+    """Insert many keys at once on an ID (object, camera data, material...)."""
+    if not idb.animation_data:
+        idb.animation_data_create()
+    ad = idb.animation_data
+    if not ad.action:
+        ad.action = bpy.data.actions.new(f"{idb.name}Action")
+    act = ad.action
+    if hasattr(act, "fcurve_ensure_for_datablock"):
+        fc = act.fcurve_ensure_for_datablock(idb, path, index=index)
+    else:
+        fc = act.fcurves.find(path, index=index) or act.fcurves.new(path, index=index)
+    fc.keyframe_points.add(len(frames))
+    co = []
+    for f, v in zip(frames, values):
+        co += [f, v]
+    fc.keyframe_points.foreach_set("co", co)
+    for kp in fc.keyframe_points:
+        kp.interpolation = interp
+    fc.update()
+    return fc
+
+
+def smooth(idb, path, index, pts):
+    """pts: [(frame, value)], eased between keys."""
+    fc = bulk(idb, path, index, [p[0] for p in pts], [p[1] for p in pts], interp="BEZIER")
+    for kp in fc.keyframe_points:
+        kp.handle_left_type = kp.handle_right_type = "AUTO_CLAMPED"
+    fc.update()
+    return fc
+
+
+def smooth_vec(ob, path, pts):
+    """pts: [(frame, (x, y, z))] for location/scale/rotation_euler."""
+    for i in range(3):
+        smooth(ob, path, i, [(f, v[i]) for f, v in pts])
+
+
+def colour_keys(ob, pts):
+    """pts: [(frame, colour name or rgba, glow)] -> obj.color (rgb + alpha used as glow by mat_object_colour)."""
+    for ch in range(4):
+        smooth(ob, "color", ch, [(f, (col(c) if isinstance(c, str) else c)[ch] if ch < 3 else g) for f, c, g in pts])
+
+
+def puck_mesh(radius=0.085, depth=0.045, name="Puck"):
+    bpy.ops.mesh.primitive_cylinder_add(vertices=32, radius=radius, depth=depth)
+    ob = bpy.context.object
+    me = ob.data; me.name = name
+    bpy.data.objects.remove(ob)
+    bv = None
+    return me
+
+
+def new_obj(name, mesh, mat=None, loc=(0, 0, 0)):
+    ob = bpy.data.objects.new(name, mesh)
+    bpy.context.collection.objects.link(ob)
+    ob.location = loc
+    if mat is not None and not mesh.materials:
+        mesh.materials.append(mat)
+    return ob
+
+
+def prim(kind, name, mat=None, **kw):
+    """Add a primitive (cube, cylinder, uv_sphere, ico_sphere, torus, cone, plane) and return it."""
+    getattr(bpy.ops.mesh, f"primitive_{kind}_add")(**kw)
+    ob = bpy.context.object; ob.name = name
+    if mat is not None:
+        assign(ob, mat)
+    return ob
+
+
+def bevel(ob, width=0.01, segments=3):
+    m = ob.modifiers.new("Bevel", "BEVEL"); m.width = width; m.segments = segments
+    try:
+        ob.data.shade_smooth()
+    except Exception:
+        pass
+    return ob
+
+
+def build_and_save(film_id, build_fn):
+    build_fn()
+    out = globals().get("FILMS_OUT")
+    import os
+    root = os.path.abspath(os.path.join(os.path.dirname(__file__) if "__file__" in globals() else ".", ".."))
+    path = out or os.path.join(root, "build", f"{film_id}.blend")
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    save(path)
+
+
+fcurves_of = _fcurves  # public name for film scripts

@@ -10,3 +10,6 @@ vite.config.ts.*
 .neon
 packages/layer-kit/dist
 films/build
+films/out
+films/vo
+films/blender/__pycache__
