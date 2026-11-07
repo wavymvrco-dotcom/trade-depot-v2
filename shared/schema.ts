@@ -601,3 +601,16 @@ export const playbookSkills = pgTable("playbook_skills", {
   provenance: jsonb("provenance").notNull(),     // run, vault hash, dates
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => [index("playbook_skills_user_idx").on(t.userId, t.style), uniqueIndex("playbook_skills_license_uq").on(t.licenseId)]);
+
+// ─── Hive (Phase 3): per-bar probability predictions of Licensed strategies ───
+export const hivePredictions = pgTable("hive_predictions", {
+  licenseId: varchar("license_id").notNull(),
+  symbol: text("symbol").notNull(),
+  style: text("style").notNull(),
+  barTime: text("bar_time").notNull(),
+  p: doublePrecision("p").notNull(),             // P(close in icHorizon bars > close now), from its Vault calibration
+  horizon: integer("horizon").notNull(),
+  up: boolean("up"),                             // filled when the horizon has passed
+  logScore: doublePrecision("log_score"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => [primaryKey({ columns: [t.licenseId, t.symbol, t.barTime] }), index("hive_predictions_symbol_idx").on(t.symbol, t.barTime)]);

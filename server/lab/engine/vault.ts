@@ -13,6 +13,9 @@ import { rng } from "./rng";
 import { hunt } from "./hunter";
 import { simulateProp } from "./prop";
 import { runGenome } from "./episode";
+import { isotonic } from "./hive";
+import { scoreRow, weightNorm } from "./combine";
+import { weightsFor } from "./types";
 
 export const GRADING = { minTrades: 30, minProfitFactor: 1.1, minDsr: 0.95 } as const;
 
@@ -46,9 +49,11 @@ export interface VaultReport {
   luck: { dsr: number; sr0: number; sharpe: number; trials: number; observations: number; skew: number; kurt: number; varianceOfSharpes: number };
   envelope: ReturnType<typeof bootstrapEnvelope>;
   /** The vault trades in time order (R), and their pace, for Challenge Odds and Tripwire. */
-  sequence: { rs: number[]; tradesPerDay: number };
+  sequence: { rs: number[]; tradesPerDay: number; days?: number[] };
   /** Phase 2: the vault sequence run through the Blueprint's prop rules (if any). */
   prop: { status: "passed" | "failed" | "open"; reason: string | null; days: number; returnPct: number } | null;
+  /** Hive (§11.3): isotonic map from composite to P(up over icHorizon bars), fitted on the vault rows. */
+  hiveCurve: { xs: number[]; ps: number[]; horizon: number } | null;
   /** Vault results by market regime at the signal bar (calm, normal, trend, volatile) — the Playbook's regime tags. */
   perRegime: { tag: number; trades: number; totalR: number }[];
   /** Rewind (§10.3): the champion in the user's worst drawdown periods. Gated only when out-of-sample. */
@@ -136,7 +141,8 @@ export function vaultExam(args: {
       const ts = envs.flatMap((env, k) => base.perEnv[k].filter(t => env.tag[t.t] === tag));
       return { tag, trades: ts.length, totalR: r3(ts.reduce((s, t) => s + t.r, 0)) };
     }),
-    sequence: { rs: merged.map(m => r4(m.t.r)), tradesPerDay: r3(tradesPerDay) },
+    sequence: { rs: merged.map(m => r4(m.t.r)), tradesPerDay: r3(tradesPerDay), days: merged.map(m => Math.floor(m.ms / 86_400_000)) },
+    hiveCurve: fitHiveCurve(envs, vault, args.champion),
     prop: propResult ? { status: propResult.status, reason: propResult.reason, days: propResult.days, returnPct: r3(propResult.equityPct) } : null,
     hunter: { totalR: r3(huntedR), keptPct: bs.totalR > 0 ? r3(Math.max(0, huntedR) / bs.totalR) : null, attacks },
     grade: reasons.length ? "scrapped" : "probation",
@@ -146,4 +152,23 @@ export function vaultExam(args: {
 
 function roundEnvelope(e: ReturnType<typeof bootstrapEnvelope>) {
   return { ...e, ddP50: r3(e.ddP50), ddP95: r3(e.ddP95), ddP99: r3(e.ddP99), meanR: r4(e.meanR), meanP05: r4(e.meanP05), meanP95: r4(e.meanP95) };
+}
+
+/** Composite → P(up) on every vault row of every pair (downsampled breakpoints keep the report small). */
+function fitHiveCurve(envs: Env[], vault: Segment[], g: Genome) {
+  const xs: number[] = [], ys: number[] = [];
+  let horizon = 6;
+  envs.forEach((env, k) => {
+    horizon = env.icHorizon ?? 6;
+    for (let r = vault[k].from; r < Math.min(vault[k].to, env.n - horizon); r++) {
+      const w = weightsFor(g, env.tag[r]);
+      xs.push(scoreRow(env.X, env.L, r, env.g[r], w, weightNorm(w)).composite);
+      ys.push(env.candles[r + horizon].close > env.candles[r].close ? 1 : 0);
+    }
+  });
+  if (xs.length < 100) return null;
+  const c = isotonic(xs, ys);
+  const step = Math.max(1, Math.ceil(c.xs.length / 60));
+  const keep = c.xs.map((_, i) => i).filter(i => i % step === 0 || i === c.xs.length - 1);
+  return { xs: keep.map(i => Math.round(c.xs[i] * 1e4) / 1e4), ps: keep.map(i => Math.round(c.ps[i] * 1e4) / 1e4), horizon };
 }

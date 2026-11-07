@@ -64,6 +64,13 @@
       "when": 1794042344218,
       "tag": "0008_playbook",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1794042543129,
+      "tag": "0009_hive",
+      "breakpoints": true
     }
   ]
 }

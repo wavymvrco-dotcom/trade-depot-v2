@@ -26,6 +26,7 @@ import { judgeLive, judgeShadow } from "../engine/verdicts";
 import { mayTradeLive } from "../engine/license-rules";
 import type { VaultReport } from "../engine/vault";
 import { saveEvidence, transition, type LicenseRow } from "./licenses";
+import { hiveRecord } from "./hive-fleet";
 
 const ACTIVE = { stages: ["shadow", "live"], grades: ["probation", "licensed"] };
 const lastProcessed = new Map<string, number>(); // `${symbol}:${style}` → open time (ms) of the last bar decided
@@ -61,7 +62,7 @@ async function decide(ctx: Awaited<ReturnType<typeof loadContext>>, i: number, d
     const inside = sess[0] <= sess[1] ? h >= sess[0] && h < sess[1] : h >= sess[0] || h < sess[1];
     if (!inside) act = 0;
   }
-  return { act, score: s.score, x };
+  return { act, score: s.score, x, composite: s.composite };
 }
 
 const actName = (a: 1 | -1 | 0) => (a > 0 ? "LONG" : a < 0 ? "SHORT" : "FLAT");
@@ -155,7 +156,10 @@ async function processLicense(lic: LicenseRow, all: LicenseRow[], ctx: Awaited<R
 
   // 2. Decide on the newest closed bar (once), unless a candidate position is still open on this symbol
   const busy = pending.some(t => t.side && t.status !== "closed");
-  const c = busy ? { act: 0 as const, score: null as number | null, x: [] as number[] } : await decide(ctx, i, self);
+  const fresh0 = await decide(ctx, i, self);
+  // Hive: every Licensed strategy states P(up) for this bar, busy or not (scored later on real outcomes)
+  await hiveRecord(lic, symbol, ctx.p, i, fresh0.composite).catch(e => console.warn("[hive]", e.message));
+  const c = busy ? { act: 0 as const, score: null as number | null, x: [] as number[] } : fresh0;
   const ic = await decide(ctx, i, inc);
   if (c.act === 0 && ic.act === 0) return; // nobody acts: nothing to record
   const attr = c.act ? attribution(c.x, weightsFor(genome, regimeTagAt(ctx, i)), lic.layers as string[]).top : null;

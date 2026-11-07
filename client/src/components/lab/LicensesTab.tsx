@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { StatusBadge, type Status } from "./StatusBadge";
 import { ChallengeOdds } from "./ChallengeOdds";
+import { FleetCard } from "./FleetCard";
+import { useQuery } from "@tanstack/react-query";
 import { lab, fmtR, useLabMe, useLabNav, useLicense, useLicenseAction, useLicenses, type License } from "./api";
 
 const statusOf = (l: License): Status =>
@@ -38,6 +40,7 @@ export function LicensesTab() {
     <div className="flex-1 overflow-y-auto">
       <div className="max-w-6xl mx-auto px-4 md:px-8 py-6 md:py-10 flex flex-col gap-4">
         <p className="text-sm text-muted-foreground m-0">Plan: <span className="font-medium text-foreground">{me.data?.tier === "pro" ? "Pro" : "Free"}</span>{me.data?.tier !== "pro" && " — Shadow Run and Live trading are part of Pro."}</p>
+        {me.data?.tier === "pro" && (lics.data?.filter(l => l.grade === "licensed").length ?? 0) >= 2 && <FleetCard />}
         <ul className="m-0 p-0 list-none flex flex-col gap-3">
           {lics.data?.map(l => {
             const v = l.vault;
@@ -73,6 +76,7 @@ export function LicensesTab() {
                       </p>
                     )}
                     {l.grade !== "scrapped" && me.data?.tier === "pro" && <ChallengeOdds licenseId={l.id} />}
+                    {l.grade === "licensed" && <ShelfLife style={l.style} />}
                     {l.grade !== "scrapped" && <PublicPage license={l} />}
                     <div>
                       <h4 className="text-sm font-medium m-0 mb-2">History</h4>
@@ -140,5 +144,21 @@ function PublicPage({ license }: { license: License }) {
       </div>
       {err && <p role="alert" className="text-destructive m-0 text-sm">{err}</p>}
     </section>
+  );
+}
+
+/** Shelf Life (§11.8): how long strategies like this usually stay effective — or honestly, not enough history yet. */
+function ShelfLife({ style }: { style: string }) {
+  const q = useQuery<any>({ queryKey: ["/api/lab/shelf-life", style], queryFn: () => lab("GET", `/api/lab/shelf-life?style=${style}`), staleTime: 300_000 });
+  const d = q.data;
+  if (!d) return null;
+  const months = (days: number | null) => (days == null ? "?" : Math.max(1, Math.round(days / 30)));
+  return (
+    <p className="text-sm m-0 bg-secondary rounded-lg px-4 py-3">
+      <span className="font-medium">Shelf life: </span>
+      {d.enough
+        ? <>{style} strategies like this usually stay effective for {months(d.lowDays)}–{months(d.highDays)} months (middle half of {d.licenses} Licensed strategies).</>
+        : <>not enough history yet ({d.licenses} Licensed {style} strategies so far; an estimate needs at least 30, with 10 that have ended).</>}
+    </p>
   );
 }

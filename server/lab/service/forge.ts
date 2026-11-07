@@ -16,7 +16,7 @@ import { getBoss, QUEUES } from "../../jobs";
 import { rng, hashSeed } from "../engine/rng";
 import { GRAMMAR, printLayer, validateLayer, type Node } from "../engine/forge/dsl";
 import { randomLayer, mutateLayer } from "../engine/forge/mutate";
-import { testLayer, nicheOf, layerInputFor, type AcceptanceResult } from "../engine/forge/accept";
+import { testLayer, nicheOf, layerInputFor, tThreshold, type AcceptanceResult } from "../engine/forge/accept";
 import { evaluateLayer } from "../engine/forge/interp";
 import type { EnvData } from "../engine/env";
 import { getEnvData } from "./envs";
@@ -114,7 +114,7 @@ export async function forgeArchive(style: StyleKey) {
   const rows = await db.select().from(forgeLayers).where(eq(forgeLayers.style, style)).orderBy(desc(forgeLayers.createdAt)).limit(200);
   const trials = await layerTrials(style);
   return {
-    style, layerTrials: trials,
+    style, layerTrials: trials, nextThreshold: Math.round(tThreshold(trials + 1) * 100) / 100,
     accepted: rows.filter(r => r.status === "accepted").map(r => ({ id: r.id, text: r.text, niche: r.niche, score: r.score, stats: r.stats, authorType: r.authorType, createdAt: r.createdAt })),
     recent: rows.slice(0, 40).map(r => ({ id: r.id, text: r.text, niche: r.niche, status: r.status, score: r.score, reasons: (r.stats as any)?.reasons ?? [], authorType: r.authorType })),
   };

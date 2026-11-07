@@ -7,6 +7,7 @@ import { ArenaTab } from "@/components/lab/ArenaTab";
 import { ReportTab } from "@/components/lab/ReportTab";
 import { ShadowTab } from "@/components/lab/ShadowTab";
 import { LicensesTab } from "@/components/lab/LicensesTab";
+import { ForgeTab } from "@/components/lab/ForgeTab";
 
 export default function Lab() {
   return (
@@ -18,6 +19,7 @@ export default function Lab() {
         { id: "report", label: "Report", render: () => <ReportTab /> },
         { id: "shadow", label: "Shadow", render: () => <ShadowTab /> },
         { id: "licenses", label: "Licenses", render: () => <LicensesTab /> },
+        { id: "forge", label: "Forge", render: () => <ForgeTab /> },
       ]}
       footer={
         <p className="shrink-0 border-t border-border px-4 md:px-6 py-1.5 sm:py-2 text-[11px] sm:text-xs text-muted-foreground m-0">

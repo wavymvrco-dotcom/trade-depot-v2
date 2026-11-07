@@ -2,6 +2,7 @@
 // Terminal hub: the trading dashboard, with News and the economic Calendar in a
 // collapsible side panel, and links to chart analysis, the order ticket and alerts.
 import { lazy, Suspense, useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation, useSearch } from "wouter";
 import { Newspaper } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -49,6 +50,7 @@ export default function Terminal() {
               <Link href="/alerts" className="underline">price alerts</Link>
             </SheetDescription>
           </SheetHeader>
+          <HiveLine />
           <Tabs value={panel ?? "news"} onValueChange={v => setPanel(v as Panel)} className="flex-1 min-h-0 flex flex-col">
             <TabsList className="mx-4 mt-2 self-start">
               <TabsTrigger value="news">News</TabsTrigger>
@@ -64,5 +66,22 @@ export default function Terminal() {
         </SheetContent>
       </Sheet>
     </AppLayout>
+  );
+}
+
+/** Hive (§11.3): the skill-weighted view of Licensed strategies — shown only with at least 5 contributors. */
+function HiveLine() {
+  const [symbol, setSymbol] = useState("EURUSD");
+  const q = useQuery<{ pUp: number | null; contributors: number }>({ queryKey: ["/api/hive", symbol], queryFn: () => fetch(`/api/hive/${symbol}`, { credentials: "include" }).then(r => r.json()), staleTime: 60_000 });
+  return (
+    <div className="mx-4 mt-2 text-sm bg-secondary rounded-lg px-3 py-2 flex flex-wrap items-center gap-2">
+      <span className="font-medium">Hive</span>
+      <select aria-label="Hive symbol" value={symbol} onChange={e => setSymbol(e.target.value)} className="bg-card border border-border rounded px-2 py-1 font-mono text-xs">
+        {["EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD", "USDCHF", "GBPJPY", "XAUUSD"].map(s => <option key={s}>{s}</option>)}
+      </select>
+      {q.data?.pUp != null
+        ? <span><span className="font-mono">{Math.round(q.data.pUp * 100)}%</span> chance of higher prices ahead, from {q.data.contributors} Licensed strategies weighted by their track record. Context, not a signal.</span>
+        : <span className="text-muted-foreground">Not enough Licensed strategies yet (needs 5).</span>}
+    </div>
   );
 }

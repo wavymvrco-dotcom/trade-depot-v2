@@ -24,6 +24,7 @@ import { forgeArchive, enqueueForge, judgeAndRecord, FORGE_SYMBOLS } from "../la
 import { getEnvData } from "../lab/service/envs";
 import { enqueueStorm } from "../lab/service/storm";
 import { addToPlaybook } from "../lab/service/playbook";
+import { hiveFor, shelfLifeFor, fleetFor } from "../lab/service/hive-fleet";
 import { validateLayer } from "../lab/engine/forge/dsl";
 const isLabStyle = (s: string): s is "scalp" | "day" | "swing" | "position" => ["scalp", "day", "swing", "position"].includes(s);
 import { TIERS, tierOf, monthKey } from "../lab/service/tiers";
@@ -252,6 +253,23 @@ export function register(app: Express) {
       for (const s of FORGE_SYMBOLS) envs.push(await getEnvData(s, style));
       const out = await judgeAndRecord(v.node, style, envs, { type: "user", id: uid(req) }, 1);
       res.json(out.duplicate ? { duplicate: true, status: out.row.status } : { duplicate: false, status: out.row?.status, result: out.result });
+    } catch (e) { fail(res, e); }
+  });
+
+  // ── Hive (§11.3), Shelf Life (§11.8), Fleet (§11.9) ──
+  app.get("/api/hive/:symbol", async (req: Request, res: Response) => {
+    try { res.set("Cache-Control", "private, max-age=60"); res.json(await hiveFor(String(req.params.symbol).toUpperCase())); } catch (e) { fail(res, e); }
+  });
+  app.get("/api/lab/shelf-life", async (req: Request, res: Response) => {
+    try { const style = String(req.query.style ?? "swing"); if (!isLabStyle(style)) throw new LabError("Unknown style"); res.json(await shelfLifeFor(style)); } catch (e) { fail(res, e); }
+  });
+  app.post("/api/lab/fleet", async (req: Request, res: Response) => {
+    try {
+      const { tier } = await tierFor(uid(req));
+      if (tier !== "pro") throw new LabError("Fleet is part of the Pro plan.", 402);
+      const cap = req.body?.cap != null ? Math.min(1, Math.max(0.1, Number(req.body.cap))) : 0.6;
+      const targetR = req.body?.targetR != null ? Number(req.body.targetR) : undefined;
+      res.json(await fleetFor(uid(req), { cap, targetR }));
     } catch (e) { fail(res, e); }
   });
 
