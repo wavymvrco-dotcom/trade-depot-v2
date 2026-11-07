@@ -1,0 +1,132 @@
+{
+  "_about": "Voice-over and on-screen subtitles for each film. Each line is one subtitle; words in *asterisks* are highlighted. Timing comes from the recorded audio when films/vo/<id>/<n>.wav exists, otherwise from word count (2.6 words/s). Facts checked against server/lab/engine. Never mention profit.",
+  "voice": {
+    "azure": "en-AU-WilliamNeural",
+    "style": "excited, warm, documentary",
+    "rate": "+4%"
+  },
+  "arena": {
+    "title": "The Arena",
+    "subtitle": "Where strategies are bred — and most of them die.",
+    "lines": [
+      "Every trading strategy looks *brilliant* on the chart it was built on.",
+      "So here's the question nobody asks: was it *skill*… or just *luck*?",
+      "Meet the *Probe*. It's your strategy — its rules — driving through real price history: a currency, a stock, gold, oil.",
+      "But one road proves *nothing*. So we built a *sandbox*.",
+      "*144 worlds.* Currencies, *stocks*, *commodities*. Different stretches of history. Different trading costs — even orders that *fail to fill*.",
+      "Every version of the strategy runs through every world. *At the same time.*",
+      "Then the Arena does what markets do. The weakest get *wiped out*.",
+      "The strongest are *copied* — with small mutations to their settings.",
+      "Again. And again. *Twelve generations.* Every single version *counted*.",
+      "Because surviving here proves nothing yet. It earns one thing: *a shot at the Vault*."
+    ],
+    "end": "Next: the Vault Exam"
+  },
+  "gauntlet": {
+    "title": "The Gauntlet",
+    "subtitle": "We try to break it before you ever trust it.",
+    "lines": [
+      "A strategy that's never been attacked is a strategy you *can't trust*.",
+      "So we send in the *Hunter* — an adversary with one job: hit your *stop loss*.",
+      "It rips *gaps* into the price. It blows out the *spread*. It hits exactly where it hurts.",
+      "Survive that, and the sky changes. This is *Storm Mode*.",
+      "*200 simulated worlds* — reshuffled history, regime shifts, overnight and *earnings gaps*, spread blowouts.",
+      "Each world is a full rerun of the strategy, start to finish.",
+      "The rule is simple: *95%* of worlds must stay inside the drawdown limit.",
+      "Pass, and it earns a *Storm stamp*. Fail, and you find out *here* — not with your money."
+    ],
+    "end": "Stress-tested before it's trusted"
+  },
+  "vault": {
+    "title": "The Vault Exam",
+    "subtitle": "Data it has never seen. Opened once.",
+    "lines": [
+      "Here's where most backtests *cheat*: they peek at the answers.",
+      "We lock away the last *20%* of history. The strategy has *never* seen it.",
+      "The Vault opens *once* per strategy. No retakes. No tweaking.",
+      "Inside, five gates. Gate one: *double the trading costs*. Does it still hold up?",
+      "Gate two: *the luck adjustment*. Every version the Arena tried is counted against it.",
+      "Gate three: does it beat our *default model* on the same data?",
+      "Gate four: is the *drawdown* inside the range we expected? Gate five: *enough trades* to mean something?",
+      "Pass them all: *Licensed*. Fall short: *probation* or *scrapped*. And the door *seals* behind it."
+    ],
+    "end": "One exam. No second chances."
+  },
+  "shadow": {
+    "title": "Shadow Run",
+    "subtitle": "Live prices. Real decisions. No money.",
+    "lines": [
+      "History is one thing. The *live market* is another.",
+      "In a Shadow Run, the strategy trades *real live prices* — forex, stocks or commodities — on paper.",
+      "Every decision is *locked in before the next bar* appears. No hindsight. Ever.",
+      "Beside it runs the *current champion*, making its own calls on the same prices.",
+      "Each result drops into the *record* — permanently.",
+      "An evidence meter fills as it proves itself *trade by trade* against the champion.",
+      "Only when the evidence is *strong enough* does it get promoted to *Live*."
+    ],
+    "end": "Proof on live prices before any money"
+  },
+  "licensed": {
+    "title": "Licensed",
+    "subtitle": "Earned — and watched every minute.",
+    "lines": [
+      "Pass the Vault, survive the Shadow Run, and a strategy earns its *licence*.",
+      "But a licence isn't forever. Markets *change*.",
+      "So every licensed strategy runs above a *tripwire*.",
+      "It watches for *drift* — results sliding away from what the Vault promised — and drawdowns deeper than the Vault ever saw.",
+      "The moment it's crossed: *the licence is pulled*. Automatically. Back to the Shadow Run.",
+      "No ego, no hoping it comes back. It has to *earn it again*."
+    ],
+    "end": "Trust that's re-checked, not assumed"
+  },
+  "mirror": {
+    "title": "Mirror",
+    "subtitle": "Tested with the costs you actually pay.",
+    "lines": [
+      "Most backtests assume *perfect fills*. Your broker doesn't.",
+      "Every real order you place — a currency, a share, a barrel of oil — lands a little *off target*. That's *slippage*. Plus the *spread*.",
+      "Mirror measures it — fill after fill — and builds a *model of your real costs*.",
+      "Thin data? It leans on the average across traders on the *same broker*, until yours speaks for itself.",
+      "Then that cost model goes *straight into the Arena*.",
+      "So every strategy is tested with what *you* actually pay — not a fantasy."
+    ],
+    "end": "Your fills. Your costs. Your tests."
+  },
+  "forge": {
+    "title": "The Forge",
+    "subtitle": "New ideas, held to a bar that rises with every try.",
+    "lines": [
+      "The Arena breeds strategies from building blocks called *layers* — trend, momentum, volatility.",
+      "The Forge *invents new layers*. Small formulas, built from safe pieces. Never code that runs.",
+      "Each one is tested on training data: does it *actually predict* what price does next?",
+      "But here's the twist: the bar *rises with every idea tried*. Try a thousand, and luck alone would find something — so the bar climbs.",
+      "*109 ideas tested. None has cleared the bar yet.* That's not failure. That's *honesty*.",
+      "When one does, it joins the Arena — earned, not wished for."
+    ],
+    "end": "No lucky formulas allowed"
+  },
+  "hive": {
+    "title": "Playbook · Hive · Fleet",
+    "subtitle": "What worked — kept, combined, balanced.",
+    "lines": [
+      "Every licensed strategy becomes a *skill* in your Playbook — tagged by the market weather it handles: *calm, trending, volatile*.",
+      "The Arena reuses those skills, so your next strategy starts *smarter*.",
+      "Across everyone, licensed strategies quietly make predictions — scored on what actually happens.",
+      "The *Hive* blends them, weighting the ones with the best track record. At least *five* must agree to speak.",
+      "And the *Fleet* spreads your risk across strategies — tuned to soften the *worst days*, then checked on days it's never seen."
+    ],
+    "end": "Experience that compounds"
+  },
+  "proof": {
+    "title": "Proof of Process",
+    "subtitle": "Every decision on the record — before its result.",
+    "lines": [
+      "Anyone can *claim* a track record. We let you *check* ours.",
+      "Every decision is written to a *chain* — the instant it's made, *before* its outcome exists.",
+      "Each link carries a *fingerprint* of the one before it. Change one entry, and every link after it *breaks*.",
+      "At midnight, the whole day folds into *one seal*.",
+      "On any public strategy page, press *Verify* — and your own browser checks every link. No trust required."
+    ],
+    "end": "Don't trust. Verify."
+  }
+}
