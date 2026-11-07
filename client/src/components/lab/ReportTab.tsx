@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { StatusBadge } from "./StatusBadge";
 import { RunPicker } from "./ArenaTab";
 import { EquityLine } from "./EquityLine";
-import { lab, fmtR, useLabMe, useLabNav, useLicenseAction, useRun, useRuns, BELTS, LAYER_LABELS, RR_GRID, STOP_GRID, useLicense } from "./api";
+import { lab, layerLabel, fmtR, useLabMe, useLabNav, useLicenseAction, useRun, useRuns, BELTS, LAYER_LABELS, RR_GRID, STOP_GRID, useLicense } from "./api";
 
 function VaultBar({ s }: { s: { trainFrom: string; trainTo: string; validationFrom: string; validationTo: string; vaultFrom: string; vaultTo: string } }) {
   const parts = [
@@ -159,7 +159,7 @@ export function ReportTab() {
                     const w = r.champion!.genome.w[j];
                     return (
                       <li key={k} className="flex items-center gap-3 text-sm">
-                        <span className="w-40 truncate">{LAYER_LABELS[k] ?? k}</span>
+                        <span className="w-40 truncate">{layerLabel(k)}</span>
                         <span className="flex-1 h-2 bg-secondary rounded-full relative overflow-hidden" aria-hidden="true">
                           <span className="absolute top-0 bottom-0" style={{ left: w >= 0 ? "50%" : `${50 + w * 50}%`, width: `${Math.abs(w) * 50}%`, background: w >= 0 ? "var(--rj-pos)" : "var(--rj-neg)" }} />
                         </span>

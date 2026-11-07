@@ -30,6 +30,12 @@ export interface EnvData {
   g: Float32Array;         // regime multiplier per row
   tag: Uint8Array;         // curriculum regime tag per row
   closeHour: Uint8Array;   // UTC hour at which the signal bar closes
+  /** Higher-timeframe bars and, per candle, the last HTF bar closed by that candle's close (−1 if none). For Forge layers. */
+  h?: Candle[];
+  hIdx?: Int32Array;
+  htfMs?: number;
+  /** Bars ahead for the information-coefficient test (profile icHorizon). */
+  icHorizon?: number;
 }
 
 export interface OutcomeGrid {
@@ -71,6 +77,7 @@ export function buildEnvData(ctx: TdciContext, cost: TradeCost): EnvData {
   return {
     symbol: ctx.symbol, style: ctx.profile.key, layers, maxHold: ctx.profile.model.maxHold, barMs: ctx.barMs, cost,
     candles, atr: Float64Array.from(ctx.pAtr.slice(start)), X, g, tag, closeHour,
+    h: ctx.h, hIdx: Int32Array.from(ctx.hIdx.slice(start)), htfMs: ctx.htfMs, icHorizon: ctx.profile.model.icHorizon,
   };
 }
 
@@ -81,6 +88,7 @@ export function sliceEnvData(d: EnvData, end: number): EnvData {
     ...d,
     candles: d.candles.slice(0, end), atr: d.atr.slice(0, end),
     X: d.X.slice(0, rows * L), g: d.g.slice(0, rows), tag: d.tag.slice(0, rows), closeHour: d.closeHour.slice(0, rows),
+    hIdx: d.hIdx?.slice(0, end),
   };
 }
 

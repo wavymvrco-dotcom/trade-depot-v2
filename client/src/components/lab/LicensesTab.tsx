@@ -64,6 +64,14 @@ export function LicensesTab() {
                       {l.stage !== "retired" && <Button variant="ghost" className="min-h-[44px]" onClick={() => setConfirm({ id: l.id, action: "retire" })}>Retire</Button>}
                       {l.runId && <Button variant="ghost" className="min-h-[44px]" onClick={() => go("report", { run: l.runId })}>Vault report</Button>}
                     </div>
+                    {l.grade !== "scrapped" && (
+                      <p className="text-sm m-0 bg-secondary rounded-lg px-4 py-3">
+                        <span className="font-medium">Storm Mode: </span>
+                        {l.storm
+                          ? <>{l.storm.passed ? "survived" : "did not survive"} — drawdown stayed under {l.storm.limitR.toFixed(1)}R in {l.storm.survived} of {l.storm.worlds} synthetic crisis markets ({Math.round(l.storm.survivalRate * 100)}%; needs 95%). Worst: {l.storm.worstDrawdownR.toFixed(1)}R. <span className="text-muted-foreground">A stress check only — it does not change the grade.</span></>
+                          : "running after the Vault Exam (bootstrapped markets, volatility regimes, price gaps, spread blowouts)…"}
+                      </p>
+                    )}
                     {l.grade !== "scrapped" && me.data?.tier === "pro" && <ChallengeOdds licenseId={l.id} />}
                     {l.grade !== "scrapped" && <PublicPage license={l} />}
                     <div>

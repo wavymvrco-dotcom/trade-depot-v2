@@ -61,3 +61,8 @@ export async function saveEvidence(licenseId: string, evidence: unknown) {
 export async function setPublicPage(licenseId: string, v: { publicSlug: string | null; publicName: string | null; publicSince: Date | null }) {
   await db.update(strategyLicenses).set({ ...v, updatedAt: new Date() }).where(eq(strategyLicenses.id, licenseId));
 }
+
+/** Storm Mode verdict (pass/fail only; never a grade change). */
+export async function setStormResult(licenseId: string, storm: unknown) {
+  await db.update(strategyLicenses).set({ storm: storm as any, updatedAt: new Date() }).where(eq(strategyLicenses.id, licenseId));
+}

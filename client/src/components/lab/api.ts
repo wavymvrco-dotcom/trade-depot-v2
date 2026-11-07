@@ -42,6 +42,7 @@ export interface License {
   evidence: (Record<string, any> & { kind?: "shadow" | "live"; checks?: ShadowCheck[]; verdict?: string; reasons?: string[] }) | null;
   createdAt: string; updatedAt: string; shadowStartedAt: string | null; liveSince: string | null;
   publicSlug?: string | null; publicName?: string | null;
+  storm?: { worlds: number; survived: number; survivalRate: number; passed: boolean; limitR: number; worstDrawdownR: number; ranAt: string; byKind: Record<string, { worlds: number; survived: number }> } | null;
   events?: { id: string; fromGrade: string | null; fromStage: string | null; toGrade: string; toStage: string; reason: string; at: string }[];
 }
 export interface ShadowTrade {
@@ -103,3 +104,6 @@ export const LAYER_LABELS: Record<string, string> = {
 };
 export const BELTS = ["None", "Level 1 · calm markets", "Level 2 · trending markets", "Level 3 · all markets", "Level 4 · survived Hunter"];
 export const fmtR = (v: number | null | undefined, dp = 1) => (v == null || !Number.isFinite(v) ? "—" : `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v).toFixed(dp)}R`);
+
+/** Human label for a layer key (TDCI layers by name; Forge layers by a short id). */
+export const layerLabel = (k: string) => (k.startsWith("forge:") ? `Forge layer ${k.slice(6, 12)}` : LAYER_LABELS[k] ?? k);

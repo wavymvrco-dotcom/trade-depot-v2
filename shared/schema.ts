@@ -496,6 +496,7 @@ export const strategyLicenses = pgTable("strategy_licenses", {
   publicSlug: text("public_slug"),                 // License Page (opt-in); null = not shared
   publicName: text("public_name"),                 // optional display name shown on the page (otherwise anonymous)
   publicSince: timestamp("public_since"),
+  storm: jsonb("storm"),                           // Storm Mode verdict (pass/fail only; never affects the grade)
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (t) => [
@@ -568,3 +569,20 @@ export const mirrorModels = pgTable("mirror_models", {
   slippage: jsonb("slippage").notNull(),         // same, signed against the trader
   fittedAt: timestamp("fitted_at").notNull().defaultNow(),
 }, (t) => [primaryKey({ columns: [t.broker, t.symbol, t.hourBucket, t.news] })]);
+
+// ─── Forge (Phase 3): layers invented as DSL programs ─────────────────────────
+/** Every layer program ever tested (accepted or not): the MAP-Elites archive and the layerTrials count. */
+export const forgeLayers = pgTable("forge_layers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  authorType: text("author_type").notNull(),     // forge | user (Layer Kit submission)
+  authorId: varchar("author_id"),                // user who ran the Forge job or submitted it
+  style: text("style").notNull(),                // layers are judged per TDCI style (timeframe)
+  dsl: jsonb("dsl").notNull(),                   // validated JSON AST
+  text: text("text").notNull(),                  // printed form, for dedupe and display
+  niche: text("niche").notNull(),                // family:timeframe
+  status: text("status").notNull(),              // accepted | rejected
+  score: doublePrecision("score").notNull(),
+  stats: jsonb("stats").notNull(),               // acceptance result
+  novelty: doublePrecision("novelty"),           // 1 − max |ρ| with existing layers
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => [index("forge_layers_style_idx").on(t.style, t.status), uniqueIndex("forge_layers_style_text_uq").on(t.style, t.text)]);

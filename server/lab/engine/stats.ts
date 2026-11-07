@@ -188,3 +188,26 @@ export function probBetter(diffs: ArrayLike<number>, sigma: number, priorTrades 
   const postMean = postVar * (mean(diffs) / likeVar);
   return normCdf(postMean / Math.sqrt(postVar));
 }
+
+/** Average ranks (ties share their mean rank). */
+export function ranks(v: ArrayLike<number>) {
+  const idx = Array.from(v, (x, i) => [x, i] as const).sort((a, b) => a[0] - b[0]);
+  const r = new Float64Array(v.length);
+  for (let k = 0; k < idx.length;) {
+    let e = k;
+    while (e + 1 < idx.length && idx[e + 1][0] === idx[k][0]) e++;
+    for (let m = k; m <= e; m++) r[idx[m][1]] = (k + e) / 2;
+    k = e + 1;
+  }
+  return r;
+}
+
+export function pearson(x: ArrayLike<number>, y: ArrayLike<number>) {
+  const n = x.length; if (n < 3) return 0;
+  const mx = mean(x), my = mean(y);
+  let num = 0, dx = 0, dy = 0;
+  for (let i = 0; i < n; i++) { num += (x[i] - mx) * (y[i] - my); dx += (x[i] - mx) ** 2; dy += (y[i] - my) ** 2; }
+  return dx && dy ? num / Math.sqrt(dx * dy) : 0;
+}
+
+export const spearman = (x: ArrayLike<number>, y: ArrayLike<number>) => pearson(ranks(x), ranks(y));

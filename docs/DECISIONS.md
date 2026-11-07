@@ -208,3 +208,25 @@ Newest at the bottom. Format: date — decision — why.
   its text renders.
 - Publish/unpublish only touches the page fields, through `licenses.ts` (`setPublicPage`), never grade or stage.
 - The "Verify" button and timestamping are Proof of Process (§11.10, Phase 3).
+
+## 2026-11-07 — Phase 3: Forge and Storm Mode
+
+- **Forge DSL validator is hand-written**, not a recursive zod union: the zod version re-checks every branch at every
+  level and took 42 s on a deep tree (now ~2 ms). It refuses unknown ops, unknown keys, wrong types, out-of-range
+  numbers, depth > 6, > 40 nodes and nested `htf()`. A `hour` series (UTC hour of the bar's close) was added so the
+  "session" family the sheet lists can exist.
+- **Acceptance** pools the training rows of EURUSD, GBPUSD, USDJPY and AUDUSD per style; only rows after a layer's own
+  warmup count; programs that read no market data are refused. layerTrials = every program ever tested for that
+  style (never reset), which raises the |t| bar via Bonferroni.
+- **Real-data result (swing, 2026-11-07):** 109 programs tested by mutation (no AI key), **none accepted**; best
+  |t| = 1.69 against a bar of 3.49. Reported as is. The first 55 were judged with a warmup flaw (constant programs
+  scored on warmup zeros); they stay in the count — they were real trials.
+- **Arena use:** accepted layers become extra genome dimensions at weight 0 in Gen Zero; Shadow Run evaluates them on
+  live data. `TDCI_VERSION` → 3 (environments now carry higher-timeframe bars for `htf()`).
+- **Gap fills (§11A.3):** a stop or target crossed by the bar's *open* fills at the open — worse for stops, better for
+  targets. Applies to calibration, the Lab and Shadow Run alike. The parity test still holds (no gaps in its data).
+- **Storm Mode** runs as its own job after a Vault pass: 200 worlds (bootstrap, regime, gaps, spread blowouts) over the
+  strategy's pairs, each the length of the Vault period plus warmup, all TDCI layers recomputed (COT/rates keep real
+  values). Limit: the prop rules' max drawdown in R if set, else the Vault's 99th-percentile drawdown. Pass = ≥ 95% of
+  worlds under the limit. It is a stamp only — never a grade change, never imported by training (test-enforced).
+  ~7 s for 200 worlds.

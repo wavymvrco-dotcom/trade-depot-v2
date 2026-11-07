@@ -8,7 +8,9 @@
 
 import { and, eq, inArray, isNotNull, gte } from "drizzle-orm";
 import { db } from "../../db";
-import { blueprints, labRuns, positions, shadowTrades, strategyLicenses } from "@shared/schema";
+import { blueprints, forgeLayers, labRuns, positions, shadowTrades, strategyLicenses } from "@shared/schema";
+import { validateLayer } from "../engine/forge/dsl";
+import { evaluateLayer } from "../engine/forge/interp";
 import { blueprintSpecSchema, genomeSchema, vaultExpectationSchema } from "@shared/lab-schemas";
 import { PROFILES, layerValues, lastClosedIndex, parseTime, type StyleKey } from "../../tdci";
 import { loadContext, costFor } from "../../tdci-service";
@@ -30,9 +32,26 @@ const lastProcessed = new Map<string, number>(); // `${symbol}:${style}` → ope
 
 interface Decider { genome: Genome; layers: string[]; spec: BlueprintSpec | null }
 
-function decide(ctx: Awaited<ReturnType<typeof loadContext>>, i: number, d: Decider) {
+/** Forge layer values on a live context, computed once per context per tick. */
+const forgeCache = new WeakMap<object, Map<string, Float64Array>>();
+async function forgeValue(ctx: Awaited<ReturnType<typeof loadContext>>, key: string, i: number) {
+  let m = forgeCache.get(ctx); if (!m) { m = new Map(); forgeCache.set(ctx, m); }
+  let v = m.get(key);
+  if (!v) {
+    const [row] = await db.select({ dsl: forgeLayers.dsl }).from(forgeLayers).where(eq(forgeLayers.id, key.slice(6)));
+    const ok = row ? validateLayer(row.dsl) : null;
+    const times = ctx.p.map(c => parseTime(c.time)), hTimes = ctx.h.map(c => parseTime(c.time));
+    try { v = ok && ok.ok ? evaluateLayer(ok.node, { p: ctx.p, times, barMs: ctx.barMs, h: ctx.h, hTimes, htfMs: ctx.htfMs, hIdx: ctx.hIdx }).values : new Float64Array(ctx.p.length); }
+    catch { v = new Float64Array(ctx.p.length); }
+    m.set(key, v);
+  }
+  return v[i] ?? 0;
+}
+
+async function decide(ctx: Awaited<ReturnType<typeof loadContext>>, i: number, d: Decider) {
   const lv = layerValues(ctx, i);
-  const x = d.layers.map(k => (lv.layers as any)[k]?.value ?? 0);
+  const x: number[] = [];
+  for (const k of d.layers) x.push(k.startsWith("forge:") ? await forgeValue(ctx, k, i) : (lv.layers as any)[k]?.value ?? 0);
   const s = scoreRow(x, x.length, 0, lv.regime.value, d.genome.w, weightNorm(d.genome.w));
   let act: 1 | -1 | 0 = s.direction !== 0 && s.score >= d.genome.threshold ? s.direction : 0;
   const sess = d.spec?.constraints.sessionHoursUtc;
@@ -135,8 +154,8 @@ async function processLicense(lic: LicenseRow, all: LicenseRow[], ctx: Awaited<R
 
   // 2. Decide on the newest closed bar (once), unless a candidate position is still open on this symbol
   const busy = pending.some(t => t.side && t.status !== "closed");
-  const c = busy ? { act: 0 as const, score: null as number | null, x: [] as number[] } : decide(ctx, i, self);
-  const ic = decide(ctx, i, inc);
+  const c = busy ? { act: 0 as const, score: null as number | null, x: [] as number[] } : await decide(ctx, i, self);
+  const ic = await decide(ctx, i, inc);
   if (c.act === 0 && ic.act === 0) return; // nobody acts: nothing to record
   const attr = c.act ? attribution(c.x, genome.w, lic.layers as string[]).top : null;
   const inserted = await db.insert(shadowTrades).values({

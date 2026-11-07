@@ -20,6 +20,11 @@ import { shadowEvidence } from "../lab/service/shadow";
 import { userRewind } from "../lab/service/rewind";
 import { parseBlueprint, reflectOnRun } from "../lab/service/blueprint";
 import { publishLicense, unpublishLicense } from "../lab/service/license-pages";
+import { forgeArchive, enqueueForge, judgeAndRecord, FORGE_SYMBOLS } from "../lab/service/forge";
+import { getEnvData } from "../lab/service/envs";
+import { enqueueStorm } from "../lab/service/storm";
+import { validateLayer } from "../lab/engine/forge/dsl";
+const isLabStyle = (s: string): s is "scalp" | "day" | "swing" | "position" => ["scalp", "day", "swing", "position"].includes(s);
 import { TIERS, tierOf, monthKey } from "../lab/service/tiers";
 import { FAILURE_TEXT } from "../lab/engine/types";
 import type { BlueprintSpec } from "../lab/engine/types";
@@ -221,6 +226,32 @@ export function register(app: Express) {
     } catch (e) { fail(res, e); }
   });
 
+  // ── Forge (§11.1) and Layer Kit submissions (§11.6) ──
+  app.get("/api/lab/forge", async (req: Request, res: Response) => {
+    try { const style = String(req.query.style ?? "swing"); if (!isLabStyle(style)) throw new LabError("Unknown style"); res.json(await forgeArchive(style)); } catch (e) { fail(res, e); }
+  });
+  app.post("/api/lab/forge", async (req: Request, res: Response) => {
+    try {
+      const { tier } = await tierFor(uid(req));
+      if (tier !== "pro") throw new LabError("The Forge is part of the Pro plan.", 402);
+      const style = String(req.body?.style ?? "swing"); if (!isLabStyle(style)) throw new LabError("Unknown style");
+      const steps = Math.max(1, Math.min(50, Number(req.body?.steps ?? 20)));
+      res.status(202).json({ jobId: await enqueueForge(style, steps, uid(req), !!req.body?.useAi) });
+    } catch (e) { fail(res, e); }
+  });
+  app.post("/api/lab/forge/submit", async (req: Request, res: Response) => {
+    try {
+      const style = String(req.body?.style ?? "swing"); if (!isLabStyle(style)) throw new LabError("Unknown style");
+      const v = validateLayer(req.body?.layer);
+      if (!v.ok) throw new LabError(`Not a valid layer: ${v.errors.join("; ")}`);
+      if (feasLimited(uid(req))) return res.status(429).json({ message: "Too many submissions — wait a minute." });
+      const envs = [];
+      for (const s of FORGE_SYMBOLS) envs.push(await getEnvData(s, style));
+      const out = await judgeAndRecord(v.node, style, envs, { type: "user", id: uid(req) }, 1);
+      res.json(out.duplicate ? { duplicate: true, status: out.row.status } : { duplicate: false, status: out.row?.status, result: out.result });
+    } catch (e) { fail(res, e); }
+  });
+
   app.get("/api/lab/prop-templates", (_req: Request, res: Response) => res.json(PROP_TEMPLATES));
 
   /** Challenge Odds (§10.6): recomputed from every real trade the strategy has so far (vault + shadow + live). */
@@ -242,6 +273,15 @@ export function register(app: Express) {
       const odds = challengeOdds(rs, vault.sequence.tradesPerDay || 1, rules as PropRules, risk, rng(hashSeed(lic.id + JSON.stringify(rules) + rs.length)), 10_000);
       if (!odds) throw new LabError("Not enough real trades yet to estimate the odds (needs at least 10).", 409);
       res.json({ ...odds, rules, riskPct: risk, sources: { vault: vault.sequence.rs.length, shadow: shadow.length, live: live.length }, failureText: PROP_FAILURE_TEXT });
+    } catch (e) { fail(res, e); }
+  });
+
+  /** Storm Mode on demand (it also runs automatically after a Vault pass). */
+  app.post("/api/lab/licenses/:id/storm", async (req: Request, res: Response) => {
+    try {
+      const lic = await owned(req);
+      if (lic.grade === "scrapped") throw new LabError("Storm Mode runs on strategies that passed the Vault Exam.", 409);
+      res.status(202).json({ jobId: await enqueueStorm(lic.id) });
     } catch (e) { fail(res, e); }
   });
 

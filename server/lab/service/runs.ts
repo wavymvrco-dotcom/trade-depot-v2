@@ -20,12 +20,15 @@ import { TIERS, tierOf, monthKey } from "./tiers";
 import { createFromExam } from "./licenses";
 import { mirrorModelFor } from "./mirror";
 import { userGenome, worstDrawdownWindows } from "./rewind";
+import { acceptedLayers } from "./forge";
+import { enqueueStorm } from "./storm";
+import { withForgeLayers } from "../engine/forge/accept";
 
 export class LabError extends Error { constructor(message: string, public status = 400) { super(message); } }
 
-const defaultsFor = (style: StyleKey) => {
+const defaultsFor = (style: StyleKey, extraLayers = 0) => {
   const prof = PROFILES[style];
-  return { defaultWeights: prof.layers.map(k => prof.defaultWeights[k] ?? 0), defaultStop: prof.model.stopAtr, defaultRr: prof.model.rr };
+  return { defaultWeights: [...prof.layers.map(k => prof.defaultWeights[k] ?? 0), ...new Array(extraLayers).fill(0)], defaultStop: prof.model.stopAtr, defaultRr: prof.model.rr };
 };
 
 // ─── Create / read / cancel ───────────────────────────────────────────────────
@@ -111,8 +114,11 @@ export async function processRun(runId: string) {
     const priorTrials = prior.filter(p => (p.config as any)?.dataVersion === dataVersion && [...(p.symbols as string[])].sort().join(",") === symKey)
       .reduce((s, p) => s + (p.trials ?? 0), 0);
     await db.update(labRuns).set({ config: { ...(run.config as any), dataVersion } }).where(eq(labRuns.id, runId));
+    // Forge (§11.1): accepted layers join as extra genome dimensions (weight 0 in Gen Zero; mutation can switch them on)
+    const forge = await acceptedLayers(style).catch(() => []);
     const envData = [];
-    for (const s of spec.symbols) envData.push(await getEnvData(s, style));
+    for (const s of spec.symbols) envData.push(withForgeLayers(await getEnvData(s, style), forge));
+    const extra = forge.length;
     const settings = await storage.getUserSettings(run.userId);
     const broker = settings?.brokerType === "mql5" ? "mt5" : settings?.brokerType;
     const mirror = await Promise.all(spec.symbols.map(s => mirrorModelFor(broker, s, style).catch(() => null)));
@@ -122,13 +128,13 @@ export async function processRun(runId: string) {
     const cal = await latestCalibration(spec.symbols[0], style).catch(() => null);
     const calRes = cal?.result as any;
     const prof = PROFILES[style];
-    const calibrationWeights = calRes?.weightsLearned ? prof.layers.map(k => Number(calRes.weights?.[k] ?? 0)) : null;
+    const calibrationWeights = calRes?.weightsLearned ? [...prof.layers.map(k => Number(calRes.weights?.[k] ?? 0)), ...new Array(extra).fill(0)] : null;
 
     let gen = 0;
     const cfg = run.config as { population: number; generations: number; episodes: number; successiveHalving: boolean };
     const result = await runLabAsync({
       envData, spec, seed: run.seed, population: cfg.population, generations: cfg.generations, episodes: cfg.episodes,
-      successiveHalving: cfg.successiveHalving, ...defaultsFor(style), calibrationWeights, userThreshold: settings?.tdciMinScore ?? null, mirror,
+      successiveHalving: cfg.successiveHalving, ...defaultsFor(style, extra), calibrationWeights, userThreshold: settings?.tdciMinScore ?? null, mirror,
       userGenome: userG, rewindWindows, priorTrials,
     }, {
       onProgress: p => { gen = p.generation; return setProgress({ ...p, phase: "Arena" }).then(() => {}); },
@@ -148,7 +154,7 @@ export async function processRun(runId: string) {
       },
     });
 
-    await finishRun(run, bp, spec, result);
+    await finishRun(run, bp, spec, result, envData[0]?.layers ?? PROFILES[style].layers);
     console.log(`[lab] run ${runId} ${result.cancelled ? "cancelled" : "done"} in ${((Date.now() - t0) / 1000).toFixed(1)}s, trials=${result.trials}, grade=${result.grade}`);
   } catch (e: any) {
     console.error(`[lab] run ${runId} failed: ${e.message}`);
@@ -158,7 +164,7 @@ export async function processRun(runId: string) {
   }
 }
 
-async function finishRun(run: typeof labRuns.$inferSelect, bp: typeof blueprints.$inferSelect, spec: BlueprintSpec, result: LabResult) {
+async function finishRun(run: typeof labRuns.$inferSelect, bp: typeof blueprints.$inferSelect, spec: BlueprintSpec, result: LabResult, layers: readonly string[]) {
   await db.update(labRuns).set({
     status: result.cancelled ? "cancelled" : "done", result: result as any, trials: result.trials, finishedAt: new Date(),
   }).where(eq(labRuns.id, run.id));
@@ -166,12 +172,14 @@ async function finishRun(run: typeof labRuns.$inferSelect, bp: typeof blueprints
   const v = result.vault;
   const best = [...v.perPair].sort((a, b) => b.totalR - a.totalR).slice(0, 3).map(p => p.symbol);
   const passed = v.grade === "probation";
-  await createFromExam({
+  const lic = await createFromExam({
     userId: run.userId, runId: run.id, kind: "lab",
     name: `${bp.name} · ${run.id.slice(0, 6)}`, style: spec.style, symbols: best,
-    genome: result.champion.genome as any, genomeHash: genomeHash(result.champion.genome), layers: PROFILES[spec.style].layers as any,
+    genome: result.champion.genome as any, genomeHash: genomeHash(result.champion.genome), layers: layers as any,
     vault: v as any, vaultHash: combinedVaultHash(v.vaultHashes),
   }, passed, passed ? "Passed the Vault Exam" : `Vault Exam: ${v.failureReasons.join(", ")}`, { runId: run.id });
+  // Storm Mode runs after the exam, as a pass/fail stamp only (never part of selection or the grade)
+  if (passed) await enqueueStorm(lic.id).catch(e => console.warn("[storm] not queued:", e.message));
 }
 
 export async function startLabRunWorker() {

@@ -4,7 +4,7 @@
 
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "./StatusBadge";
-import { fmtR, useLabNav, useLicense, useLicenseAction, useLicenses, useShadowTrades, LAYER_LABELS } from "./api";
+import { fmtR, useLabNav, useLicense, useLicenseAction, useLicenses, useShadowTrades, layerLabel } from "./api";
 
 export function ShadowTab() {
   const lics = useLicenses();
@@ -86,7 +86,7 @@ export function ShadowTab() {
                           <td className="pr-3">{t.side ?? "Flat"}{t.score != null && <span className="text-muted-foreground font-mono"> · {t.score}</span>}</td>
                           <td className="pr-3">{t.incumbentAction === "FLAT" ? "Flat" : t.incumbentAction}{disagree && <span className="sr-only"> (disagrees)</span>}</td>
                           <td className={`pr-3 font-mono ${t.r == null ? "" : t.r >= 0 ? "text-pos" : "text-neg"}`}>{t.status === "closed" ? fmtR(t.r, 2) : t.side ? t.status : "—"}</td>
-                          <td className="pr-3 text-muted-foreground">{t.attribution?.map(a => `${Math.round(a.share * 100)}% ${LAYER_LABELS[a.key] ?? a.key}`).join(" · ") ?? ""}</td>
+                          <td className="pr-3 text-muted-foreground">{t.attribution?.map(a => `${Math.round(a.share * 100)}% ${layerLabel(a.key)}`).join(" · ") ?? ""}</td>
                         </tr>
                       );
                     })}

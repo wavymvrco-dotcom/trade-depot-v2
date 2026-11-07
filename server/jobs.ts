@@ -13,6 +13,7 @@ export const QUEUES = {
   labMirrorFit: "lab.mirror.fit",
   labForgeGenerate: "lab.forge.generate",
   labEnvBuild: "lab.env.build",
+  labStorm: "lab.storm",
 } as const;
 
 /** Per-queue retry/expiry policy. Calibrations pull months of rate-limited data, so allow them time. */

@@ -9,6 +9,8 @@ import { startCalibrationWorker } from "./tdci-service";
 import { startLabRunWorker } from "./lab/service/runs";
 import { startShadowWorker } from "./lab/service/shadow";
 import { startMirrorWorker } from "./lab/service/mirror";
+import { startForgeWorker } from "./lab/service/forge";
+import { startStormWorker } from "./lab/service/storm";
 
 export function workersEnabledInWeb(): boolean {
   return (process.env.RUN_WORKERS ?? "true").toLowerCase() !== "false";
@@ -23,5 +25,7 @@ export async function startBackgroundWorkers() {
   await startLabRunWorker();
   startShadowWorker();
   await startMirrorWorker();
+  await startForgeWorker();
+  await startStormWorker();
   console.log("[workers] background workers started (auto-trade, alerts, signal outcomes, push digest, job queue, Lab runs, Shadow Run/Tripwire)");
 }

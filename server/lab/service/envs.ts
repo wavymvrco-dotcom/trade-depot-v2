@@ -28,6 +28,7 @@ export function serializeEnv(d: EnvData): Buffer {
   const json = JSON.stringify({
     symbol: d.symbol, style: d.style, layers: d.layers, maxHold: d.maxHold, barMs: d.barMs, cost: d.cost, candles: d.candles,
     atr: b64(d.atr), X: b64(d.X), g: b64(d.g), tag: b64(d.tag), closeHour: b64(d.closeHour),
+    h: d.h ?? null, hIdx: d.hIdx ? b64(d.hIdx) : null, htfMs: d.htfMs ?? null, icHorizon: d.icHorizon ?? null,
   });
   return gzipSync(Buffer.from(json));
 }
@@ -37,6 +38,7 @@ export function deserializeEnv(buf: Buffer): EnvData {
   return {
     ...o, atr: fromB64(o.atr, Float64Array), X: fromB64(o.X, Float32Array), g: fromB64(o.g, Float32Array),
     tag: fromB64(o.tag, Uint8Array), closeHour: fromB64(o.closeHour, Uint8Array),
+    h: o.h ?? undefined, hIdx: o.hIdx ? fromB64(o.hIdx, Int32Array) : undefined, htfMs: o.htfMs ?? undefined, icHorizon: o.icHorizon ?? undefined,
   };
 }
 

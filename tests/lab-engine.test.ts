@@ -308,3 +308,15 @@ test("grades change only through server/lab/service/licenses.ts", () => {
     assert.ok(!/insert\(\s*strategyLicenses\s*\)/.test(src), `${f} inserts strategy_licenses directly`);
   }
 });
+
+test("a bar that opens beyond the stop fills at the open (gap), not at the stop", () => {
+  const atr = 0.001, cost = { half: 0, slip: 0, commission: 0 };
+  const c = (o: number, h: number, l: number, cl: number) => ({ time: "t", open: o, high: h, low: l, close: cl });
+  // Long from 1.1000 with a 1.5 ATR stop at 1.0985; the next bar gaps down and opens at 1.0950
+  const p = [c(1.1, 1.1, 1.1, 1.1), c(1.1, 1.1005, 1.0995, 1.1), c(1.095, 1.0955, 1.094, 1.0945)];
+  const r = simulateTrade(p, atr, "EURUSD", 0, 1, { stopAtr: 1.5, rr: 2, maxHold: 5 }, cost);
+  assert.ok(Math.abs(r.r - (1.095 - 1.1) / 0.0015) < 1e-9, `gap loss ${r.r}R, worse than −1R`);
+  // Without a gap the stop fills at the stop: exactly −1R
+  const q = [c(1.1, 1.1, 1.1, 1.1), c(1.1, 1.1005, 1.0995, 1.1), c(1.0999, 1.1, 1.098, 1.0982)];
+  assert.ok(Math.abs(simulateTrade(q, atr, "EURUSD", 0, 1, { stopAtr: 1.5, rr: 2, maxHold: 5 }, cost).r + 1) < 1e-9);
+});

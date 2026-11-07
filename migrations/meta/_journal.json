@@ -43,6 +43,20 @@
       "when": 1794040868283,
       "tag": "0005_license_pages",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794041669910,
+      "tag": "0006_forge",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1794041968285,
+      "tag": "0007_storm",
+      "breakpoints": true
     }
   ]
 }

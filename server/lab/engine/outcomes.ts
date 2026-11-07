@@ -13,6 +13,23 @@ export interface TradeModel { stopAtr: number; rr: number; maxHold: number }
 
 export interface SimResult { r: number; exitIdx: number; costR: number }
 
+/**
+ * Exit price when a stop or target is touched in bar b. If the bar OPENS beyond
+ * the level (a gap — weekends, news), the order fills at the open, not at the
+ * level (§11A.3): worse for stops, better for targets. Otherwise stops fill at
+ * the level less slippage and targets at the level.
+ */
+function gapOrLevel(b: Candle, side: 1 | -1, level: number, cost: TradeCost, isStop: boolean) {
+  // Price the position would exit at on the bar's open (longs sell at the bid, shorts buy at the ask)
+  const openExit = side > 0 ? b.open - cost.half : b.open + cost.half;
+  if (isStop) {
+    const gappedThrough = side > 0 ? openExit <= level : openExit >= level;
+    return gappedThrough ? openExit - side * cost.slip : level - side * cost.slip;
+  }
+  const gappedThrough = side > 0 ? openExit >= level : openExit <= level;
+  return gappedThrough ? openExit : level;
+}
+
 export function simulateTrade(
   p: readonly Candle[], atrAtSignal: number, symbol: string, i: number, side: 1 | -1,
   model: TradeModel, cost: TradeCost,
@@ -27,8 +44,8 @@ export function simulateTrade(
     const b = p[j];
     const slHit = side > 0 ? b.low - cost.half <= sl : b.high + cost.half >= sl;
     const tpHit = side > 0 ? b.high - cost.half >= tp : b.low + cost.half <= tp;
-    if (slHit) { exit = sl - side * cost.slip; exitIdx = j; break; }
-    if (tpHit) { exit = tp; exitIdx = j; break; }
+    if (slHit) { exit = gapOrLevel(b, side, sl, cost, true); exitIdx = j; break; }
+    if (tpHit) { exit = gapOrLevel(b, side, tp, cost, false); exitIdx = j; break; }
   }
   if (!Number.isFinite(exit)) exit = side > 0 ? p[exitIdx].close - cost.half : p[exitIdx].close + cost.half;
   const commissionR = commissionInR(symbol, entry, stopAtr * a, cost.commission);
@@ -81,7 +98,7 @@ export function resolveTrade(
     const slHit = side > 0 ? b.low - cost.half <= sl : b.high + cost.half >= sl;
     const tpHit = side > 0 ? b.high - cost.half >= tp : b.low + cost.half <= tp;
     if (slHit || tpHit) {
-      const exit = slHit ? sl - side * cost.slip : tp;
+      const exit = slHit ? gapOrLevel(b, side, sl, cost, true) : gapOrLevel(b, side, tp, cost, false);
       return { r: (side * (exit - entry)) / (stopAtr * a) - commissionR, exitIdx: j, costR, final: true, entry, sl, tp, exitPrice: exit };
     }
   }
