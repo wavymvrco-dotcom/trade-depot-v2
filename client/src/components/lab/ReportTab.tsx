@@ -79,7 +79,14 @@ export function ReportTab() {
 
             {v && (
               <section aria-labelledby="rc-title" className="bg-card border border-border rounded-2xl p-5 md:p-7 flex flex-col gap-5">
-                <h3 id="rc-title" className="font-display text-xl m-0">Report card</h3>
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <h3 id="rc-title" className="font-display text-xl m-0">Report card</h3>
+                  <span className="text-xs text-muted-foreground">
+                    {r.costModel?.source === "mirror"
+                      ? `Costs calibrated from ${r.costModel.fills} real fills (Mirror)`
+                      : "Costs: standard assumptions (no real fills from your broker yet)"}
+                  </span>
+                </div>
                 <dl className="grid grid-cols-2 md:grid-cols-4 gap-3 m-0">
                   <Stat label="Vault result" value={fmtR(v.base.totalR)} sub={`${v.base.trades} trades · PF ${v.base.profitFactor} · max DD ${v.base.maxDD}R`} />
                   <Stat label="At 2× costs" value={fmtR(v.doubleCost.totalR)} sub={`PF ${v.doubleCost.profitFactor}`} />

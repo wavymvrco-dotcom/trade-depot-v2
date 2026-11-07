@@ -6,6 +6,8 @@ import { placeMT5Order, closeMT5Trade } from "./brokers/mt5";
 import { calcProfit, getSymbolConfig } from "@shared/pips";
 import { generateTradeReview } from "./ai-knowledge";
 import type { Position } from "@shared/schema";
+import { recordFill } from "./lab/service/mirror";
+import { minutesToHighImpact } from "./calendar";
 
 // ─── Single execution path ────────────────────────────────────────────────────
 // Auto-trade, signal execution and manual orders all open and close through
@@ -67,6 +69,8 @@ export async function openTrade(params: {
   const brokerType = settings?.brokerType ?? "demo";
   let brokerTradeId: string | null = null;
   let brokerNote = "demo";
+  const requestedAt = new Date();
+  const quote = { bid: check.price.bid, ask: check.price.ask };
 
   if (brokerType === "oanda") {
     if (!settings?.brokerApiKey || !settings.brokerAccountId) return { ok: false, reason: "OANDA is selected but not connected." };
@@ -93,6 +97,12 @@ export async function openTrade(params: {
     // Money at risk at the stop, so results can be measured in R
     riskAmount: sl != null ? Math.abs(calcProfit(side, fillPrice, sl, symbol, lots)) : null,
   });
+  // Mirror: record the fill (fire-and-forget; never blocks the order)
+  void minutesToHighImpact(symbol, 30).catch(() => null).then(news => recordFill({
+    userId, positionId: position.id, kind: "open", broker: brokerType === "mql5" ? "mt5" : brokerType, symbol, side,
+    quoteBid: quote.bid, quoteAsk: quote.ask, requestedAt, filledAt: new Date(), fillPrice,
+    newsWithinMin: news, contribute: settings?.contributeExecutionData !== false,
+  }));
   return { ok: true, position, brokerNote };
 }
 
@@ -111,13 +121,23 @@ export async function closeTrade(position: Position, opts: { price?: number; rea
 
   if (position.brokerTradeId) {
     const settings = await storage.getUserSettings(position.userId);
+    const requestedAt = new Date();
+    const quote = (await fetchLivePrices().catch(() => ({} as Record<string, LivePrice>)))[position.symbol];
+    const exitSide = side === "BUY" ? "SELL" : "BUY";
+    const record = (price: number | null, broker: string) => recordFill({
+      userId: position.userId, positionId: position.id, kind: "close", broker, symbol: position.symbol, side: exitSide,
+      quoteBid: isTradablePrice(quote) ? quote.bid : null, quoteAsk: isTradablePrice(quote) ? quote.ask : null,
+      requestedAt, filledAt: new Date(), fillPrice: price, newsWithinMin: null, contribute: settings?.contributeExecutionData !== false,
+    });
     if (position.brokerTradeId.startsWith("oanda:") && settings?.brokerApiKey && settings.brokerAccountId) {
       const r = await closeOandaTrade(settings.brokerApiKey, settings.brokerAccountId, settings.brokerServer, position.brokerTradeId);
       if (!r.closed) throw new Error("OANDA did not confirm the close. The position is still open at the broker.");
       if (r.price) closePrice = r.price;
+      record(r.price ?? null, "oanda");
     } else if (position.brokerTradeId.startsWith("mt5:") && settings?.brokerServer) {
       const ok = await closeMT5Trade(settings.brokerServer, position.brokerTradeId.replace(/^mt5:/, ""));
       if (!ok) throw new Error("MT5 bridge did not confirm the close. The position is still open at the broker.");
+      record(null, "mt5"); // the bridge does not report a fill price; latency is still useful
     }
   }
 

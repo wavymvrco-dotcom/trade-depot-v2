@@ -13,7 +13,7 @@ import type { Segment } from "./splits";
 import { rng, type Rng } from "./rng";
 import { runGenome } from "./episode";
 import { aggregateFitness, episodeScore, validationScore, type EpisodeScore } from "./fitness";
-import { hardnessIndex, sampleEpisodes, MAX_LEVEL, type Episode } from "./worlds";
+import { hardnessIndex, sampleEpisodes, MAX_LEVEL, type Episode, type MirrorEnvModel } from "./worlds";
 import { mean, sharpe, maxDrawdown, quantile } from "./stats";
 
 export const LIMITS = { population: { default: 128, max: 256 }, generations: { default: 40, max: 80 }, episodes: 8 };
@@ -32,6 +32,8 @@ export interface TrainConfig {
   calibrationWeights?: number[] | null;
   userThreshold?: number | null;
   hallOfFamePerGeneration?: number;
+  /** Mirror cost model per env (Phase 2), or null to use the uniform cost multiplier. */
+  mirror?: (MirrorEnvModel | null)[];
 }
 
 export interface Progress {
@@ -132,7 +134,7 @@ function mutate(g: Genome, rand: Rng): Genome {
 
 function evalEpisode(envs: Env[], g: Genome, ep: Episode, spec: BlueprintSpec): EpisodeScore {
   const env = envs[ep.envIdx];
-  const res = runGenome(env, g, { from: ep.from, to: ep.to, limit: ep.limit, costMult: ep.costMult, miss: ep.miss, constraints: spec.constraints });
+  const res = runGenome(env, g, { from: ep.from, to: ep.to, limit: ep.limit, costMult: ep.costMult, costRows: ep.costRows, miss: ep.miss, constraints: spec.constraints });
   const spanMs = env.timeMs(Math.min(ep.to, env.n)) - env.timeMs(ep.from);
   return episodeScore(spec, res.trades, res.died, spanMs);
 }
@@ -185,7 +187,7 @@ export function* trainSteps(
 
   for (let gen = 0; gen < cfg.generations; gen++) {
     const worldRand = rand.fork();
-    const episodes = sampleEpisodes(envs, train, hard, level, cfg.episodes, worldRand);
+    const episodes = sampleEpisodes(envs, train, hard, level, cfg.episodes, worldRand, cfg.mirror ?? []);
     const P = pop.length;
     const scores: EpisodeScore[][] = pop.map(() => []);
     // Successive halving: 2 episodes each, keep the top half, 2 more, ... until survivors have all E

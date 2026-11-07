@@ -11,6 +11,7 @@ import { eq } from "drizzle-orm";
 import { BCRYPT_ROUNDS } from "../password";
 import { uid } from "./_shared";
 import { dailyUsage, sessionUsage } from "../lab/service/data";
+import { mirrorCoverage, fitMirrorModels } from "../lab/service/mirror";
 
 export function register(app: Express) {
   // ─── Admin middleware ────────────────────────────────────────────────────────
@@ -114,6 +115,14 @@ export function register(app: Express) {
       await storage.deleteUser(req.params.id);
       res.json({ ok: true });
     } catch (err: any) { res.status(500).json({ message: err.message }); }
+  });
+
+  // ─── Admin: Mirror coverage and manual refit ─────────────────────────────────
+  app.get("/api/admin/mirror", requireAdmin as any, async (_req: Request, res: Response) => {
+    try { res.json(await mirrorCoverage()); } catch (err: any) { res.status(500).json({ message: err.message }); }
+  });
+  app.post("/api/admin/mirror/fit", requireAdmin as any, async (_req: Request, res: Response) => {
+    try { res.json(await fitMirrorModels()); } catch (err: any) { res.status(500).json({ message: err.message }); }
   });
 
   // ─── Admin: Strategy Lab plan (until billing sets it) ──────────────────────────

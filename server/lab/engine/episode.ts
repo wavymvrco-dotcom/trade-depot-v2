@@ -10,6 +10,7 @@ import { scoreRow, weightNorm } from "./combine";
 export interface RunOpts {
   from: number; to: number; limit: number;
   costMult: number;                // 1 = base costs; 2 = double costs
+  costRows?: Float32Array | null;  // per-bar multipliers from Mirror (indexed from `from`); overrides costMult
   miss?: Uint8Array | null;        // missed-fill mask, indexed from `from`
   constraints: BlueprintSpec["constraints"];
 }
@@ -49,7 +50,7 @@ export function runGenome(env: Env, g: Genome, o: RunOpts): RunResult {
       rr = env.forcedExitR(r, side, k, g.stopIdx);
       exit = k;
     }
-    rr -= (o.costMult - 1) * out.costR[r];
+    rr -= ((o.costRows ? o.costRows[r - o.from] : o.costMult) - 1) * out.costR[r];
     trades.push({ t: r, side, r: rr, exit });
     busyUntil = exit;
     if (rr <= 0) {

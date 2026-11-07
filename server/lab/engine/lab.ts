@@ -8,6 +8,7 @@ import { makeSplits, vaultHash, trainingCut, type Splits } from "./splits";
 import { trainSteps, genomeHash, LIMITS, type Progress, type TrainResult } from "./evolve";
 import { vaultExam, type VaultReport } from "./vault";
 import type { BlueprintSpec, FailureReason, Grade } from "./types";
+import type { MirrorEnvModel } from "./worlds";
 
 export const ENGINE_VERSION = 1;
 
@@ -19,6 +20,8 @@ export interface LabInput {
   defaultWeights: number[]; defaultStop: number; defaultRr: number;
   calibrationWeights?: number[] | null;
   userThreshold?: number | null;
+  /** Phase 2: Mirror cost model per env (same order as envData). */
+  mirror?: (MirrorEnvModel | null)[];
   /** Called once before the vault opens; must return false if this (genome, vault) was already examined. */
   claimVault?: (genomeHash: string, vaultHashes: Record<string, string>) => boolean;
 }
@@ -35,6 +38,8 @@ export interface LabResult {
   cancelled: boolean;
   champion: Omit<NonNullable<TrainResult["champion"]>, "validationTrades"> | null;
   hallOfFame: TrainResult["hallOfFame"];
+  /** Where the Arena's trading costs came from: Mirror (real fills, shrunk toward the prior) or the fixed assumption. */
+  costModel: { source: "mirror" | "assumed"; fills: number };
   vault: VaultReport | null;
   grade: Grade;
   failureReasons: FailureReason[];
@@ -53,7 +58,7 @@ function prepareLab(input: LabInput) {
   const steps = trainSteps(trainingEnvs, splits.map(s => s.train), splits.map(s => s.validation), {
     spec: input.spec, population, generations, episodes, seed: input.seed, successiveHalving,
     defaultWeights: input.defaultWeights, defaultStop: input.defaultStop, defaultRr: input.defaultRr,
-    calibrationWeights: input.calibrationWeights, userThreshold: input.userThreshold,
+    calibrationWeights: input.calibrationWeights, userThreshold: input.userThreshold, mirror: input.mirror,
   });
   return { config: { population, generations, episodes, seed: input.seed, successiveHalving }, splits, vaultHashes, steps };
 }
@@ -72,6 +77,9 @@ function baseResult(input: LabInput, prep: ReturnType<typeof prepareLab>, tr: Tr
     engineVersion: ENGINE_VERSION, config: prep.config,
     splits: splitInfo, trials: tr.trials, evaluations: tr.evaluations, generationsRun: tr.generationsRun, levelReached: tr.levelReached, cancelled: tr.cancelled,
     champion: tr.champion ? championPublic : null, hallOfFame: tr.hallOfFame,
+    costModel: input.mirror?.some(Boolean)
+      ? { source: "mirror" as const, fills: input.mirror.reduce((s, m) => s + (m?.fills ?? 0), 0) }
+      : { source: "assumed" as const, fills: 0 },
   };
 }
 

@@ -22,6 +22,7 @@ export interface LabResult {
   trials: number; generationsRun: number; levelReached: number; cancelled: boolean; evaluations: number;
   champion: { genome: { w: number[]; threshold: number; stopIdx: number; rrIdx: number }; belt: number; validation: { trades: number; totalR: number; maxDD: number } } | null;
   vault: VaultReport | null; grade: Grade; failureReasons: string[];
+  costModel?: { source: "mirror" | "assumed"; fills: number };
 }
 export interface Progress { phase?: string; generation: number; generations: number; level?: number; fitness?: number[]; elites?: number[]; best?: number; median?: number; deaths?: number; trials?: number; championCurve?: number[] }
 export interface Run {

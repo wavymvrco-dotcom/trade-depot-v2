@@ -18,6 +18,7 @@ import type { BlueprintSpec } from "../engine/types";
 import { getEnvData } from "./envs";
 import { TIERS, tierOf, monthKey } from "./tiers";
 import { createFromExam } from "./licenses";
+import { mirrorModelFor } from "./mirror";
 
 export class LabError extends Error { constructor(message: string, public status = 400) { super(message); } }
 
@@ -104,6 +105,8 @@ export async function processRun(runId: string) {
     const envData = [];
     for (const s of spec.symbols) envData.push(await getEnvData(s, style));
     const settings = await storage.getUserSettings(run.userId);
+    const broker = settings?.brokerType === "mql5" ? "mt5" : settings?.brokerType;
+    const mirror = await Promise.all(spec.symbols.map(s => mirrorModelFor(broker, s, style).catch(() => null)));
     const cal = await latestCalibration(spec.symbols[0], style).catch(() => null);
     const calRes = cal?.result as any;
     const prof = PROFILES[style];
@@ -113,7 +116,7 @@ export async function processRun(runId: string) {
     const cfg = run.config as { population: number; generations: number; episodes: number; successiveHalving: boolean };
     const result = await runLabAsync({
       envData, spec, seed: run.seed, population: cfg.population, generations: cfg.generations, episodes: cfg.episodes,
-      successiveHalving: cfg.successiveHalving, ...defaultsFor(style), calibrationWeights, userThreshold: settings?.tdciMinScore ?? null,
+      successiveHalving: cfg.successiveHalving, ...defaultsFor(style), calibrationWeights, userThreshold: settings?.tdciMinScore ?? null, mirror,
     }, {
       onProgress: p => { gen = p.generation; return setProgress({ ...p, phase: "Arena" }).then(() => {}); },
       isCancelled: async () => {

@@ -299,6 +299,7 @@ export default function Settings() {
   // Email notifications
   const [emailAddress, setEmailAddress] = useState("");
   const [emailNotifications, setEmailNotifications] = useState(false);
+  const [contributeFills, setContributeFills] = useState(true);
   const [smtpHost, setSmtpHost] = useState("");
   const [smtpPort, setSmtpPort] = useState("587");
   const [smtpUser, setSmtpUser] = useState("");
@@ -431,6 +432,7 @@ export default function Settings() {
       // Email settings
       setEmailAddress(s.emailAddress ?? "");
       setEmailNotifications(s.emailNotifications ?? false);
+      setContributeFills(s.contributeExecutionData !== false);
       setSmtpHost(s.smtpHost ?? "");
       setSmtpPort(String(s.smtpPort ?? "587"));
       setSmtpUser(s.smtpUser ?? "");
@@ -1095,6 +1097,26 @@ export default function Settings() {
                   {saveSettings.isPending ? "Saving…" : "Save Trading Hours"}
                 </Button>
               </motion.div>
+            </div>
+
+            {/* ━━━━ DATA SHARING (Mirror) ━━━━ */}
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3 px-1">Data sharing</p>
+              <div className="bg-card/50 border border-border rounded-xl p-5">
+                <div className="flex items-start justify-between gap-4 py-1">
+                  <div>
+                    <p className="text-sm font-medium" id="mirror-toggle-label">Contribute anonymized execution data to improve Mirror</p>
+                    <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                      When your broker fills an order, Trade Depot records the quoted spread, the fill price and how long it took.
+                      Pooled with other traders on the same broker, this teaches the Lab what trading really costs, so its tests use
+                      realistic costs. Only these numbers are pooled — never your name, account, balance, positions or strategies.
+                      Turning this off removes all of your fills from the pool at the next nightly update.
+                    </p>
+                  </div>
+                  <Switch aria-labelledby="mirror-toggle-label" checked={contributeFills}
+                    onCheckedChange={v => { setContributeFills(v); saveSettings.mutate({ contributeExecutionData: v } as any); }} />
+                </div>
+              </div>
             </div>
 
             {/* ━━━━ EMAIL NOTIFICATIONS ━━━━ */}

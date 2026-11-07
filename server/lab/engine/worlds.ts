@@ -8,11 +8,17 @@ import type { Env } from "./env";
 import { TAG } from "./env";
 import type { Segment } from "./splits";
 import type { Rng } from "./rng";
+import { costMultipliers, type Quantiles } from "./mirror";
+
+/** Mirror cost model for one env: cells by 4-hour UTC bucket, and the base costs the outcome cache used. */
+export interface MirrorEnvModel { cells: { spread: Quantiles; slippage: Quantiles }[]; baseSpreadPips: number; baseSlipPips: number; fills: number }
 
 export interface Episode {
   envIdx: number;
   from: number; to: number; limit: number;
   costMult: number;
+  /** Per-bar cost multipliers drawn from Mirror (same for every agent), or null for the uniform multiplier. */
+  costRows: Float32Array | null;
   /** 1 = this row's entry is missed. Indexed from `from`. */
   miss: Uint8Array;
 }
@@ -40,6 +46,7 @@ function fitsLevel(h: ReturnType<typeof hardnessIndex>, from: number, to: number
 
 export function sampleEpisodes(
   envs: Env[], train: Segment[], hard: ReturnType<typeof hardnessIndex>[], level: number, count: number, rand: Rng,
+  mirror: (MirrorEnvModel | null)[] = [],
 ): Episode[] {
   const out: Episode[] = [];
   for (let e = 0; e < count; e++) {
@@ -55,7 +62,11 @@ export function sampleEpisodes(
     }
     const miss = new Uint8Array(to - from);
     for (let k = 0; k < miss.length; k++) miss[k] = rand.next() < P_MISS ? 1 : 0;
-    out.push({ envIdx, from, to, limit: seg.limit, costMult: rand.uniform(0.8, 2.5), miss });
+    const costMult = rand.uniform(0.8, 2.5);
+    const m = mirror[envIdx];
+    // Phase 2: costs drawn from Mirror (real fills, shrunk toward the prior); otherwise the uniform multiplier
+    const costRows = m ? costMultipliers(m.cells, m.baseSpreadPips, m.baseSlipPips, envs[envIdx].closeHour, from, to, rand) : null;
+    out.push({ envIdx, from, to, limit: seg.limit, costMult, costRows, miss });
   }
   return out;
 }

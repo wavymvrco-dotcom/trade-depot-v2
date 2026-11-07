@@ -531,3 +531,36 @@ export const shadowTrades = pgTable("shadow_trades", {
   index("shadow_trades_license_idx").on(t.licenseId, t.signalTime),
   uniqueIndex("shadow_trades_decision_uq").on(t.licenseId, t.symbol, t.signalTime),
 ]);
+
+// ─── Mirror (Phase 2): execution digital twin ─────────────────────────────────
+
+/** One row per real order fill (open or close). Written fire-and-forget; never blocks an order. */
+export const executionFills = pgTable("execution_fills", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  positionId: varchar("position_id"),
+  kind: text("kind").notNull(),                 // open | close
+  broker: text("broker").notNull(),             // demo | oanda | mt5
+  symbol: text("symbol").notNull(),
+  side: text("side").notNull(),                 // BUY | SELL (the order's side)
+  quoteBid: doublePrecision("quote_bid"),
+  quoteAsk: doublePrecision("quote_ask"),
+  requestedAt: timestamp("requested_at").notNull(),
+  filledAt: timestamp("filled_at").notNull(),
+  fillPrice: doublePrecision("fill_price"),
+  latencyMs: integer("latency_ms"),
+  newsWithinMin: integer("news_within_min"),    // minutes to the nearest high-impact event if within 30, else null
+  contribute: boolean("contribute").notNull().default(true), // user's Mirror opt-in at the time
+}, (t) => [index("execution_fills_model_idx").on(t.broker, t.symbol, t.filledAt)]);
+
+/** Fitted cost distributions per (broker, symbol, 4-hour UTC bucket, news flag), pooled and anonymized. */
+export const mirrorModels = pgTable("mirror_models", {
+  broker: text("broker").notNull(),
+  symbol: text("symbol").notNull(),
+  hourBucket: integer("hour_bucket").notNull(),  // 0..5 → 00–04, 04–08, … UTC
+  news: boolean("news").notNull(),
+  n: integer("n").notNull(),
+  spread: jsonb("spread").notNull(),             // { p10, p50, p90, p99 } in pips, shrunk toward the prior
+  slippage: jsonb("slippage").notNull(),         // same, signed against the trader
+  fittedAt: timestamp("fitted_at").notNull().defaultNow(),
+}, (t) => [primaryKey({ columns: [t.broker, t.symbol, t.hourBucket, t.news] })]);

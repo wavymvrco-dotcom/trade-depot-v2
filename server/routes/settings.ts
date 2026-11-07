@@ -22,7 +22,7 @@ export function register(app: Express) {
   const WRITABLE_SETTINGS = [
     "notifications", "autoTrade", "riskMode", "theme", "tradingInstruments", "tradingTimezone",
     "activeSessions", "offHoursBehavior", "offHoursRiskReduction", "selectedAiProvider", "tdciMinScore",
-    "emailAddress", "emailNotifications", "smtpHost", "smtpPort", "smtpUser", "smtpPass",
+    "emailAddress", "emailNotifications", "smtpHost", "smtpPort", "smtpUser", "smtpPass", "contributeExecutionData",
   ] as const;
 
   app.post("/api/settings", async (req: Request, res: Response) => {

@@ -51,3 +51,17 @@ export async function highImpactEventNear(symbol: string, minutes = 15): Promise
     Math.abs(new Date(e.date).getTime() - now) <= minutes * 60_000);
   return hit ? `${hit.currency} ${hit.title}` : null;
 }
+
+/** Minutes to the nearest high-impact event for either currency of `symbol` if within `window`, else null. */
+export async function minutesToHighImpact(symbol: string, window = 30): Promise<number | null> {
+  const events = await fetchEconomicCalendar().catch(() => []);
+  const ccys = symbol === "XAUUSD" ? ["USD"] : [symbol.slice(0, 3), symbol.slice(3, 6)];
+  const now = Date.now();
+  let best: number | null = null;
+  for (const e of events) {
+    if (e.impact !== "high" || !ccys.includes(e.currency)) continue;
+    const m = Math.abs(new Date(e.date).getTime() - now) / 60_000;
+    if (m <= window && (best == null || m < best)) best = Math.round(m);
+  }
+  return best;
+}
