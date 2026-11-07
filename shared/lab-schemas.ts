@@ -110,3 +110,67 @@ export function describeBlueprint(s: BlueprintSpecInput): string {
   parts.push(`${dd}, risking ${s.risk.riskPercentPerTrade}% per trade with at most ${s.risk.maxOpenPositions} open`);
   return `You want: ${parts.join("; ")}.`;
 }
+
+/**
+ * JSON Schema of BlueprintSpec handed to the AI provider (Blueprint AI, §10.4).
+ * Kept by hand next to the zod schema; tests/blueprint-ai.test.ts checks that
+ * both list exactly the same fields.
+ */
+export const BLUEPRINT_JSON_SCHEMA = {
+  type: "object", additionalProperties: false,
+  required: ["version", "style", "symbols", "objective", "constraints", "risk"],
+  properties: {
+    version: { const: 1 },
+    style: { enum: [...LAB_STYLES], description: "scalp = 5-minute bars, day = 15-minute, swing = 4-hour, position = daily" },
+    symbols: { type: "array", minItems: 1, maxItems: 8, items: { enum: [...LAB_SYMBOLS] } },
+    objective: {
+      type: "object", additionalProperties: false, required: ["totalR", "drawdownPenalty", "consistencyPenalty"],
+      properties: {
+        totalR: { type: "number", minimum: 0, maximum: 5, description: "weight on total return; normally 1" },
+        drawdownPenalty: { type: "number", minimum: 0, maximum: 5, description: "conservative 1, balanced 0.5, aggressive 0.2" },
+        consistencyPenalty: { type: "number", minimum: 0, maximum: 5, description: "same scale as drawdownPenalty" },
+        tradeFrequency: { type: "object", additionalProperties: false, properties: { minPerWeek: { type: "number", minimum: 0 }, maxPerWeek: { type: "number", minimum: 0 } } },
+      },
+    },
+    constraints: {
+      type: "object", additionalProperties: false,
+      properties: {
+        maxConsecutiveLosses: { type: "integer", minimum: 1, maximum: 50 },
+        noWeekendHolding: { type: "boolean" },
+        sessionHoursUtc: { type: "array", items: { type: "integer", minimum: 0, maximum: 24 }, minItems: 2, maxItems: 2, description: "[startHour, endHour) in UTC" },
+        maxStopAtr: { type: "number", minimum: 1, maximum: 3 },
+        minRr: { type: "number", minimum: 1, maximum: 3 },
+      },
+    },
+    risk: {
+      type: "object", additionalProperties: false, required: ["riskPercentPerTrade", "maxOpenPositions"],
+      properties: { riskPercentPerTrade: { type: "number", minimum: 0.05, maximum: 5 }, maxOpenPositions: { type: "integer", minimum: 1, maximum: 20 } },
+    },
+    prop: {
+      type: "object", additionalProperties: false, description: "only if the user is trading a prop-firm challenge",
+      required: ["firmLabel", "accountSize", "dailyLossLimitPct", "maxDrawdownPct", "drawdownType", "weekendHoldingAllowed"],
+      properties: {
+        firmLabel: { type: "string" }, accountSize: { type: "number" }, dailyLossLimitPct: { type: "number" }, maxDrawdownPct: { type: "number" },
+        drawdownType: { enum: ["static", "trailing"] }, drawdownMeasure: { enum: ["intraday", "end_of_day"] },
+        profitTargetPct: { type: "number" }, minTradingDays: { type: "integer" }, consistencyRulePct: { type: "number" },
+        newsRestrictionMin: { type: "integer" }, weekendHoldingAllowed: { type: "boolean" }, timeLimitDays: { type: "integer" }, dailyResetHourUtc: { type: "integer" },
+      },
+    },
+  },
+} as const;
+
+/**
+ * Accept or reject a model's answer (Blueprint AI). Only a spec that passes the
+ * strict zod schema is ever returned; notes are trimmed strings. Pure.
+ */
+export function acceptAiSpec(out: unknown):
+  | { ok: true; spec: BlueprintSpecInput; notes: string[] }
+  | { ok: false; error: string } {
+  const o = out as any;
+  const parsed = blueprintSpecSchema.safeParse(o?.spec);
+  if (!parsed.success) {
+    return { ok: false, error: o == null ? "the reply was not JSON" : parsed.error.issues.slice(0, 5).map(i => `${i.path.join(".") || "spec"}: ${i.message}`).join("; ") };
+  }
+  const notes = Array.isArray(o?.notes) ? o.notes.filter((n: unknown): n is string => typeof n === "string").slice(0, 8).map((n: string) => n.slice(0, 300)) : [];
+  return { ok: true, spec: parsed.data, notes };
+}

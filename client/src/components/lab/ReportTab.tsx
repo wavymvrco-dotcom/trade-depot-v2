@@ -3,11 +3,12 @@
 // result, luck-adjusted confidence and the comparison with default TDCI.
 // Results are simulated until Live.
 
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "./StatusBadge";
 import { RunPicker } from "./ArenaTab";
 import { EquityLine } from "./EquityLine";
-import { fmtR, useLabMe, useLabNav, useLicenseAction, useRun, useRuns, BELTS, LAYER_LABELS, RR_GRID, STOP_GRID, useLicense } from "./api";
+import { lab, fmtR, useLabMe, useLabNav, useLicenseAction, useRun, useRuns, BELTS, LAYER_LABELS, RR_GRID, STOP_GRID, useLicense } from "./api";
 
 function VaultBar({ s }: { s: { trainFrom: string; trainTo: string; validationFrom: string; validationTo: string; vaultFrom: string; vaultTo: string } }) {
   const parts = [
@@ -170,6 +171,8 @@ export function ReportTab() {
               </section>
             )}
 
+            {run.data && <Refinements runId={run.data.id} />}
+
             {lic.data && lic.data.grade === "probation" && lic.data.stage === "vault" && (
               <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
                 <Button className="min-h-[44px]" disabled={act.isPending} onClick={() => act.mutate({ id: lic.data!.id, action: "shadow" }, { onSuccess: () => go("shadow", { license: lic.data!.id }) })}>Start Shadow Run</Button>
@@ -181,5 +184,42 @@ export function ReportTab() {
         )}
       </div>
     </div>
+  );
+}
+
+/** Blueprint AI reflection: up to three suggested changes; the user picks one (or none) to review in the form. */
+function Refinements({ runId }: { runId: string }) {
+  const { go } = useLabNav();
+  const [items, setItems] = useState<{ spec: any; reason: string; summary: string }[] | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const ask = async () => {
+    setBusy(true); setErr(null);
+    try { setItems((await lab<{ refinements: any[] }>("POST", `/api/lab/runs/${runId}/refine`)).refinements); }
+    catch (e: any) { setErr(e.message); }
+    finally { setBusy(false); }
+  };
+  return (
+    <section className="bg-card border border-border rounded-2xl p-5 md:p-7" aria-labelledby={`ref-${runId}`}>
+      <h3 id={`ref-${runId}`} className="font-display text-xl m-0 mb-1">What to try next</h3>
+      <p className="text-sm text-muted-foreground m-0 mb-3">Your AI provider reads this report card (not your data) and suggests up to three changes to the Blueprint. A new run on the same data counts its attempts toward the luck adjustment.</p>
+      {!items && <Button variant="outline" className="min-h-[44px]" disabled={busy} onClick={ask}>{busy ? "Thinking…" : "Suggest refinements"}</Button>}
+      {err && <p role="alert" className="text-destructive mt-2 mb-0">{err}</p>}
+      {items && !items.length && <p className="m-0">No valid suggestions came back.</p>}
+      {items && !!items.length && (
+        <ul className="m-0 p-0 list-none flex flex-col gap-3">
+          {items.map((it, i) => (
+            <li key={i} className="bg-secondary rounded-xl p-4 flex flex-col gap-2">
+              <p className="m-0 font-medium">{it.reason}</p>
+              <p className="m-0 text-sm text-muted-foreground">{it.summary}</p>
+              <Button className="min-h-[44px] self-start" onClick={() => {
+                try { sessionStorage.setItem("td_pending_spec", JSON.stringify({ spec: it.spec })); } catch {}
+                go("blueprint");
+              }}>Review this in the Blueprint form</Button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }

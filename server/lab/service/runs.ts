@@ -15,7 +15,7 @@ import { runLabAsync, type LabResult } from "../engine/lab";
 import { genomeHash } from "../engine/evolve";
 import { LIMITS } from "../engine/evolve";
 import type { BlueprintSpec } from "../engine/types";
-import { getEnvData } from "./envs";
+import { getEnvData, todaysDataVersion } from "./envs";
 import { TIERS, tierOf, monthKey } from "./tiers";
 import { createFromExam } from "./licenses";
 import { mirrorModelFor } from "./mirror";
@@ -103,6 +103,14 @@ export async function processRun(runId: string) {
   const t0 = Date.now();
   try {
     await setProgress({ phase: "Loading market data", generation: 0, generations: (run.config as any).generations });
+    // Invariant 3: earlier runs by this user on the same data (pairs, style, data day) count as trials too
+    const { dataVersion } = todaysDataVersion();
+    const symKey = [...spec.symbols].sort().join(",");
+    const prior = await db.select({ trials: labRuns.trials, symbols: labRuns.symbols, config: labRuns.config }).from(labRuns)
+      .where(and(eq(labRuns.userId, run.userId), eq(labRuns.style, style), eq(labRuns.status, "done")));
+    const priorTrials = prior.filter(p => (p.config as any)?.dataVersion === dataVersion && [...(p.symbols as string[])].sort().join(",") === symKey)
+      .reduce((s, p) => s + (p.trials ?? 0), 0);
+    await db.update(labRuns).set({ config: { ...(run.config as any), dataVersion } }).where(eq(labRuns.id, runId));
     const envData = [];
     for (const s of spec.symbols) envData.push(await getEnvData(s, style));
     const settings = await storage.getUserSettings(run.userId);
@@ -121,7 +129,7 @@ export async function processRun(runId: string) {
     const result = await runLabAsync({
       envData, spec, seed: run.seed, population: cfg.population, generations: cfg.generations, episodes: cfg.episodes,
       successiveHalving: cfg.successiveHalving, ...defaultsFor(style), calibrationWeights, userThreshold: settings?.tdciMinScore ?? null, mirror,
-      userGenome: userG, rewindWindows,
+      userGenome: userG, rewindWindows, priorTrials,
     }, {
       onProgress: p => { gen = p.generation; return setProgress({ ...p, phase: "Arena" }).then(() => {}); },
       isCancelled: async () => {

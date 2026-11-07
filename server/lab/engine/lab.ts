@@ -20,6 +20,8 @@ export interface LabInput {
   defaultWeights: number[]; defaultStop: number; defaultRr: number;
   calibrationWeights?: number[] | null;
   userThreshold?: number | null;
+  /** Trials from this user's earlier runs on the same data (same pairs, style and data day) — never reset (invariant 3). */
+  priorTrials?: number;
   /** Phase 2 (Rewind): Gen Zero genome fitted to the user's entries, and their worst drawdown windows. */
   userGenome?: Genome | null;
   rewindWindows?: { symbol: string; fromMs: number; toMs: number }[];
@@ -34,6 +36,8 @@ export interface LabResult {
   config: { population: number; generations: number; episodes: number; seed: number; successiveHalving: boolean };
   splits: Record<string, { trainFrom: string; trainTo: string; validationFrom: string; validationTo: string; vaultFrom: string; vaultTo: string; embargoBars: number }>;
   trials: number;
+  /** Trials from earlier runs on the same data, added to this run's in the luck adjustment. */
+  priorTrials: number;
   /** Agent-episode evaluations performed (compute used). */
   evaluations: number;
   generationsRun: number;
@@ -79,7 +83,7 @@ function baseResult(input: LabInput, prep: ReturnType<typeof prepareLab>, tr: Tr
   const { validationTrades: _v, ...championPublic } = tr.champion ?? ({} as any);
   return {
     engineVersion: ENGINE_VERSION, config: prep.config,
-    splits: splitInfo, trials: tr.trials, evaluations: tr.evaluations, generationsRun: tr.generationsRun, levelReached: tr.levelReached, cancelled: tr.cancelled,
+    splits: splitInfo, trials: tr.trials, priorTrials: input.priorTrials ?? 0, evaluations: tr.evaluations, generationsRun: tr.generationsRun, levelReached: tr.levelReached, cancelled: tr.cancelled,
     champion: tr.champion ? championPublic : null, hallOfFame: tr.hallOfFame,
     costModel: input.mirror?.some(Boolean)
       ? { source: "mirror" as const, fills: input.mirror.reduce((s, m) => s + (m?.fills ?? 0), 0) }
@@ -91,7 +95,7 @@ function examine(input: LabInput, prep: ReturnType<typeof prepareLab>, tr: Train
   return vaultExam({
     envs: input.envData.map(makeEnv), vault: prep.splits.map(s => s.vault), vaultHashes: prep.vaultHashes, spec: input.spec, champion: tr.champion!.genome,
     baselineWeights: input.defaultWeights, defaultStop: input.defaultStop, defaultRr: input.defaultRr,
-    validationTrades: tr.champion!.validationTrades, candidateSharpes: tr.candidateSharpes, trials: tr.trials, seed: input.seed,
+    validationTrades: tr.champion!.validationTrades, candidateSharpes: tr.candidateSharpes, trials: tr.trials + (input.priorTrials ?? 0), seed: input.seed,
     rewindWindows: input.rewindWindows,
   });
 }

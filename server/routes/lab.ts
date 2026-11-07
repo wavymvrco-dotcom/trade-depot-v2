@@ -18,6 +18,7 @@ import { feasibility } from "../lab/service/feasibility";
 import { getLicense, listLicenses, licenseHistory, transition } from "../lab/service/licenses";
 import { shadowEvidence } from "../lab/service/shadow";
 import { userRewind } from "../lab/service/rewind";
+import { parseBlueprint, reflectOnRun } from "../lab/service/blueprint";
 import { TIERS, tierOf, monthKey } from "../lab/service/tiers";
 import { FAILURE_TEXT } from "../lab/engine/types";
 import type { BlueprintSpec } from "../lab/engine/types";
@@ -71,6 +72,25 @@ export function register(app: Express) {
       }
       const [row] = await db.insert(blueprints).values({ userId, name: body.name, prompt: body.prompt, spec: body.spec }).returning();
       res.json({ ...row, summary: describeBlueprint(body.spec) });
+    } catch (e) { fail(res, e); }
+  });
+
+  /** Blueprint AI: plain English → a validated Blueprint (the user confirms before anything runs). */
+  app.post("/api/lab/blueprint-ai/parse", async (req: Request, res: Response) => {
+    try {
+      const prompt = String(req.body?.prompt ?? "").trim();
+      if (prompt.length < 10 || prompt.length > 4000) throw new LabError("Describe the strategy in 10 to 4,000 characters.");
+      res.json(await parseBlueprint(uid(req), prompt));
+    } catch (e) { fail(res, e); }
+  });
+
+  /** Blueprint AI reflection: up to three validated refinements after a run (the user picks one or none). */
+  app.post("/api/lab/runs/:id/refine", async (req: Request, res: Response) => {
+    try {
+      const run = await getRun(uid(req), req.params.id);
+      if (!run || !run.result) throw new LabError("Finished run not found", 404);
+      const [bp] = await db.select({ spec: blueprints.spec }).from(blueprints).where(and(eq(blueprints.id, run.blueprintId), eq(blueprints.userId, uid(req))));
+      res.json({ refinements: await reflectOnRun(uid(req), blueprintSpecSchema.parse(bp?.spec), run.result) });
     } catch (e) { fail(res, e); }
   });
 

@@ -184,3 +184,16 @@ Newest at the bottom. Format: date — decision — why.
   graded; out-of-sample breaches of the Vault's 95th-percentile drawdown fail with `rewind_drawdown`.
 - **Gen Zero "you":** logistic regression of the user's entry bars vs. 5× random bars on |layer value| (entries are
   side-agnostic); only layers that made entries more likely get weight; needs ≥ 20 entries.
+
+## 2026-11-07 — Phase 2: Blueprint AI
+
+- The model receives a hand-written JSON Schema (zod 3 has no built-in exporter); a test keeps its fields identical
+  to the zod schema. Acceptance is a pure function (`acceptAiSpec`) — only a strictly valid spec ever leaves it.
+  One retry with the validation errors, then "please use the form".
+- Confirmation is explicit: the plain-English read-back must be accepted before the form is filled, and a run still
+  needs the feasibility check and Train. Refinements are reviewed in the form, never run automatically.
+- Reflection sends only the report-card summary (grade, reasons, vault statistics), never candles or trades.
+- Cost control: 12 Blueprint AI calls per user per hour, on the user's own key.
+- **Trials across runs (invariant 3):** every earlier finished run by the same user on the same pairs, style and data
+  day adds its trials to the luck adjustment — not only Blueprint versions. Re-running until something looks lucky
+  makes the bar higher, as it should.

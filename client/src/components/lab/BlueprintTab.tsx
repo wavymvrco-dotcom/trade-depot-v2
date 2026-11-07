@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 import { lab, useBlueprints, useLabMe, useLabNav, type Feasibility } from "./api";
 
 type Goal = keyof typeof GOAL_PRESETS;
@@ -102,8 +103,11 @@ export function BlueprintTab() {
 
   const loadBlueprint = (id: string) => {
     const b = bps.data?.find(x => x.id === id); if (!b) return;
-    const s = b.spec;
-    setName(b.name); setStyle(s.style); setSymbols(s.symbols); setRisk(s.risk.riskPercentPerTrade); setMaxPos(s.risk.maxOpenPositions);
+    applySpec(b.spec, b.name);
+  };
+  function applySpec(s: BlueprintSpecInput, nm?: string) {
+    if (nm) setName(nm);
+    setStyle(s.style); setSymbols(s.symbols); setRisk(s.risk.riskPercentPerTrade); setMaxPos(s.risk.maxOpenPositions);
     const g = (Object.keys(GOAL_PRESETS) as Goal[]).find(k => GOAL_PRESETS[k].drawdownPenalty === s.objective.drawdownPenalty) ?? "balanced";
     setGoal(g);
     setMaxLosses(s.constraints.maxConsecutiveLosses?.toString() ?? ""); setNoWeekend(!!s.constraints.noWeekendHolding);
@@ -111,7 +115,28 @@ export function BlueprintTab() {
     setMaxStop(s.constraints.maxStopAtr?.toString() ?? ""); setMinRr(s.constraints.minRr?.toString() ?? "");
     setMinWeek(s.objective.tradeFrequency?.minPerWeek?.toString() ?? ""); setMaxWeek(s.objective.tradeFrequency?.maxPerWeek?.toString() ?? "");
     setPropOn(!!s.prop); if (s.prop) setProp(s.prop);
-  };
+  }
+
+  // Plain English → Blueprint (Blueprint AI). Nothing is used until the user confirms the read-back.
+  const [nl, setNl] = useState("");
+  const [parsed2, setParsed2] = useState<{ spec: BlueprintSpecInput; notes: string[]; summary: string; provider: string } | null>(null);
+  const [nlBusy, setNlBusy] = useState(false);
+  const [nlErr, setNlErr] = useState<string | null>(null);
+  async function readBack() {
+    setNlBusy(true); setNlErr(null); setParsed2(null);
+    try { setParsed2(await lab("POST", "/api/lab/blueprint-ai/parse", { prompt: nl })); }
+    catch (e: any) { setNlErr(e.message); }
+    finally { setNlBusy(false); }
+  }
+
+  // A refinement picked on the Report arrives here to be reviewed (never run automatically)
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem("td_pending_spec");
+      if (raw) { sessionStorage.removeItem("td_pending_spec"); const p = JSON.parse(raw); applySpec(p.spec, p.name); }
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="flex-1 overflow-y-auto">
@@ -120,6 +145,29 @@ export function BlueprintTab() {
           <h2 className="text-2xl md:text-3xl m-0">Write a Blueprint</h2>
           <p className="text-muted-foreground m-0">Describe the strategy you want. The Arena searches for it, the Vault Exam tests it on data it has never seen, and it is graded honestly — Scrapped is a real answer.</p>
         </div>
+
+        <section className={card} aria-labelledby="bp-nl">
+          <h3 id="bp-nl" className="font-display text-xl m-0 mb-1">Describe it in plain English</h3>
+          <p className="text-sm text-muted-foreground m-0 mb-3">Your connected AI provider turns this into the form below, using your own key. You check the read-back before anything is used.</p>
+          <Textarea aria-label="Describe your strategy" value={nl} onChange={e => setNl(e.target.value)} rows={3} maxLength={4000}
+            placeholder="e.g. Swing trades on EURUSD and GBPUSD, no positions over the weekend, never more than 3 losses in a row, risk 0.5% a trade." />
+          <div className="flex flex-wrap gap-3 items-center mt-3">
+            <Button variant="outline" className="min-h-[44px]" disabled={nlBusy || nl.trim().length < 10} onClick={readBack}>{nlBusy ? "Reading…" : "Read it back to me"}</Button>
+            {nlErr && <span role="alert" className="text-destructive text-sm">{nlErr}</span>}
+          </div>
+          {parsed2 && (
+            <div className="mt-4 bg-secondary rounded-xl p-4 flex flex-col gap-3" aria-live="polite">
+              <p className="m-0 text-lg leading-relaxed">{parsed2.summary}</p>
+              {!!parsed2.notes.length && (
+                <div className="text-sm"><p className="m-0 font-medium">Couldn't be expressed in a Blueprint:</p><ul className="m-0 pl-5">{parsed2.notes.map(n => <li key={n}>{n}</li>)}</ul></div>
+              )}
+              <div className="flex flex-wrap gap-2">
+                <Button className="min-h-[44px]" onClick={() => { applySpec(parsed2.spec); setParsed2(null); }}>Yes, that's what I mean — fill in the form</Button>
+                <Button variant="ghost" className="min-h-[44px]" onClick={() => setParsed2(null)}>No, discard</Button>
+              </div>
+            </div>
+          )}
+        </section>
 
         {!!bps.data?.length && (
           <div className={field}>
