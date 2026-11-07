@@ -21,10 +21,12 @@ export interface Episode {
   costRows: Float32Array | null;
   /** 1 = this row's entry is missed. Indexed from `from`. */
   miss: Uint8Array;
+  /** Level 4: the Hunter adversary attacks this episode's trades. */
+  hunter: boolean;
 }
 
 export const P_MISS = 0.10;
-export const MAX_LEVEL = 3; // Level 4 adds Hunter (Phase 2)
+export const MAX_LEVEL = 4; // Level 4: all markets plus the Hunter adversary
 
 /** Prefix sums of "hard" bars, for fast window difficulty checks. */
 export function hardnessIndex(env: Env) {
@@ -66,7 +68,7 @@ export function sampleEpisodes(
     const m = mirror[envIdx];
     // Phase 2: costs drawn from Mirror (real fills, shrunk toward the prior); otherwise the uniform multiplier
     const costRows = m ? costMultipliers(m.cells, m.baseSpreadPips, m.baseSlipPips, envs[envIdx].closeHour, from, to, rand) : null;
-    out.push({ envIdx, from, to, limit: seg.limit, costMult, costRows, miss });
+    out.push({ envIdx, from, to, limit: seg.limit, costMult, costRows, miss, hunter: level >= 4 });
   }
   return out;
 }

@@ -102,6 +102,10 @@ export function ReportTab() {
                   <Stat label="Avg R per trade" value={fmtR(v.base.avgR, 3)} sub={`90% range ${fmtR(v.envelope.meanP05, 2)} to ${fmtR(v.envelope.meanP95, 2)}`} />
                   <Stat label="Drawdown to expect" value={`${v.envelope.ddP95.toFixed(1)}R`} sub={`95th percentile · 99th: ${v.envelope.ddP99.toFixed(1)}R`} />
                   <Stat label="Belt" value={r.champion ? BELTS[r.champion.belt] ?? "—" : "—"} />
+                  {v.hunter && (
+                    <Stat label="Under Hunter attack" value={fmtR(v.hunter.totalR)}
+                      sub={v.hunter.keptPct != null ? `Keeps ${Math.round(v.hunter.keptPct * 100)}% of its results · ${v.hunter.attacks} attacks` : `${v.hunter.attacks} attacks`} />
+                  )}
                 </dl>
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[480px] text-sm">

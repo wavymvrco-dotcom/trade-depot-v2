@@ -154,3 +154,16 @@ Newest at the bottom. Format: date — decision — why.
 - **Day-style finding:** with ~7 months of 15-minute history and real TDCI layers, evolution learns to barely trade
   (losing less beats losing more), so no version reaches 30 validation trades and the run ends "no champion". Honest,
   but a reason to give Day/Scalp more history (Twelve Data plan) or more pairs.
+
+## 2026-11-07 — Phase 2: Mirror and Hunter
+
+- **Mirror** records every real order's quote, fill and latency (opens, and closes the broker confirms). Demo fills
+  are excluded from the fit (they are the quote itself). Prior quantiles reproduce the Phase 1 assumption
+  (spread 0.8–2.5×, slippage 0–4× the base), so with no fills a run behaves as before. A user who opts out is
+  removed from the pool entirely, past fills included, at the next nightly fit (03:15 UTC). The Arena uses the
+  no-news cell (historical bars have no reliable news flag). Costs are drawn per bar per episode and shared by every
+  agent in the generation (invariant 5).
+- **Hunter** is Level 4 of the curriculum (reached after Level 3 is cleared). Delayed entries reuse the next bar's
+  cached outcome; hunted stops use 4× base slippage until Mirror has real stop fills. Hunter results are reported
+  ("keeps X% of its results under attack") but do not gate the grade — the sheet does not ask for a gate.
+  Co-evolving Hunter's budget allocation (optional in the sheet) is not built.

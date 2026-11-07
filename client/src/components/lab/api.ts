@@ -14,6 +14,7 @@ export interface VaultReport {
   perPair: { symbol: string; trades: number; totalR: number; profitFactor: number; maxDD: number }[];
   luck: { dsr: number; sr0: number; sharpe: number; trials: number; observations: number };
   envelope: { ddP50: number; ddP95: number; ddP99: number; meanR: number; meanP05: number; meanP95: number };
+  hunter?: { totalR: number; keptPct: number | null; attacks: number };
   grade: Grade; failureReasons: string[]; vaultHashes: Record<string, string>;
 }
 export interface LabResult {
@@ -97,5 +98,5 @@ export const LAYER_LABELS: Record<string, string> = {
   fibonacci: "Fibonacci OTE", positioning: "COT positioning", carry: "carry", adx: "ADX", prevDay: "prior-day levels",
   pivots: "floor pivots", sessionRange: "Asian range", sessionMean: "session mean",
 };
-export const BELTS = ["None", "Level 1 · calm markets", "Level 2 · trending markets", "Level 3 · all markets"];
+export const BELTS = ["None", "Level 1 · calm markets", "Level 2 · trending markets", "Level 3 · all markets", "Level 4 · survived Hunter"];
 export const fmtR = (v: number | null | undefined, dp = 1) => (v == null || !Number.isFinite(v) ? "—" : `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v).toFixed(dp)}R`);

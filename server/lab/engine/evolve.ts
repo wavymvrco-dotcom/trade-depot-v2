@@ -15,6 +15,7 @@ import { runGenome } from "./episode";
 import { aggregateFitness, episodeScore, validationScore, type EpisodeScore } from "./fitness";
 import { hardnessIndex, sampleEpisodes, MAX_LEVEL, type Episode, type MirrorEnvModel } from "./worlds";
 import { mean, sharpe, maxDrawdown, quantile } from "./stats";
+import { hunt, withHunterPenalty } from "./hunter";
 
 export const LIMITS = { population: { default: 128, max: 256 }, generations: { default: 40, max: 80 }, episodes: 8 };
 
@@ -132,11 +133,20 @@ function mutate(g: Genome, rand: Rng): Genome {
 
 // ─── Evaluation ───────────────────────────────────────────────────────────────
 
-function evalEpisode(envs: Env[], g: Genome, ep: Episode, spec: BlueprintSpec): EpisodeScore {
+/** Score one episode; with Hunter on, also score it after the attack. */
+function evalEpisode(envs: Env[], g: Genome, ep: Episode, spec: BlueprintSpec): { s: EpisodeScore; h: EpisodeScore } {
   const env = envs[ep.envIdx];
   const res = runGenome(env, g, { from: ep.from, to: ep.to, limit: ep.limit, costMult: ep.costMult, costRows: ep.costRows, miss: ep.miss, constraints: spec.constraints });
   const spanMs = env.timeMs(Math.min(ep.to, env.n)) - env.timeMs(ep.from);
-  return episodeScore(spec, res.trades, res.died, spanMs);
+  const s = episodeScore(spec, res.trades, res.died, spanMs);
+  if (!ep.hunter) return { s, h: s };
+  return { s, h: episodeScore(spec, hunt(env, res.trades, g.stopIdx, g.rrIdx).trades, res.died, spanMs) };
+}
+
+/** Fitness from normal and hunted episode scores: F − β·max(0, F − F_hunter). */
+function fitnessOf(spec: BlueprintSpec, normal: EpisodeScore[], hunted: EpisodeScore[]) {
+  const a = aggregateFitness(spec, normal), b = aggregateFitness(spec, hunted);
+  return { F: withHunterPenalty(a.F, b.F), deaths: a.deaths };
 }
 
 /** Trades on a fixed segment of every env, base costs, no randomization. */
@@ -190,21 +200,25 @@ export function* trainSteps(
     const episodes = sampleEpisodes(envs, train, hard, level, cfg.episodes, worldRand, cfg.mirror ?? []);
     const P = pop.length;
     const scores: EpisodeScore[][] = pop.map(() => []);
+    const hscores: EpisodeScore[][] = pop.map(() => []);
     // Successive halving: 2 episodes each, keep the top half, 2 more, ... until survivors have all E
     let alive = pop.map((_, i) => i);
     let done = 0;
     const rungStep = cfg.successiveHalving ? 2 : cfg.episodes;
     while (done < cfg.episodes) {
       const upto = Math.min(cfg.episodes, done + rungStep);
-      for (const i of alive) for (let e = done; e < upto; e++) { scores[i].push(evalEpisode(envs, pop[i], episodes[e], spec)); evaluations++; }
+      for (const i of alive) for (let e = done; e < upto; e++) {
+        const r = evalEpisode(envs, pop[i], episodes[e], spec);
+        scores[i].push(r.s); hscores[i].push(r.h); evaluations++;
+      }
       done = upto;
       if (done < cfg.episodes) {
-        const ranked = alive.map(i => ({ i, F: aggregateFitness(spec, scores[i]).F })).sort((a, b) => b.F - a.F || a.i - b.i);
+        const ranked = alive.map(i => ({ i, F: fitnessOf(spec, scores[i], hscores[i]).F })).sort((a, b) => b.F - a.F || a.i - b.i);
         alive = ranked.slice(0, Math.max(2, Math.ceil(ranked.length / 2))).map(x => x.i);
       }
     }
     const full = new Set(alive);
-    const fit = scores.map(s => aggregateFitness(spec, s));
+    const fit = scores.map((s, i) => fitnessOf(spec, s, hscores[i]));
     const F = fit.map(f => f.F);
     const deaths = fit.reduce((s, f) => s + f.deaths, 0);
     // Rank: fully evaluated agents first (only they can be elites), then by fitness
