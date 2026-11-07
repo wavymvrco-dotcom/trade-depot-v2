@@ -22,18 +22,18 @@ import { apiRequest } from "@/lib/queryClient";
 type CS = "idle" | "testing" | "connected" | "failed";
 
 const AI_PROVIDERS = [
-  { id: "openai",     name: "OpenAI",         model: "GPT-4o",              color: "text-emerald-400", selectedBg: "border-emerald-500 bg-emerald-500/10", placeholder: "sk-proj-...",  hint: "platform.openai.com → API Keys",     logo: "🤖" },
-  { id: "anthropic",  name: "Anthropic",       model: "Claude 3.5 Sonnet",   color: "text-amber-400",   selectedBg: "border-amber-500 bg-amber-500/10",   placeholder: "sk-ant-...",   hint: "console.anthropic.com → API Keys",   logo: "🧠" },
-  { id: "gemini",     name: "Google Gemini",   model: "Gemini 1.5 Pro",      color: "text-blue-400",    selectedBg: "border-blue-500 bg-blue-500/10",     placeholder: "AIzaSy...",    hint: "aistudio.google.com → Get API key",  logo: "✨" },
-  { id: "groq",       name: "Groq",            model: "Llama 3.1 70B",       color: "text-orange-400",  selectedBg: "border-orange-500 bg-orange-500/10", placeholder: "gsk_...",      hint: "console.groq.com → API Keys",        logo: "⚡" },
-  { id: "xai",        name: "Grok by xAI",     model: "Grok-2",              color: "text-sky-400",     selectedBg: "border-sky-500 bg-sky-500/10",       placeholder: "xai-...",      hint: "console.x.ai → API Keys",            logo: "𝕏" },
-  { id: "perplexity", name: "Perplexity",      model: "Sonar Online",        color: "text-violet-400",  selectedBg: "border-violet-500 bg-violet-500/10", placeholder: "pplx-...",     hint: "perplexity.ai/settings/api",         logo: "🔍" },
+  { id: "openai",     name: "OpenAI",         model: "GPT-4o",              color: "text-pos", selectedBg: "border-pos bg-pos/10", placeholder: "sk-proj-...",  hint: "platform.openai.com → API Keys",     logo: "" },
+  { id: "anthropic",  name: "Anthropic",       model: "Claude 3.5 Sonnet",   color: "text-warn",   selectedBg: "border-warn bg-warn/10",   placeholder: "sk-ant-...",   hint: "console.anthropic.com → API Keys",   logo: "" },
+  { id: "gemini",     name: "Google Gemini",   model: "Gemini 1.5 Pro",      color: "text-info",    selectedBg: "border-info bg-info/10",     placeholder: "AIzaSy...",    hint: "aistudio.google.com → Get API key",  logo: "" },
+  { id: "groq",       name: "Groq",            model: "Llama 3.1 70B",       color: "text-warn",  selectedBg: "border-warn bg-warn/10", placeholder: "gsk_...",      hint: "console.groq.com → API Keys",        logo: "" },
+  { id: "xai",        name: "Grok by xAI",     model: "Grok-2",              color: "text-info",     selectedBg: "border-info bg-info/10",       placeholder: "xai-...",      hint: "console.x.ai → API Keys",            logo: "𝕏" },
+  { id: "perplexity", name: "Perplexity",      model: "Sonar Online",        color: "text-info",  selectedBg: "border-info bg-info/10", placeholder: "pplx-...",     hint: "perplexity.ai/settings/api",         logo: "" },
 ];
 
 const BROKER_OPTIONS = [
-  { id: "demo",        Icon: Monitor,          title: "Demo Account",    sub: "Paper Trading",       desc: "$10,000 virtual balance. No real money at risk. Perfect for getting started.",  badge: "Start Here",    badgeCls: "text-green-400 bg-green-500/10 border-green-500/25" },
-  { id: "mql5",        Icon: CandlestickChart, title: "MetaTrader 5",    sub: "Live via MQL5",       desc: "Connect your MT5 live or demo account. Credentials validated at runtime.",        badge: "Most Popular",  badgeCls: "text-blue-400 bg-blue-500/10 border-blue-500/25" },
-  { id: "oanda",       Icon: Building2,        title: "OANDA",           sub: "Live via REST API",   desc: "Real-time connection verified against OANDA's API. Requires a live account.",      badge: "Verified Live", badgeCls: "text-violet-400 bg-violet-500/10 border-violet-500/25" },
+  { id: "demo",        Icon: Monitor,          title: "Demo Account",    sub: "Paper Trading",       desc: "$10,000 virtual balance. No real money at risk. Perfect for getting started.",  badge: "Start Here",    badgeCls: "text-pos bg-pos/10 border-pos/25" },
+  { id: "mql5",        Icon: CandlestickChart, title: "MetaTrader 5",    sub: "Live via MQL5",       desc: "Connect your MT5 live or demo account. Credentials validated at runtime.",        badge: "Most Popular",  badgeCls: "text-info bg-info/10 border-info/25" },
+  { id: "oanda",       Icon: Building2,        title: "OANDA",           sub: "Live via REST API",   desc: "Real-time connection verified against OANDA's API. Requires a live account.",      badge: "Verified Live", badgeCls: "text-info bg-info/10 border-info/25" },
 ];
 
 const FEATURES = [
@@ -187,7 +187,7 @@ export default function Onboarding({ onComplete }: { onComplete?: () => void }) 
         // Session may have expired — localStorage flag is sufficient to proceed
       }
 
-      toast({ title: "Setup complete! Welcome to TradeAI.", className: "border-green-500/50" });
+      toast({ title: "Setup complete! Welcome to Trade Depot.", className: "border-pos/50" });
       onComplete?.();
     } catch (e: any) {
       toast({ title: "Save failed", description: e.message, variant: "destructive" });
@@ -200,9 +200,9 @@ export default function Onboarding({ onComplete }: { onComplete?: () => void }) 
     return (
       <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
         className={cn("flex items-start gap-2 text-xs px-3 py-2.5 rounded-lg border mt-2",
-          status === "connected" && "bg-green-500/8 border-green-500/30 text-green-400",
-          status === "failed"    && "bg-red-500/8 border-red-500/30 text-red-400",
-          status === "testing"   && "bg-amber-500/8 border-amber-500/30 text-amber-400",
+          status === "connected" && "bg-pos/8 border-pos/30 text-pos",
+          status === "failed"    && "bg-neg/8 border-neg/30 text-neg",
+          status === "testing"   && "bg-warn/8 border-warn/30 text-warn",
         )}>
         {status === "connected" && <CheckCircle2 className="w-3.5 h-3.5 shrink-0 mt-0.5" />}
         {status === "failed"    && <AlertCircle  className="w-3.5 h-3.5 shrink-0 mt-0.5" />}
@@ -227,7 +227,7 @@ export default function Onboarding({ onComplete }: { onComplete?: () => void }) 
 
         {/* Progress bar */}
         <div className="h-1 bg-muted">
-          <motion.div className="h-full bg-gradient-to-r from-primary to-accent" animate={{ width: `${(step / totalSteps) * 100}%` }} transition={{ duration: 0.35 }} />
+          <motion.div className="h-full bg-primary" animate={{ width: `${(step / totalSteps) * 100}%` }} transition={{ duration: 0.35 }} />
         </div>
 
         {/* Step dots */}
@@ -259,11 +259,11 @@ export default function Onboarding({ onComplete }: { onComplete?: () => void }) 
             {step === 1 && (
               <motion.div key="s1" initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -24 }} className="space-y-5">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg shadow-primary/25 shrink-0">
-                    <LineChart className="w-6 h-6 text-white" />
+                  <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center shadow-lg shrink-0">
+                    <LineChart className="w-6 h-6 text-foreground" />
                   </div>
                   <div>
-                    <h1 className="text-2xl font-bold tracking-tight">Welcome to TradeAI{user?.username ? `, ${user.username}` : ""}!</h1>
+                    <h1 className="text-2xl font-bold tracking-tight">Welcome to Trade Depot{user?.username ? `, ${user.username}` : ""}!</h1>
                     <p className="text-muted-foreground text-sm mt-0.5">Your autonomous AI trading terminal. Let's get you set up in 5 steps.</p>
                   </div>
                 </div>
@@ -331,12 +331,12 @@ export default function Onboarding({ onComplete }: { onComplete?: () => void }) 
 
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {[
-                    { id: "forex",       Icon: Globe,        label: "Forex",        sub: "Currency pairs",         color: "text-blue-400",   bg: "border-blue-500 bg-blue-500/10",   badge: "Core feature" },
-                    { id: "stocks",      Icon: TrendingUp,   label: "Stocks",       sub: "Equities & ETFs",        color: "text-green-400",  bg: "border-green-500 bg-green-500/10", badge: "" },
-                    { id: "crypto",      Icon: Bitcoin,      label: "Crypto",       sub: "BTC, ETH & more",        color: "text-orange-400", bg: "border-orange-500 bg-orange-500/10", badge: "" },
-                    { id: "bonds",       Icon: Landmark,     label: "Bonds",        sub: "Treasuries & fixed income", color: "text-purple-400", bg: "border-purple-500 bg-purple-500/10", badge: "" },
-                    { id: "commodities", Icon: Wheat,        label: "Commodities",  sub: "Gold, oil & more",       color: "text-amber-400",  bg: "border-amber-500 bg-amber-500/10", badge: "" },
-                    { id: "indices",     Icon: BarChart2,    label: "Indices",      sub: "S&P 500, FTSE & more",   color: "text-cyan-400",   bg: "border-cyan-500 bg-cyan-500/10",   badge: "" },
+                    { id: "forex",       Icon: Globe,        label: "Forex",        sub: "Currency pairs",         color: "text-info",   bg: "border-info bg-info/10",   badge: "Core feature" },
+                    { id: "stocks",      Icon: TrendingUp,   label: "Stocks",       sub: "Equities & ETFs",        color: "text-pos",  bg: "border-pos bg-pos/10", badge: "" },
+                    { id: "crypto",      Icon: Bitcoin,      label: "Crypto",       sub: "BTC, ETH & more",        color: "text-warn", bg: "border-warn bg-warn/10", badge: "" },
+                    { id: "bonds",       Icon: Landmark,     label: "Bonds",        sub: "Treasuries & fixed income", color: "text-info", bg: "border-info bg-info/10", badge: "" },
+                    { id: "commodities", Icon: Wheat,        label: "Commodities",  sub: "Gold, oil & more",       color: "text-warn",  bg: "border-warn bg-warn/10", badge: "" },
+                    { id: "indices",     Icon: BarChart2,    label: "Indices",      sub: "S&P 500, FTSE & more",   color: "text-info",   bg: "border-info bg-info/10",   badge: "" },
                   ].map(({ id, Icon, label, sub, color, bg, badge }) => {
                     const selected = tradingInstruments.includes(id);
                     return (
@@ -367,7 +367,7 @@ export default function Onboarding({ onComplete }: { onComplete?: () => void }) 
                 </div>
 
                 {tradingInstruments.length === 0 && (
-                  <div className="text-xs text-amber-500 flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2.5">
+                  <div className="text-xs text-warn flex items-center gap-1.5 bg-warn/10 border border-warn/20 rounded-lg px-3 py-2.5">
                     <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                     Select at least one market to continue.
                   </div>
@@ -425,7 +425,7 @@ export default function Onboarding({ onComplete }: { onComplete?: () => void }) 
                         <div className="border-t border-primary/10 pt-3 mt-1 space-y-3 text-xs text-muted-foreground leading-relaxed">
                           <div>
                             <p className="font-semibold text-foreground mb-1">What is an AI API key?</p>
-                            <p>Think of it like a password that lets TradeAI Terminal talk to an AI service (like ChatGPT or Claude) on your behalf. Without it, the app has no AI brain — it can't generate signals or grade your trades.</p>
+                            <p>Think of it like a password that lets Trade Depot talk to an AI service (like ChatGPT or Claude) on your behalf. Without it, the app has no AI brain — it can't generate signals or grade your trades.</p>
                           </div>
                           <div>
                             <p className="font-semibold text-foreground mb-1">Do I pay for it?</p>
@@ -496,7 +496,7 @@ export default function Onboarding({ onComplete }: { onComplete?: () => void }) 
                       <Button
                         onClick={testAi}
                         disabled={aiStatus === "testing" || !aiApiKey.trim()}
-                        className={cn("w-full gap-2 h-11", aiStatus === "connected" && "bg-green-600 hover:bg-green-700 text-white")}
+                        className={cn("w-full gap-2 h-11", aiStatus === "connected" && "bg-pos hover:bg-pos text-on-strong")}
                         data-testid="button-test-ai"
                       >
                         {aiStatus === "testing"   ? <><Loader2 className="w-4 h-4 animate-spin" />Testing connection to {providerInfo?.name}…</>
@@ -517,13 +517,13 @@ export default function Onboarding({ onComplete }: { onComplete?: () => void }) 
                 </AnimatePresence>
 
                 {!selectedProvider && (
-                  <div className="text-xs text-amber-500 flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2.5">
+                  <div className="text-xs text-warn flex items-center gap-1.5 bg-warn/10 border border-warn/20 rounded-lg px-3 py-2.5">
                     <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                     Select a provider above, enter your API key, then click Test Live Connection.
                   </div>
                 )}
                 {selectedProvider && !aiDone && (
-                  <div className="text-xs text-amber-500 flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2.5">
+                  <div className="text-xs text-warn flex items-center gap-1.5 bg-warn/10 border border-warn/20 rounded-lg px-3 py-2.5">
                     <Info className="w-3.5 h-3.5 shrink-0" />
                     A successful connection test is required before continuing.
                   </div>
@@ -580,15 +580,15 @@ export default function Onboarding({ onComplete }: { onComplete?: () => void }) 
                 <AnimatePresence mode="wait">
                   {brokerType === "demo" && (
                     <motion.div key="demo" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                      className="p-4 bg-green-500/8 border border-green-500/25 rounded-xl">
-                      <p className="font-semibold text-green-400 mb-1.5 flex items-center gap-1.5 text-sm"><Monitor className="w-4 h-4" />Paper Trading Mode</p>
+                      className="p-4 bg-pos/8 border border-pos/25 rounded-xl">
+                      <p className="font-semibold text-pos mb-1.5 flex items-center gap-1.5 text-sm"><Monitor className="w-4 h-4" />Paper Trading Mode</p>
                       <p className="text-muted-foreground text-xs leading-relaxed">Starts with $10,000 virtual balance. All trades are fully simulated — zero real money at risk. You can switch to a live broker anytime from Settings.</p>
                     </motion.div>
                   )}
 
                   {brokerType === "mql5" && (
                     <motion.div key="mql5" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-3">
-                      <div className="flex items-start gap-2 text-[11px] text-blue-400 bg-blue-500/8 border border-blue-500/20 rounded-lg px-3 py-2">
+                      <div className="flex items-start gap-2 text-[11px] text-info bg-info/8 border border-info/20 rounded-lg px-3 py-2">
                         <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                         Credentials are saved and validated by the MT5 bridge at first connection. Use your Investor (read-only) password for security.
                       </div>
@@ -620,7 +620,7 @@ export default function Onboarding({ onComplete }: { onComplete?: () => void }) 
 
                   {brokerType === "oanda" && (
                     <motion.div key="oanda" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-3">
-                      <div className="flex items-start gap-2 text-[11px] text-violet-400 bg-violet-500/8 border border-violet-500/20 rounded-lg px-3 py-2">
+                      <div className="flex items-start gap-2 text-[11px] text-info bg-info/8 border border-info/20 rounded-lg px-3 py-2">
                         <CheckCheck className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                         A real API call is made to OANDA's servers to verify your key. Requires a live or practice OANDA account.
                       </div>
@@ -640,7 +640,7 @@ export default function Onboarding({ onComplete }: { onComplete?: () => void }) 
                         </p>
                         <p className="text-[10px] text-muted-foreground mt-0.5">
                           No account yet?{" "}
-                          <a href="https://www.oanda.com/register/" target="_blank" rel="noopener noreferrer" className="text-cyan-400 font-medium hover:underline">Create a free practice account →</a>
+                          <a href="https://www.oanda.com/register/" target="_blank" rel="noopener noreferrer" className="text-info font-medium hover:underline">Create a free practice account →</a>
                         </p>
                       </div>
                     </motion.div>
@@ -648,7 +648,7 @@ export default function Onboarding({ onComplete }: { onComplete?: () => void }) 
 
                   {brokerType === "interactive" && (
                     <motion.div key="ibkr" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-3">
-                      <div className="flex items-start gap-2 text-[11px] text-amber-400 bg-amber-500/8 border border-amber-500/20 rounded-lg px-3 py-2">
+                      <div className="flex items-start gap-2 text-[11px] text-warn bg-warn/8 border border-warn/20 rounded-lg px-3 py-2">
                         <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                         Credentials are saved and the IBKR Client Portal Gateway connects at runtime. Ensure the gateway is running locally.
                       </div>
@@ -668,7 +668,7 @@ export default function Onboarding({ onComplete }: { onComplete?: () => void }) 
                 </AnimatePresence>
 
                 <Button onClick={testBroker} disabled={brokerStatus === "testing"}
-                  className={cn("w-full gap-2 h-11", brokerStatus === "connected" && "bg-green-600 hover:bg-green-700 text-white")}
+                  className={cn("w-full gap-2 h-11", brokerStatus === "connected" && "bg-pos hover:bg-pos text-on-strong")}
                   data-testid="button-test-broker">
                   {brokerStatus === "testing"   ? <><Loader2 className="w-4 h-4 animate-spin" />Verifying…</>
                    : brokerStatus === "connected" ? <><CheckCircle2 className="w-4 h-4" />Verified — Continue</>
@@ -678,7 +678,7 @@ export default function Onboarding({ onComplete }: { onComplete?: () => void }) 
                 <FeedbackBar status={brokerStatus} msg={brokerMsg} />
 
                 {!brokerDone && (
-                  <div className="text-xs text-amber-500 flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2.5">
+                  <div className="text-xs text-warn flex items-center gap-1.5 bg-warn/10 border border-warn/20 rounded-lg px-3 py-2.5">
                     <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                     You must verify the connection before continuing.
                   </div>
@@ -742,10 +742,10 @@ export default function Onboarding({ onComplete }: { onComplete?: () => void }) 
                   <Select value={strategyGoal} onValueChange={setStrategyGoal}>
                     <SelectTrigger className="h-12 bg-background/50" data-testid="select-strategy-goal"><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="aggressive">🚀 Aggressive Growth — High risk, high reward</SelectItem>
-                      <SelectItem value="balanced">⚖️ Balanced Growth — Medium risk</SelectItem>
-                      <SelectItem value="conservative">🛡️ Capital Preservation — Low risk</SelectItem>
-                      <SelectItem value="income">💰 Consistent Daily Income</SelectItem>
+                      <SelectItem value="aggressive">Aggressive Growth — High risk, high reward</SelectItem>
+                      <SelectItem value="balanced">Balanced Growth — Medium risk</SelectItem>
+                      <SelectItem value="conservative">Capital Preservation — Low risk</SelectItem>
+                      <SelectItem value="income">Consistent Daily Income</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -780,7 +780,7 @@ export default function Onboarding({ onComplete }: { onComplete?: () => void }) 
                     </div>
                     <p className="text-[11px] text-muted-foreground">When enabled, the AI automatically executes pending signals within your risk limits. You can toggle this anytime.</p>
                     {autoTrade && (
-                      <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-[11px] text-amber-400 mt-1.5 flex items-center gap-1">
+                      <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-[11px] text-warn mt-1.5 flex items-center gap-1">
                         <AlertCircle className="w-3 h-3 shrink-0" />
                         Auto-Trade is active — AI will execute signals every 60s.
                       </motion.p>
@@ -810,8 +810,8 @@ export default function Onboarding({ onComplete }: { onComplete?: () => void }) 
               <motion.div key="s5" initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -24 }} className="space-y-5">
                 <div className="flex flex-col items-center text-center pt-2">
                   <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", bounce: 0.5, delay: 0.15 }}
-                    className="w-16 h-16 rounded-full bg-green-500/15 border border-green-500/30 flex items-center justify-center mb-4">
-                    <CheckCircle2 className="w-8 h-8 text-green-500" />
+                    className="w-16 h-16 rounded-full bg-pos/15 border border-pos/30 flex items-center justify-center mb-4">
+                    <CheckCircle2 className="w-8 h-8 text-pos" />
                   </motion.div>
                   <h2 className="text-2xl font-bold">You're all set!</h2>
                   <p className="text-muted-foreground text-sm mt-1.5 max-w-sm">Your terminal is configured and the AI is ready to analyze markets and generate signals.</p>
@@ -827,7 +827,7 @@ export default function Onboarding({ onComplete }: { onComplete?: () => void }) 
                     { k: "Risk / Trade",  v: `${riskPercent}%` },
                     { k: "Max Positions", v: maxPositions },
                     { k: "Style",         v: `${strategyGoal} · ${tradingStyle}` },
-                    { k: "Auto-Trade",    v: autoTrade ? "Enabled ⚡" : "Disabled" },
+                    { k: "Auto-Trade",    v: autoTrade ? "Enabled " : "Disabled" },
                   ].map(row => (
                     <div key={row.k} className="flex justify-between text-xs">
                       <span className="text-muted-foreground">{row.k}</span>
@@ -850,7 +850,7 @@ export default function Onboarding({ onComplete }: { onComplete?: () => void }) 
                 </div>
 
                 <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                  <Shield className="w-3.5 h-3.5 shrink-0 text-green-500" />
+                  <Shield className="w-3.5 h-3.5 shrink-0 text-pos" />
                   All credentials encrypted. You can update your settings anytime from the Settings page.
                 </div>
               </motion.div>

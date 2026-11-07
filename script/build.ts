@@ -24,6 +24,10 @@ const allowlist = [
   "passport",
   "passport-local",
   "pg",
+  "pg-boss",
+  "cron-parser",
+  "rrule-temporal",
+  "serialize-error",
   "stripe",
   "uuid",
   "ws",
@@ -46,12 +50,13 @@ async function buildAll() {
   ];
   const externals = allDeps.filter((dep) => !allowlist.includes(dep));
 
-  await esbuild({
-    entryPoints: ["server/index.ts"],
+  const serverBuild = (entry: string, outfile: string) => esbuild({
+    entryPoints: [entry],
     platform: "node",
+    target: "node22",
     bundle: true,
     format: "cjs",
-    outfile: "dist/index.cjs",
+    outfile,
     define: {
       "process.env.NODE_ENV": '"production"',
     },
@@ -59,6 +64,9 @@ async function buildAll() {
     external: externals,
     logLevel: "info",
   });
+  // Web server, and the background worker process (trading workers + job queue)
+  await serverBuild("server/index.ts", "dist/index.cjs");
+  await serverBuild("server/lab/worker.ts", "dist/worker.cjs");
 }
 
 buildAll().catch((err) => {

@@ -45,99 +45,132 @@
   
   --color-buy: hsl(var(--buy));
   --color-sell: hsl(var(--sell));
+  --color-rule: hsl(var(--rule));
+
+  --color-paper: var(--rj-paper);
+  --color-surface: var(--rj-surface);
+  --color-surface-soft: var(--rj-surface-soft);
+  --color-ink: var(--rj-ink);
+  --color-ink-2: var(--rj-ink-2);
+  --color-film: var(--rj-film);
+  --color-film-text: var(--rj-film-text);
+  --color-pos: var(--rj-pos);
+  --color-neg: var(--rj-neg);
+  --color-warn: var(--rj-warn);
+  --color-info: var(--rj-info);
+  --color-on-strong: var(--rj-on-strong);
+
+  --font-display: "Fraunces", Georgia, serif;
 }
 
+/* ─── Research Journal design system (build sheet §17.1) ─────────────────────
+   Light is the default; html.dark switches to the dark variant. The shadcn
+   variables below are mapped from the Research Journal tokens so every page
+   follows them. Raw tokens (--rj-*) are hex for direct use. */
 :root {
-  /* Professional Dark Trading Theme */
-  --background: 240 10% 3.9%;
-  --foreground: 0 0% 98%;
+  --rj-paper: #F4EFE6;
+  --rj-surface: #FFFFFF;
+  --rj-surface-soft: #FAF7F1;
+  --rj-ink: #1A1A1A;
+  --rj-ink-2: #3D3A35;
+  --rj-muted: #5C5650;
+  --rj-rule: #D9D0C1;
+  --rj-border: #E2DACB;
+  --rj-accent: #1F3A5F;
+  --rj-film: #12161C;
+  --rj-film-text: #C9D2DD;
+  /* Status badges (background / text). Never color alone: every badge has a label. */
+  --rj-licensed-bg: #E9EEF5; --rj-licensed-fg: #1F3A5F;
+  --rj-passed-bg: #E4EFE8;   --rj-passed-fg: #2E6B4F;
+  --rj-shadow-bg: #FBF0DF;   --rj-shadow-fg: #8A4B00;
+  --rj-arena-bg: #F1EDE6;    --rj-arena-fg: #5C5650;
+  --rj-rejected-bg: #F6E6E3; --rj-rejected-fg: #8C2F22;
+  /* Semantic colors for numbers and states (gain, loss, caution, information) */
+  --rj-pos: #2E6B4F;
+  --rj-neg: #8C2F22;
+  --rj-warn: #8A4B00;
+  --rj-info: #1F3A5F;
+  --rj-on-strong: #FFFFFF;   /* text on a solid semantic/accent fill */
+  --rj-chart-grid: #E2DACB;
 
-  --card: 240 10% 7%;
-  --card-foreground: 0 0% 98%;
-
-  --popover: 240 10% 9%;
-  --popover-foreground: 0 0% 98%;
-
-  /* Premium Cyan/Blue for Primary */
-  --primary: 190 100% 50%;
-  --primary-foreground: 0 0% 100%;
-
-  --secondary: 240 4% 16%;
-  --secondary-foreground: 0 0% 98%;
-
-  --muted: 240 4% 20%;
-  --muted-foreground: 240 5% 60%;
-
-  --accent: 51 95% 55%;
+  --background: 39 39% 93%;          /* paper */
+  --foreground: 0 0% 10%;            /* ink */
+  --card: 0 0% 100%;                 /* surface */
+  --card-foreground: 0 0% 10%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 0 0% 10%;
+  --primary: 215 51% 25%;            /* accent */
+  --primary-foreground: 39 39% 93%;
+  --secondary: 40 47% 96%;           /* surface-soft */
+  --secondary-foreground: 0 0% 10%;
+  --muted: 40 47% 96%;
+  --muted-foreground: 30 7% 34%;     /* muted: 4.5:1 on paper */
+  --accent: 39 30% 88%;              /* hover / selected background */
   --accent-foreground: 0 0% 10%;
-
-  --destructive: 0 84% 60%;
+  --destructive: 7 61% 34%;
   --destructive-foreground: 0 0% 100%;
-
-  --border: 240 4% 15%;
-  --input: 240 4% 16%;
-  --ring: 190 100% 50%;
+  --border: 39 28% 84%;
+  --input: 39 28% 84%;
+  --ring: 215 51% 25%;
+  --rule: 38 24% 80%;
 
   /* Trading colors */
-  --buy: 142 71% 50%;
-  --sell: 0 84% 60%;
+  --buy: 152 40% 30%;
+  --sell: 7 61% 34%;
 
-  --radius: 0.5rem;
-  
-  --font-sans: 'Inter', sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
+  --radius: 0.75rem;
+
+  --font-sans: "Inter", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", monospace;
 }
 
-/* Light mode override */
-html.light {
-  --background: 210 20% 96%;
-  --foreground: 220 20% 12%;
-  --card: 0 0% 100%;
-  --card-foreground: 220 20% 12%;
-  --popover: 0 0% 100%;
-  --popover-foreground: 220 20% 12%;
-  --primary: 190 80% 38%;
-  --primary-foreground: 0 0% 100%;
-  --secondary: 210 15% 89%;
-  --secondary-foreground: 220 20% 18%;
-  --muted: 210 15% 91%;
-  --muted-foreground: 220 10% 42%;
-  --accent: 47 95% 45%;
-  --accent-foreground: 0 0% 10%;
-  --destructive: 0 80% 52%;
-  --destructive-foreground: 0 0% 100%;
-  --border: 210 15% 82%;
-  --input: 0 0% 100%;
-  --ring: 190 80% 38%;
-  --buy: 142 70% 38%;
-  --sell: 0 80% 52%;
+html.dark {
+  --rj-paper: #1A1916;
+  --rj-surface: #23211D;
+  --rj-surface-soft: #2A2823;
+  --rj-ink: #F4EFE6;
+  --rj-ink-2: #D6CFC2;
+  --rj-muted: #A79F92;
+  --rj-rule: #3A372F;
+  --rj-border: #34312A;
+  --rj-accent: #8FB0D6;
+  --rj-film: #0E1115;
+  --rj-pos: #7CC4A0;
+  --rj-neg: #E08A7C;
+  --rj-warn: #E0A458;
+  --rj-info: #8FB0D6;
+  --rj-on-strong: #1A1916;
+  --rj-chart-grid: #34312A;
+
+  --background: 45 8% 9%;
+  --foreground: 39 39% 93%;
+  --card: 40 9% 13%;
+  --card-foreground: 39 39% 93%;
+  --popover: 40 9% 13%;
+  --popover-foreground: 39 39% 93%;
+  --primary: 212 46% 70%;
+  --primary-foreground: 45 8% 9%;
+  --secondary: 43 9% 15%;
+  --secondary-foreground: 39 39% 93%;
+  --muted: 43 9% 15%;
+  --muted-foreground: 37 11% 61%;
+  --accent: 43 9% 20%;
+  --accent-foreground: 39 39% 93%;
+  --destructive: 8 60% 62%;
+  --destructive-foreground: 45 8% 9%;
+  --border: 42 11% 18%;
+  --input: 42 11% 18%;
+  --ring: 212 46% 70%;
+  --rule: 44 10% 21%;
+  --buy: 150 40% 55%;
+  --sell: 8 60% 62%;
 }
 
-html.light .bg-card\/30,
-html.light .bg-card\/50,
-html.light .bg-card\/70 {
-  background-color: hsl(0 0% 100% / 0.9) !important;
-}
-
-html.light .bg-muted\/20,
-html.light .bg-muted\/30 {
-  background-color: hsl(210 15% 91% / 0.6) !important;
-}
-
-html.light .border-border\/50,
-html.light .border-border\/60 {
-  border-color: hsl(210 15% 78%) !important;
-}
-
-html.light .text-muted-foreground {
-  color: hsl(220 10% 40%) !important;
-}
-
-html.light select,
-html.light textarea {
-  background-color: hsl(0 0% 100%);
-  color: hsl(220 20% 12%);
-  border-color: hsl(210 15% 82%);
+/* Page-level headings in Fraunces; small UI labels (h3+) stay in Inter unless .font-display */
+h1, h2 {
+  font-family: var(--font-display);
+  font-weight: 500;
+  letter-spacing: -0.02em;
 }
 
 html, body, #root {

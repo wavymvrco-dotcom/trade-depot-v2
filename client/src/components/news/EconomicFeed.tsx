@@ -13,7 +13,7 @@ export function EconomicFeed() {
         </Badge>
       </div>
       
-      <div className="flex-1 min-h-0 w-full overflow-hidden bg-[#131722]">
+      <div className="flex-1 min-h-0 w-full overflow-hidden bg-background">
         <TradingViewCalendar />
       </div>
     </div>

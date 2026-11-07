@@ -1,0 +1,1 @@
+{"op":"clamp","lo":-1,"hi":1,"x":{"op":"div","a":{"op":"slope","n":10,"x":{"op":"ema","n":50,"x":{"op":"series","name":"close"}}},"b":{"op":"atr","n":14}}}

@@ -6,10 +6,12 @@ import { and, desc, eq, inArray } from "drizzle-orm";
 import { fetchCandles, defaultSpreadPips } from "./backtest";
 import { getPairCot } from "./cot";
 import { getPairRates } from "./rates";
-import { toWeekly } from "./indicators";
-import { calcProfit, getSymbolConfig } from "@shared/pips";
+import { toWeekly, type Candle } from "./indicators";
+import { getBoss, QUEUES } from "./jobs";
+import { simulateTrade } from "./lab/engine/outcomes";
+import { getSymbolConfig } from "@shared/pips";
 import {
-  prepare, warmup, layerValues, combine, computeAt, lastClosedIndex, PROFILES, STYLES,
+  prepare, warmup, layerValues, combine, computeAt, lastClosedIndex, parseTime, PROFILES, STYLES,
   type StyleKey, type Weights, type LayerKey, type TdciResult, type TdciContext, type Profile,
 } from "./tdci";
 
@@ -38,15 +40,27 @@ function apiKey() {
 
 const HTF_PER_PRIMARY: Record<string, number> = { "5min→1h": 1 / 12, "15min→4h": 1 / 16, "4h→1day": 1 / 6 };
 
-async function loadContext(symbol: string, profile: Profile, bars: number): Promise<TdciContext> {
+/** Trading costs used by calibration (and the Lab) for a symbol and style, in price units / $ per lot. */
+export interface TradeCost { half: number; slip: number; commission: number }
+export function costFor(symbol: string, style: StyleKey): TradeCost {
+  const cfg = getSymbolConfig(symbol);
+  const spreadPips = defaultSpreadPips(symbol);
+  const slippagePips = style === "scalp" ? 0.2 : 0.3, commissionPerLot = 7;
+  return { half: (spreadPips * cfg.pipSize) / 2, slip: slippagePips * cfg.pipSize, commission: commissionPerLot };
+}
+
+/** Candles + COT + rates for a symbol, prepared for TDCI scoring. Shared by calibration, live scoring and the Lab. */
+export async function loadContext(symbol: string, profile: Profile, bars: number, opts: { endBefore?: number } = {}): Promise<TdciContext> {
   const key = apiKey();
-  const p = await fetchCandles(symbol, profile.interval, bars, key);
+  // endBefore (ms): drop bars that open at or after it, so a run can pin its data to a fixed cut-off
+  const cut = (cs: Candle[]) => (opts.endBefore == null ? cs : cs.filter(c => parseTime(c.time) < opts.endBefore!));
+  const p = cut(await fetchCandles(symbol, profile.interval, bars, key));
   let h;
   if (profile.htf === "1week") {
     h = toWeekly(p);
   } else {
     const ratio = HTF_PER_PRIMARY[`${profile.interval}→${profile.htf}`] ?? 1 / 6;
-    h = await fetchCandles(symbol, profile.htf, Math.min(20000, Math.ceil(bars * ratio) + 120), key);
+    h = cut(await fetchCandles(symbol, profile.htf, Math.min(20000, Math.ceil(bars * ratio) + 120), key));
   }
   const needCot = profile.layers.includes("positioning");
   const needRates = profile.layers.includes("carry");
@@ -147,27 +161,9 @@ interface BarSample {
   costR: number;
 }
 
+/** One trade from bar i under the style's trade model. Shared with the Lab (server/lab/engine/outcomes.ts). */
 function simulate(ctx: TdciContext, i: number, side: 1 | -1, cost: { half: number; slip: number; commission: number }) {
-  const { stopAtr, rr, maxHold } = ctx.profile.model;
-  const p = ctx.p, a = ctx.pAtr[i];
-  const mid = p[i + 1].open;
-  const entry = side > 0 ? mid + cost.half + cost.slip : mid - cost.half - cost.slip;
-  const sl = entry - side * stopAtr * a, tp = entry + side * rr * stopAtr * a;
-  let exit = NaN, exitIdx = Math.min(i + maxHold, p.length - 1);
-  for (let j = i + 1; j <= exitIdx; j++) {
-    const b = p[j];
-    // Longs exit on the bid, shorts on the ask; a bar touching both counts as the stop (conservative)
-    const slHit = side > 0 ? b.low - cost.half <= sl : b.high + cost.half >= sl;
-    const tpHit = side > 0 ? b.high - cost.half >= tp : b.low + cost.half <= tp;
-    if (slHit) { exit = sl - side * cost.slip; exitIdx = j; break; }
-    if (tpHit) { exit = tp; exitIdx = j; break; }
-  }
-  if (!Number.isFinite(exit)) exit = side > 0 ? p[exitIdx].close - cost.half : p[exitIdx].close + cost.half;
-  const riskPerLot = Math.abs(calcProfit("BUY", entry, entry - stopAtr * a, ctx.symbol, 1));
-  const commissionR = riskPerLot > 0 ? cost.commission / riskPerLot : 0;
-  const r = (side * (exit - entry)) / (stopAtr * a) - commissionR;
-  const costR = (2 * cost.half + 2 * cost.slip) / (stopAtr * a) + commissionR;
-  return { r, exitIdx, costR };
+  return simulateTrade(ctx.p, ctx.pAtr[i], ctx.symbol, i, side, ctx.profile.model, cost);
 }
 
 function ranks(v: number[]) {
@@ -256,10 +252,9 @@ export async function calibrate(symbol: string, style: StyleKey, onProgress?: (m
   const profile = PROFILES[style];
   onProgress?.(`Loading ${profile.history.calibrate.toLocaleString()} ${profile.interval} bars`);
   const ctx = await loadContext(symbol, profile, profile.history.calibrate);
-  const cfg = getSymbolConfig(symbol);
-  const spreadPips = defaultSpreadPips(symbol);
-  const slippagePips = style === "scalp" ? 0.2 : 0.3, commissionPerLot = 7;
-  const cost = { half: (spreadPips * cfg.pipSize) / 2, slip: slippagePips * cfg.pipSize, commission: commissionPerLot };
+  const cost = costFor(symbol, style);
+  const pipSize = getSymbolConfig(symbol).pipSize;
+  const spreadPips = defaultSpreadPips(symbol), slippagePips = round(cost.slip / pipSize, 2), commissionPerLot = cost.commission;
   const h = profile.model.icHorizon, maxHold = profile.model.maxHold;
 
   const start = warmup(ctx), end = ctx.p.length - 1 - maxHold;
@@ -331,50 +326,67 @@ export async function calibrate(symbol: string, style: StyleKey, onProgress?: (m
 
 // ─── Background calibration jobs ──────────────────────────────────────────────
 // Calibrations pull months of data through the rate-limited feed, so they run
-// one at a time in the background; the UI polls the job status.
+// in the durable job queue (server/jobs.ts), one at a time, in the worker
+// process. The UI polls the job status, read back from the queue.
 
 export interface JobItem { symbol: string; style: StyleKey; status: "queued" | "running" | "done" | "failed"; message?: string; recommendedMin?: number | null }
-const job = { items: [] as JobItem[], running: false, startedAt: 0 as number, finishedAt: 0 as number };
+interface CalJobData { symbol: string; style: StyleKey }
+interface CalJobOutput { message?: string; recommendedMin?: number | null }
 
-export function jobStatus() {
-  const done = job.items.filter(i => i.status === "done" || i.status === "failed").length;
-  return { running: job.running, startedAt: job.startedAt || null, finishedAt: job.finishedAt || null, total: job.items.length, done, items: job.items };
+const STATE_TO_STATUS: Record<string, JobItem["status"]> = {
+  created: "queued", retry: "queued", active: "running", completed: "done", failed: "failed", cancelled: "failed",
+};
+
+export async function jobStatus() {
+  const boss = await getBoss();
+  const since = Date.now() - 24 * 3600_000;
+  const jobs = (await boss.findJobs<CalJobData>(QUEUES.tdciCalibrate, { limit: 5000 }))
+    .filter(j => new Date(j.createdOn).getTime() > since)
+    .slice(-200);
+  const items: JobItem[] = jobs.map(j => {
+    const out = (j.output ?? {}) as CalJobOutput & { message?: string };
+    const status = STATE_TO_STATUS[j.state] ?? "queued";
+    return {
+      symbol: j.data.symbol, style: j.data.style, status,
+      message: status === "running" ? "Running" : status === "queued" && j.retryCount > 0 ? `Retrying (attempt ${j.retryCount + 1})` : out.message,
+      recommendedMin: out.recommendedMin ?? null,
+    };
+  });
+  const running = items.some(i => i.status === "queued" || i.status === "running");
+  const done = items.filter(i => i.status === "done" || i.status === "failed").length;
+  const startedAt = jobs.length ? Math.min(...jobs.map(j => new Date(j.createdOn).getTime())) : null;
+  const finished = jobs.map(j => j.completedOn).filter(Boolean).map(d => new Date(d as Date).getTime());
+  const finishedAt = !running && finished.length ? Math.max(...finished) : null;
+  return { running, startedAt, finishedAt, total: items.length, done, items };
 }
 
-export function enqueueCalibrations(pairs: { symbol: string; style: StyleKey }[]) {
+export async function enqueueCalibrations(pairs: { symbol: string; style: StyleKey }[]) {
+  const boss = await getBoss();
+  const pending = await boss.findJobs<CalJobData>(QUEUES.tdciCalibrate, { queued: true, limit: 5000 });
+  const active = (await boss.findJobs<CalJobData>(QUEUES.tdciCalibrate, { limit: 5000 })).filter(j => j.state === "active");
+  const busy = new Set([...pending, ...active].map(j => `${j.data.symbol}:${j.data.style}`));
   for (const p of pairs) {
-    const existing = job.items.find(i => i.symbol === p.symbol && i.style === p.style && (i.status === "queued" || i.status === "running"));
-    if (!existing) job.items.push({ ...p, status: "queued" });
+    const key = `${p.symbol}:${p.style}`;
+    if (busy.has(key)) continue;
+    busy.add(key);
+    await boss.send(QUEUES.tdciCalibrate, { symbol: p.symbol, style: p.style }, { singletonKey: key });
   }
-  if (!job.running) void runQueue();
   return jobStatus();
 }
 
-async function runQueue() {
-  job.running = true;
-  if (!job.startedAt || job.finishedAt) { job.startedAt = Date.now(); job.finishedAt = 0; }
-  try {
-    for (;;) {
-      const next = job.items.find(i => i.status === "queued");
-      if (!next) break;
-      next.status = "running";
-      try {
-        const r = await calibrate(next.symbol, next.style, msg => { next.message = msg; });
-        next.status = "done";
-        next.recommendedMin = r.recommendedMin;
-        next.message = r.recommendedMin != null ? `Edge found ≥ ${r.recommendedMin}` : "No proven edge";
-      } catch (e: any) {
-        next.status = "failed";
-        next.message = e.message;
-        console.warn(`[TDCI] Calibration ${next.symbol} ${next.style} failed: ${e.message}`);
-      }
+/** Worker side: process calibration jobs one at a time. */
+export async function startCalibrationWorker() {
+  const boss = await getBoss();
+  await boss.work<CalJobData, CalJobOutput>(QUEUES.tdciCalibrate, { batchSize: 1 }, async ([job]) => {
+    const { symbol, style } = job.data;
+    try {
+      const r = await calibrate(symbol, style);
+      return { recommendedMin: r.recommendedMin, message: r.recommendedMin != null ? `Edge found ≥ ${r.recommendedMin}` : "No proven edge" };
+    } catch (e: any) {
+      console.warn(`[TDCI] Calibration ${symbol} ${style} failed: ${e.message}`);
+      throw e;
     }
-  } finally {
-    job.running = false;
-    job.finishedAt = Date.now();
-    // Keep the finished list for the UI, but cap its size
-    if (job.items.length > 200) job.items = job.items.slice(-200);
-  }
+  });
 }
 
 function round(v: number, dp = 3) { const m = 10 ** dp; return Math.round(v * m) / m; }

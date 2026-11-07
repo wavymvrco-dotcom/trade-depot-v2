@@ -25,43 +25,43 @@ export default function VerifyEmail() {
   }, [token]);
 
   return (
-    <div className="min-h-screen bg-[#070710] text-white flex flex-col items-center justify-center px-4">
+    <div className="min-h-screen bg-background text-foreground flex flex-col items-center justify-center px-4">
       <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] bg-cyan-500/5 rounded-full blur-[100px]" />
+        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] bg-info/5 rounded-full blur-[100px]" />
       </div>
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-sm relative">
         <div className="flex items-center justify-center gap-2.5 mb-10">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center shadow-xl shadow-cyan-500/30">
-            <LineChart className="w-5 h-5 text-white" />
+          <div className="w-9 h-9 rounded-xl bg-info/10 flex items-center justify-center shadow-xl">
+            <LineChart className="w-5 h-5 text-foreground" />
           </div>
-          <span className="font-bold text-lg">TradeAI <span className="text-cyan-400">Terminal</span></span>
+          <span className="font-display font-semibold text-xl">Trade Depot</span>
         </div>
-        <div className="bg-white/[0.03] border border-white/10 rounded-2xl p-8 text-center">
+        <div className="bg-white/[0.03] border border-foreground/10 rounded-2xl p-8 text-center">
           {status === "loading" && (
             <>
-              <Loader2 className="w-10 h-10 text-cyan-400 animate-spin mx-auto mb-4" />
+              <Loader2 className="w-10 h-10 text-info animate-spin mx-auto mb-4" />
               <h2 className="font-bold text-lg mb-2">Verifying your email…</h2>
-              <p className="text-sm text-white/40">Please wait a moment.</p>
+              <p className="text-sm text-foreground/40">Please wait a moment.</p>
             </>
           )}
           {status === "success" && (
             <>
-              <div className="w-14 h-14 rounded-2xl bg-green-500/10 border border-green-500/20 flex items-center justify-center mx-auto mb-4">
-                <CheckCircle2 className="w-7 h-7 text-green-400" />
+              <div className="w-14 h-14 rounded-2xl bg-pos/10 border border-pos/20 flex items-center justify-center mx-auto mb-4">
+                <CheckCircle2 className="w-7 h-7 text-pos" />
               </div>
               <h2 className="font-bold text-lg mb-2">Email verified!</h2>
-              <p className="text-sm text-white/40 mb-6">{message}</p>
-              <Link href="/"><Button className="bg-cyan-500 hover:bg-cyan-400 text-black font-semibold">Go to Terminal</Button></Link>
+              <p className="text-sm text-foreground/40 mb-6">{message}</p>
+              <Link href="/"><Button className="bg-info hover:bg-info text-foreground font-semibold">Go to Terminal</Button></Link>
             </>
           )}
           {status === "error" && (
             <>
-              <div className="w-14 h-14 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center mx-auto mb-4">
-                <XCircle className="w-7 h-7 text-red-400" />
+              <div className="w-14 h-14 rounded-2xl bg-neg/10 border border-neg/20 flex items-center justify-center mx-auto mb-4">
+                <XCircle className="w-7 h-7 text-neg" />
               </div>
               <h2 className="font-bold text-lg mb-2">Verification failed</h2>
-              <p className="text-sm text-white/40 mb-6">{message}</p>
-              <Link href="/"><Button variant="outline" className="border-white/10 text-white/50 hover:text-white">Go to Terminal</Button></Link>
+              <p className="text-sm text-foreground/40 mb-6">{message}</p>
+              <Link href="/"><Button variant="outline" className="border-foreground/10 text-foreground/50 hover:text-foreground">Go to Terminal</Button></Link>
             </>
           )}
         </div>

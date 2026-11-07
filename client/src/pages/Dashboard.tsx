@@ -139,7 +139,7 @@ export default function Dashboard() {
   }, [tabs.length, activeTabId, toast]);
 
   const handleExecuteTrade = useCallback(() => {
-    toast({ title: "Trade Executed", description: "AI trade opened and recorded.", className: "border-green-500/50" });
+    toast({ title: "Trade Executed", description: "AI trade opened and recorded.", className: "border-pos/50" });
   }, [toast]);
 
   const handleCancelTrade = useCallback(() => {
@@ -154,7 +154,7 @@ export default function Dashboard() {
       toast({
         title: "Position Closed",
         description: `${position.symbol} ${position.type.toUpperCase()} closed at ${closed?.currentPrice}. P/L: ${profit >= 0 ? "+" : ""}$${profit.toFixed(2)}`,
-        className: profit >= 0 ? "border-green-500/50" : "border-destructive/50",
+        className: profit >= 0 ? "border-pos/50" : "border-destructive/50",
       });
     } catch (e: any) {
       toast({ title: "Close failed", description: e.message, variant: "destructive" });
@@ -189,19 +189,19 @@ export default function Dashboard() {
       <div className="flex items-center gap-1.5">
         <Activity className="w-3.5 h-3.5 text-muted-foreground" />
         <span className="text-muted-foreground">{positions.length} open</span>
-        <span className={cn("font-bold", totalLivePL >= 0 ? "text-green-500" : "text-red-500")}>
+        <span className={cn("font-bold", totalLivePL >= 0 ? "text-pos" : "text-neg")}>
           {totalLivePL >= 0 ? "+" : ""}${totalLivePL.toFixed(2)}
         </span>
         <span className="text-muted-foreground/60">live P&L</span>
       </div>
       <div className="flex items-center gap-1" title={wsConnected ? "Live prices connected" : "Price feed disconnected"}>
         {wsConnected
-          ? <Wifi className="w-3 h-3 text-green-500" />
-          : <WifiOff className="w-3 h-3 text-red-400" />
+          ? <Wifi className="w-3 h-3 text-pos" />
+          : <WifiOff className="w-3 h-3 text-neg" />
         }
       </div>
       {brokerConnected && (
-        <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-green-500/10 text-green-400 border border-green-500/20 text-[10px] font-semibold">
+        <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-pos/10 text-pos border border-pos/20 text-[10px] font-semibold">
           {brokerType === "demo" ? "DEMO (paper)" : `${brokerType.toUpperCase()} connected`}
         </div>
       )}
@@ -217,7 +217,7 @@ export default function Dashboard() {
       <TableRow className="font-mono text-[11px] border-border/20 hover:bg-muted/30 transition-colors" data-testid={`position-row-${p.id}`}>
         <TableCell className="font-bold">{p.symbol}</TableCell>
         <TableCell>
-          <span className={cn("px-1.5 py-0.5 rounded font-bold text-[10px]", isBuy ? "text-green-500 bg-green-500/10" : "text-red-500 bg-red-500/10")}>
+          <span className={cn("px-1.5 py-0.5 rounded font-bold text-[10px]", isBuy ? "text-pos bg-pos/10" : "text-neg bg-neg/10")}>
             {isBuy ? "BUY" : "SELL"}
           </span>
         </TableCell>
@@ -226,15 +226,15 @@ export default function Dashboard() {
         <TableCell className="text-muted-foreground">
           {livePrice ? (isBuy ? livePrice.bid : livePrice.ask)?.toFixed(priceDecimals(p.symbol)) : "—"}
         </TableCell>
-        <TableCell className={cn("font-bold", lp >= 0 ? "text-green-500" : "text-red-500")}>
+        <TableCell className={cn("font-bold", lp >= 0 ? "text-pos" : "text-neg")}>
           {lp >= 0 ? "+" : ""}${lp.toFixed(2)}
         </TableCell>
-        <TableCell className="text-red-400">{p.stopLoss?.toFixed(priceDecimals(p.symbol)) || "—"}</TableCell>
-        <TableCell className="text-green-400">{p.takeProfit?.toFixed(priceDecimals(p.symbol)) || "—"}</TableCell>
+        <TableCell className="text-neg">{p.stopLoss?.toFixed(priceDecimals(p.symbol)) || "—"}</TableCell>
+        <TableCell className="text-pos">{p.takeProfit?.toFixed(priceDecimals(p.symbol)) || "—"}</TableCell>
         <TableCell>
           <Button
             size="sm" variant="outline"
-            className="h-6 text-[10px] px-2 border-destructive/30 text-destructive hover:bg-destructive hover:text-white"
+            className="h-6 text-[10px] px-2 border-destructive/30 text-destructive hover:bg-destructive hover:text-on-strong"
             onClick={() => handleClosePosition(p)}
             disabled={closePosition.isPending}
             data-testid={`close-position-${p.id}`}
@@ -271,23 +271,23 @@ export default function Dashboard() {
           <div className="flex-1 flex flex-col min-w-0 border-r border-border/50">
             {/* Chart Grid */}
             {gridMode === "1x1" ? (
-              <div className="flex-1 relative bg-[#131722] min-h-[280px]">
+              <div className="flex-1 relative bg-background min-h-[280px]">
                 <ChartPanel symbol={activeTab.symbol} />
                 <button onClick={handleGenerateSignal} disabled={generateSignal.isPending} className={cn("absolute top-3 right-3 z-10 text-[11px] font-bold px-3 py-1.5 rounded-md flex items-center gap-1.5 transition-all shadow-lg", generateSignal.isPending ? "bg-primary/60 text-primary-foreground cursor-wait" : "bg-primary/90 hover:bg-primary text-primary-foreground")} data-testid="generate-signal-btn">
-                  {generateSignal.isPending ? <><span className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Analyzing…</> : <><Zap className="w-3.5 h-3.5" /> Request AI Signal</>}
+                  {generateSignal.isPending ? <><span className="w-3 h-3 border-2 border-foreground/40 border-t-white rounded-full animate-spin" /> Analyzing…</> : <><Zap className="w-3.5 h-3.5" /> Request AI Signal</>}
                 </button>
               </div>
             ) : (
               <div className={cn("flex-1 min-h-[280px]", gridMode === "2x1" && "grid grid-cols-2", gridMode === "1x2" && "flex flex-col", gridMode === "2x2" && "grid grid-cols-2")}>
                 {/* Slot 1 — active tab symbol */}
-                <div className="relative bg-[#131722] min-h-[140px]">
+                <div className="relative bg-background min-h-[140px]">
                   <ChartPanel symbol={activeTab.symbol} />
                   <button onClick={handleGenerateSignal} disabled={generateSignal.isPending} className={cn("absolute top-2 right-2 z-10 text-[10px] font-bold px-2.5 py-1 rounded-md flex items-center gap-1 shadow-lg", generateSignal.isPending ? "bg-primary/60 text-primary-foreground cursor-wait" : "bg-primary/90 hover:bg-primary text-primary-foreground")} data-testid="generate-signal-btn">
-                    {generateSignal.isPending ? <><span className="w-2.5 h-2.5 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Analyzing…</> : <><Zap className="w-3 h-3" /> AI Signal</>}
+                    {generateSignal.isPending ? <><span className="w-2.5 h-2.5 border-2 border-foreground/40 border-t-white rounded-full animate-spin" /> Analyzing…</> : <><Zap className="w-3 h-3" /> AI Signal</>}
                   </button>
                 </div>
                 {/* Slot 2 */}
-                <div className={cn("relative bg-[#131722] min-h-[140px]", gridMode === "1x2" ? "border-t" : "border-l", "border-border/40")}>
+                <div className={cn("relative bg-background min-h-[140px]", gridMode === "1x2" ? "border-t" : "border-l", "border-border/40")}>
                   <ChartPanel symbol={gridSymbols[0]} />
                   <select value={gridSymbols[0]} onChange={e => setGridSymbols(p => [e.target.value, p[1], p[2]])} className="absolute top-2 left-2 z-10 bg-background/80 text-xs font-mono px-2 py-1 rounded border border-border/50 backdrop-blur-sm cursor-pointer">
                     {GRID_PAIRS.map(p => <option key={p} value={p}>{p}</option>)}
@@ -295,13 +295,13 @@ export default function Dashboard() {
                 </div>
                 {/* Slots 3 & 4 (2x2 only) */}
                 {gridMode === "2x2" && (<>
-                  <div className="relative bg-[#131722] min-h-[140px] border-t border-border/40">
+                  <div className="relative bg-background min-h-[140px] border-t border-border/40">
                     <ChartPanel symbol={gridSymbols[1]} />
                     <select value={gridSymbols[1]} onChange={e => setGridSymbols(p => [p[0], e.target.value, p[2]])} className="absolute top-2 left-2 z-10 bg-background/80 text-xs font-mono px-2 py-1 rounded border border-border/50 backdrop-blur-sm cursor-pointer">
                       {GRID_PAIRS.map(p => <option key={p} value={p}>{p}</option>)}
                     </select>
                   </div>
-                  <div className="relative bg-[#131722] min-h-[140px] border-l border-t border-border/40">
+                  <div className="relative bg-background min-h-[140px] border-l border-t border-border/40">
                     <ChartPanel symbol={gridSymbols[2]} />
                     <select value={gridSymbols[2]} onChange={e => setGridSymbols(p => [p[0], p[1], e.target.value])} className="absolute top-2 left-2 z-10 bg-background/80 text-xs font-mono px-2 py-1 rounded border border-border/50 backdrop-blur-sm cursor-pointer">
                       {GRID_PAIRS.map(p => <option key={p} value={p}>{p}</option>)}
@@ -396,11 +396,11 @@ export default function Dashboard() {
                         {history.slice(0, 30).map((p: Position) => (
                           <TableRow key={p.id} className="font-mono text-[11px] border-border/20 hover:bg-muted/30">
                             <TableCell className="font-bold">{p.symbol}</TableCell>
-                            <TableCell><span className={cn("font-bold", p.type === "BUY" || p.type === "buy" ? "text-green-500" : "text-red-500")}>{p.type.toUpperCase()}</span></TableCell>
+                            <TableCell><span className={cn("font-bold", p.type === "BUY" || p.type === "buy" ? "text-pos" : "text-neg")}>{p.type.toUpperCase()}</span></TableCell>
                             <TableCell>{(p.size ?? 0).toFixed(2)}</TableCell>
                             <TableCell>{(p.entryPrice ?? 0).toFixed(priceDecimals(p.symbol))}</TableCell>
                             <TableCell className="text-muted-foreground">{p.closedAt ? format(new Date(p.closedAt), "MM/dd HH:mm") : "—"}</TableCell>
-                            <TableCell className={cn("font-bold", (p.profit ?? 0) >= 0 ? "text-green-500" : "text-red-500")}>
+                            <TableCell className={cn("font-bold", (p.profit ?? 0) >= 0 ? "text-pos" : "text-neg")}>
                               {(p.profit ?? 0) >= 0 ? "+" : ""}${(p.profit ?? 0).toFixed(2)}
                             </TableCell>
                           </TableRow>
@@ -435,7 +435,7 @@ export default function Dashboard() {
         <div className="flex-1 flex flex-col md:hidden overflow-hidden">
 
           {/* Chart */}
-          <div className={cn("flex-1 relative bg-[#131722]", mobileView !== "chart" && "hidden")}>
+          <div className={cn("flex-1 relative bg-background", mobileView !== "chart" && "hidden")}>
             <ChartPanel symbol={activeTab.symbol} />
             <div className="absolute top-3 right-3 z-10 flex gap-2">
               <button
@@ -445,7 +445,7 @@ export default function Dashboard() {
                 data-testid="mobile-generate-signal-btn"
               >
                 {generateSignal.isPending
-                  ? <><span className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Analyzing…</>
+                  ? <><span className="w-3 h-3 border-2 border-foreground/40 border-t-white rounded-full animate-spin" /> Analyzing…</>
                   : <><Zap className="w-3.5 h-3.5" /> AI Signal</>
                 }
               </button>
@@ -454,7 +454,7 @@ export default function Dashboard() {
             {(positions.length > 0 || accountBalance) && (
               <div className="absolute bottom-0 left-0 right-0 bg-background/85 backdrop-blur-sm border-t border-border/50 px-4 py-2 flex items-center justify-between text-xs font-mono">
                 <span className="text-muted-foreground flex items-center gap-1.5">
-                  {wsConnected ? <Wifi className="w-3 h-3 text-green-500" /> : <WifiOff className="w-3 h-3 text-red-400" />}
+                  {wsConnected ? <Wifi className="w-3 h-3 text-pos" /> : <WifiOff className="w-3 h-3 text-neg" />}
                   {positions.length} open
                 </span>
                 <div className="flex items-center gap-3">
@@ -464,7 +464,7 @@ export default function Dashboard() {
                       <ScrollText className="w-3 h-3" />
                     </button>
                   )}
-                  <span className={cn("font-bold", totalLivePL >= 0 ? "text-green-500" : "text-red-500")}>
+                  <span className={cn("font-bold", totalLivePL >= 0 ? "text-pos" : "text-neg")}>
                     P&L: {totalLivePL >= 0 ? "+" : ""}${totalLivePL.toFixed(2)}
                   </span>
                 </div>
@@ -479,7 +479,7 @@ export default function Dashboard() {
                 <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                   Open Positions ({positions.length})
                 </span>
-                <span className={cn("text-xs font-mono font-bold", totalLivePL >= 0 ? "text-green-500" : "text-red-500")}>
+                <span className={cn("text-xs font-mono font-bold", totalLivePL >= 0 ? "text-pos" : "text-neg")}>
                   {totalLivePL >= 0 ? "+" : ""}${totalLivePL.toFixed(2)}
                 </span>
               </div>
@@ -501,7 +501,7 @@ export default function Dashboard() {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-0.5">
                               <span className="font-mono font-bold text-sm">{p.symbol}</span>
-                              <span className={cn("text-[10px] font-bold px-1.5 py-0.5 rounded", isBuy ? "text-green-500 bg-green-500/10" : "text-red-500 bg-red-500/10")}>
+                              <span className={cn("text-[10px] font-bold px-1.5 py-0.5 rounded", isBuy ? "text-pos bg-pos/10" : "text-neg bg-neg/10")}>
                                 {isBuy ? "BUY" : "SELL"}
                               </span>
                               {p.aiSignal && <span className="text-[10px] px-1 py-0.5 rounded bg-primary/10 text-primary font-mono">AI</span>}
@@ -515,17 +515,17 @@ export default function Dashboard() {
                               </div>
                             )}
                             <div className="text-[10px] font-mono mt-0.5 flex gap-2">
-                              <span className="text-red-400">SL: {p.stopLoss?.toFixed(priceDecimals(p.symbol)) || "—"}</span>
-                              <span className="text-green-400">TP: {p.takeProfit?.toFixed(priceDecimals(p.symbol)) || "—"}</span>
+                              <span className="text-neg">SL: {p.stopLoss?.toFixed(priceDecimals(p.symbol)) || "—"}</span>
+                              <span className="text-pos">TP: {p.takeProfit?.toFixed(priceDecimals(p.symbol)) || "—"}</span>
                             </div>
                           </div>
                           <div className="flex flex-col items-end gap-2 shrink-0">
-                            <span className={cn("font-mono font-bold text-sm", lp >= 0 ? "text-green-500" : "text-red-500")}>
+                            <span className={cn("font-mono font-bold text-sm", lp >= 0 ? "text-pos" : "text-neg")}>
                               {lp >= 0 ? "+" : ""}${lp.toFixed(2)}
                             </span>
                             <Button
                               size="sm" variant="outline"
-                              className="h-7 text-[10px] px-2 border-destructive/30 text-destructive hover:bg-destructive hover:text-white"
+                              className="h-7 text-[10px] px-2 border-destructive/30 text-destructive hover:bg-destructive hover:text-on-strong"
                               onClick={() => handleClosePosition(p)}
                               disabled={closePosition.isPending}
                               data-testid={`mobile-close-${p.id}`}
@@ -604,9 +604,9 @@ export default function Dashboard() {
                 <div className="px-5 py-4 grid grid-cols-2 sm:grid-cols-4 gap-3 border-b border-border/50 shrink-0">
                   {[
                     { label: "Balance", value: `$${Number(accountBalance ?? 10000).toLocaleString()}`, icon: DollarSign, color: "text-foreground" },
-                    { label: "Equity", value: `$${equity.toLocaleString("en-US", { maximumFractionDigits: 0 })}`, icon: Activity, color: equity >= startBalance ? "text-green-400" : "text-red-400" },
-                    { label: "Realized P&L", value: `${totalRealized >= 0 ? "+" : ""}$${totalRealized.toFixed(2)}`, icon: totalRealized >= 0 ? Trophy : Target, color: totalRealized >= 0 ? "text-green-400" : "text-red-400" },
-                    { label: "Win Rate", value: `${winRate}%  (${wins.length}W/${losses.length}L)`, icon: Clock, color: winRate >= 50 ? "text-green-400" : "text-yellow-400" },
+                    { label: "Equity", value: `$${equity.toLocaleString("en-US", { maximumFractionDigits: 0 })}`, icon: Activity, color: equity >= startBalance ? "text-pos" : "text-neg" },
+                    { label: "Realized P&L", value: `${totalRealized >= 0 ? "+" : ""}$${totalRealized.toFixed(2)}`, icon: totalRealized >= 0 ? Trophy : Target, color: totalRealized >= 0 ? "text-pos" : "text-neg" },
+                    { label: "Win Rate", value: `${winRate}%  (${wins.length}W/${losses.length}L)`, icon: Clock, color: winRate >= 50 ? "text-pos" : "text-warn" },
                   ].map(({ label, value, icon: Icon, color }) => (
                     <div key={label} className="bg-muted/20 rounded-xl p-3">
                       <div className="flex items-center gap-1.5 text-muted-foreground text-[10px] font-medium uppercase tracking-wide mb-1">
@@ -623,7 +623,7 @@ export default function Dashboard() {
                   {positions.length > 0 && (
                     <div className="px-5 py-3">
                       <div className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground mb-2 flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                        <span className="w-1.5 h-1.5 rounded-full bg-pos animate-pulse" />
                         Open Positions ({positions.length})
                       </div>
                       <div className="space-y-1.5">
@@ -634,18 +634,18 @@ export default function Dashboard() {
                             <div key={pos.id} data-testid={`ledger-open-${pos.id}`} className="flex items-center justify-between bg-muted/15 rounded-lg px-3 py-2 text-xs font-mono">
                               <div className="flex items-center gap-2">
                                 {pos.type?.toUpperCase().includes("BUY")
-                                  ? <ArrowUpRight className="w-3.5 h-3.5 text-green-400" />
-                                  : <ArrowDownRight className="w-3.5 h-3.5 text-red-400" />
+                                  ? <ArrowUpRight className="w-3.5 h-3.5 text-pos" />
+                                  : <ArrowDownRight className="w-3.5 h-3.5 text-neg" />
                                 }
                                 <span className="font-semibold">{pos.symbol}</span>
-                                <span className={cn("text-[10px] px-1.5 py-0.5 rounded font-bold", pos.type?.toUpperCase().includes("BUY") ? "bg-green-500/15 text-green-400" : "bg-red-500/15 text-red-400")}>
+                                <span className={cn("text-[10px] px-1.5 py-0.5 rounded font-bold", pos.type?.toUpperCase().includes("BUY") ? "bg-pos/15 text-pos" : "bg-neg/15 text-neg")}>
                                   {pos.type?.toUpperCase()}
                                 </span>
                                 <span className="text-muted-foreground">{pos.size} lot{(pos.size ?? 1) !== 1 ? "s" : ""}</span>
                               </div>
                               <div className="flex items-center gap-3 text-right">
                                 <span className="text-muted-foreground">@ {pos.entryPrice}</span>
-                                <span className={cn("font-bold", isPositive ? "text-green-400" : "text-red-400")}>
+                                <span className={cn("font-bold", isPositive ? "text-pos" : "text-neg")}>
                                   {isPositive ? "+" : ""}${livePL.toFixed(2)}
                                 </span>
                               </div>
@@ -672,8 +672,8 @@ export default function Dashboard() {
                             <div key={pos.id ?? idx} data-testid={`ledger-closed-${pos.id}`} className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-muted/15 transition-colors text-xs font-mono border-b border-border/20 last:border-0">
                               <div className="flex items-center gap-2 min-w-0">
                                 {pos.type?.toUpperCase().includes("BUY")
-                                  ? <ArrowUpRight className="w-3 h-3 text-green-400 shrink-0" />
-                                  : <ArrowDownRight className="w-3 h-3 text-red-400 shrink-0" />
+                                  ? <ArrowUpRight className="w-3 h-3 text-pos shrink-0" />
+                                  : <ArrowDownRight className="w-3 h-3 text-neg shrink-0" />
                                 }
                                 <span className="font-semibold">{pos.symbol}</span>
                                 <span className="text-muted-foreground text-[10px] hidden sm:inline">
@@ -682,10 +682,10 @@ export default function Dashboard() {
                               </div>
                               <div className="flex items-center gap-3 shrink-0">
                                 <span className="text-muted-foreground text-[10px]">{pos.size}L</span>
-                                <span className={cn("font-bold w-20 text-right", isWin ? "text-green-400" : "text-red-400")}>
+                                <span className={cn("font-bold w-20 text-right", isWin ? "text-pos" : "text-neg")}>
                                   {isWin ? "+" : ""}${Math.abs(pl).toFixed(2)}
                                 </span>
-                                <span className={cn("text-[10px] w-6 text-center font-bold", isWin ? "text-green-400" : "text-red-400")}>
+                                <span className={cn("text-[10px] w-6 text-center font-bold", isWin ? "text-pos" : "text-neg")}>
                                   {isWin ? "W" : "L"}
                                 </span>
                               </div>

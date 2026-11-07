@@ -68,7 +68,7 @@ export function OrderPanel() {
               <span className="font-bold text-sm">SELL</span>
               <span className="text-xs font-mono opacity-80">1.08410</span>
             </Button>
-            <Button className="bg-green-600 hover:bg-green-700 text-white h-12 flex flex-col items-center justify-center gap-0">
+            <Button className="bg-pos hover:bg-pos text-on-strong h-12 flex flex-col items-center justify-center gap-0">
               <span className="font-bold text-sm">BUY</span>
               <span className="text-xs font-mono opacity-80">1.08520</span>
             </Button>
@@ -81,7 +81,7 @@ export function OrderPanel() {
         <div className="flex items-center gap-2">
           <div className="flex-1 bg-muted/30 p-2 rounded border border-border border-dashed text-center">
              <span className="text-xs text-muted-foreground">AI Auto-Trading</span>
-             <div className="text-green-500 font-bold text-sm">ACTIVE</div>
+             <div className="text-pos font-bold text-sm">ACTIVE</div>
           </div>
         </div>
       </div>

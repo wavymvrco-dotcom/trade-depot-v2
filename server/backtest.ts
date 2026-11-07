@@ -7,10 +7,11 @@
 
 import { ema, rsi, atr, type Candle } from "./indicators";
 import { calcProfit, getSymbolConfig, priceDecimals } from "@shared/pips";
+import { getCandles } from "./lab/service/data";
+import { dropClosedBars } from "@shared/sessions";
 
 export type { Candle } from "./indicators";
 
-const TWELVE_BASE = "https://api.twelvedata.com";
 
 export interface BacktestTrade {
   index: number;
@@ -66,32 +67,9 @@ export interface BacktestResult {
   trades: BacktestTrade[];
 }
 
-function toTwelveSymbol(symbol: string) {
-  if (symbol === "XAUUSD") return "XAU/USD";
-  if (symbol === "XAGUSD") return "XAG/USD";
-  return symbol.slice(0, 3) + "/" + symbol.slice(3);
-}
-
-// ─── Twelve Data access: shared rate limit + cache ───────────────────────────
-// The free plan allows 8 requests/minute. Every candle request in the app goes
-// through here, so concurrent features queue instead of tripping the limit.
-
-const RATE_PER_MIN = Number(process.env.TWELVE_DATA_RATE_PER_MIN) || 8;
-const requestTimes: number[] = [];
-let queue: Promise<void> = Promise.resolve();
-
-function rateSlot(): Promise<void> {
-  const next = queue.then(async () => {
-    for (;;) {
-      const now = Date.now();
-      while (requestTimes.length && now - requestTimes[0] > 60_000) requestTimes.shift();
-      if (requestTimes.length < RATE_PER_MIN) { requestTimes.push(now); return; }
-      await new Promise(r => setTimeout(r, 60_000 - (now - requestTimes[0]) + 250));
-    }
-  });
-  queue = next.catch(() => {});
-  return next;
-}
+// ─── Candles: short in-memory cache in front of the Postgres candle cache ────
+// Postgres (server/lab/service/data.ts) holds every bar ever fetched and makes
+// the provider requests under a rate limit shared by all processes.
 
 /** How long a fetched series stays fresh — roughly a fraction of one bar. */
 function ttlFor(interval: string) {
@@ -104,36 +82,7 @@ function ttlFor(interval: string) {
 const candleCache = new Map<string, { at: number; size: number; data: Candle[] }>();
 const inflight = new Map<string, Promise<Candle[]>>();
 
-const PAGE = 5000; // Twelve Data's per-request maximum
-
-/** One request: up to 5000 bars ending at `endDate` (exclusive of nothing; inclusive end). */
-async function fetchPage(symbol: string, interval: string, outputsize: number, apiKey: string, endDate?: string): Promise<Candle[]> {
-  await rateSlot();
-  const end = endDate ? `&end_date=${encodeURIComponent(endDate)}` : "";
-  const url = `${TWELVE_BASE}/time_series?symbol=${encodeURIComponent(toTwelveSymbol(symbol))}&interval=${encodeURIComponent(interval)}&outputsize=${outputsize}&timezone=UTC&apikey=${encodeURIComponent(apiKey)}&order=ASC${end}`;
-  const res = await fetch(url, { signal: AbortSignal.timeout(30_000) });
-  if (!res.ok) throw new Error(`Candle fetch failed: HTTP ${res.status}`);
-  const data = await res.json() as any;
-  if (data.status === "error") {
-    // "No data" before the start of available history ends paging cleanly
-    if (/no data/i.test(String(data.message))) return [];
-    throw new Error(`Candle fetch failed: ${data.message || "Twelve Data error"}`);
-  }
-  const values = (data.values as any[]) ?? [];
-  return values.map((v: any) => ({
-    time: v.datetime,
-    open: parseFloat(v.open),
-    high: parseFloat(v.high),
-    low: parseFloat(v.low),
-    close: parseFloat(v.close),
-    volume: v.volume ? parseFloat(v.volume) : undefined,
-  }));
-}
-
-/**
- * Fetch `outputsize` bars, paging backward in 5000-bar requests when more
- * history is needed than one request returns. Shared cache and rate limit.
- */
+/** Latest `outputsize` bars. Served from memory while fresh, else from the candle cache + only the missing bars. */
 export async function fetchCandles(symbol: string, interval: string, outputsize: number, apiKey: string): Promise<Candle[]> {
   const key = `${symbol}:${interval}`;
   const cached = candleCache.get(key);
@@ -145,20 +94,14 @@ export async function fetchCandles(symbol: string, interval: string, outputsize:
   const pending = inflight.get(flightKey);
   if (pending) return pending;
 
-  const p = (async () => {
-    let candles = await fetchPage(symbol, interval, Math.min(PAGE, outputsize), apiKey);
-    if (!candles.length) throw new Error("Candle fetch failed: no data returned");
-    while (candles.length < outputsize) {
-      // Next page ends just before the oldest bar we have
-      const oldest = candles[0].time;
-      const older = await fetchPage(symbol, interval, Math.min(PAGE, outputsize - candles.length + 1), apiKey, oldest);
-      const fresh = older.filter(c => c.time < oldest);
-      if (!fresh.length) break; // reached the start of available history
-      candles = [...fresh, ...candles];
-    }
+  // Some feeds quote FX through the weekend. Those bars are not tradeable, so they are dropped
+  // (shared/sessions.ts); ask for enough raw bars that `outputsize` remain afterwards.
+  const raw = Math.ceil(outputsize * 1.45);
+  const p = getCandles(symbol, interval, raw, apiKey).then(all => {
+    const candles = dropClosedBars(symbol, interval, all).slice(-outputsize);
     candleCache.set(key, { at: Date.now(), size: outputsize, data: candles });
     return candles;
-  })();
+  });
   inflight.set(flightKey, p);
   try { return await p; } finally { inflight.delete(flightKey); }
 }

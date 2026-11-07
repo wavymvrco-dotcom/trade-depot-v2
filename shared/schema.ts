@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, real, boolean, timestamp, index, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, real, boolean, timestamp, index, jsonb, doublePrecision, primaryKey, date, bigint, bigserial, uniqueIndex, customType } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -66,7 +66,9 @@ export const positions = pgTable("positions", {
   aiSignal: boolean("ai_signal").notNull().default(false),
   brokerTradeId: text("broker_trade_id"),
   signalId: varchar("signal_id"),
-}, (t) => [index("positions_user_status_idx").on(t.userId, t.status)]);
+  licenseId: varchar("license_id"), // Strategy Lab license that opened this position (live trades)
+  riskAmount: real("risk_amount"),  // account currency at risk at the stop when opened (for R-multiples)
+}, (t) => [index("positions_user_status_idx").on(t.userId, t.status), index("positions_license_idx").on(t.licenseId)]);
 
 export const insertPositionSchema = createInsertSchema(positions).omit({
   id: true,
@@ -169,6 +171,10 @@ export const userSettings = pgTable("user_settings", {
   offHoursBehavior: text("off_hours_behavior").default("pause"),
   offHoursRiskReduction: integer("off_hours_risk_reduction").default(50),
   tdciMinScore: integer("tdci_min_score").default(60), // auto-trade only at or above this TDCI
+  labTier: text("lab_tier").notNull().default("free"),         // free | pro (Strategy Lab limits)
+  labCreditsUsed: integer("lab_credits_used").notNull().default(0),
+  labCreditsMonth: text("lab_credits_month"),                  // YYYY-MM the credit count belongs to
+  contributeExecutionData: boolean("contribute_execution_data").notNull().default(true), // Mirror (Phase 2)
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
@@ -384,3 +390,250 @@ export const tdciCalibrations = pgTable("tdci_calibrations", {
   createdAt: timestamp("created_at").defaultNow(),
 }, (t) => [index("tdci_calibrations_symbol_interval_idx").on(t.symbol, t.interval, t.createdAt)]);
 export type TdciCalibration = typeof tdciCalibrations.$inferSelect;
+
+// ─── Market data cache (shared by all users) ──────────────────────────────────
+// Every candle the app has fetched, so the same history is never requested
+// twice. `time` keeps Twelve Data's UTC string ("YYYY-MM-DD HH:MM:SS", or
+// "YYYY-MM-DD" for daily+) so cached bars are byte-identical to fetched ones.
+export const candleCache = pgTable("candle_cache", {
+  symbol: text("symbol").notNull(),
+  interval: text("interval").notNull(),
+  time: text("time").notNull(),
+  open: doublePrecision("open").notNull(),
+  high: doublePrecision("high").notNull(),
+  low: doublePrecision("low").notNull(),
+  close: doublePrecision("close").notNull(),
+  volume: doublePrecision("volume"),
+}, (t) => [primaryKey({ columns: [t.symbol, t.interval, t.time] })]);
+
+// One row per external market-data request; drives the cross-process rate limit.
+export const externalCalls = pgTable("external_calls", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  provider: text("provider").notNull(),
+  at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index("external_calls_provider_at_idx").on(t.provider, t.at)]);
+
+// Daily totals for the Admin page: requests made and cache effectiveness.
+export const apiUsage = pgTable("api_usage", {
+  day: date("day").notNull(),
+  provider: text("provider").notNull(),
+  calls: integer("calls").notNull().default(0),
+  cachedBars: bigint("cached_bars", { mode: "number" }).notNull().default(0),
+  fetchedBars: bigint("fetched_bars", { mode: "number" }).notNull().default(0),
+}, (t) => [primaryKey({ columns: [t.day, t.provider] })]);
+
+// ─── Strategy Lab (Phase 1) ───────────────────────────────────────────────────
+// JSON columns are validated with the zod schemas in shared/lab-schemas.ts.
+
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({ dataType: () => "bytea" });
+
+/** Shared, precomputed layer matrices per (symbol, style, data version, TDCI version). */
+export const envCache = pgTable("env_cache", {
+  symbol: text("symbol").notNull(),
+  style: text("style").notNull(),
+  dataVersion: text("data_version").notNull(),
+  tdciVersion: integer("tdci_version").notNull(),
+  payload: bytea("payload").notNull(),
+  builtAt: timestamp("built_at").notNull().defaultNow(),
+}, (t) => [primaryKey({ columns: [t.symbol, t.style, t.dataVersion, t.tdciVersion] })]);
+
+export const blueprints = pgTable("blueprints", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  name: text("name").notNull(),
+  prompt: text("prompt"),
+  spec: jsonb("spec").notNull(),
+  specVersion: integer("spec_version").notNull().default(1),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => [index("blueprints_user_idx").on(t.userId, t.createdAt)]);
+
+export const labRuns = pgTable("lab_runs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  blueprintId: varchar("blueprint_id").notNull(),
+  style: text("style").notNull(),
+  symbols: jsonb("symbols").notNull(),
+  config: jsonb("config").notNull(),
+  seed: integer("seed").notNull(),
+  status: text("status").notNull().default("queued"), // queued | running | done | failed | cancelled
+  cancelRequested: boolean("cancel_requested").notNull().default(false),
+  progress: jsonb("progress"),
+  result: jsonb("result"),
+  trials: integer("trials").notNull().default(0),
+  error: text("error"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  startedAt: timestamp("started_at"),
+  finishedAt: timestamp("finished_at"),
+}, (t) => [index("lab_runs_user_idx").on(t.userId, t.createdAt), index("lab_runs_status_idx").on(t.status)]);
+
+/** One row per examined (run, champion). Its existence is the "vault opened" record (invariant 2). */
+export const vaultOpenings = pgTable("vault_openings", {
+  runId: varchar("run_id").notNull(),
+  genomeHash: text("genome_hash").notNull(),
+  vaultHash: text("vault_hash").notNull(),
+  openedAt: timestamp("opened_at").notNull().defaultNow(),
+}, (t) => [primaryKey({ columns: [t.runId, t.genomeHash] })]);
+
+export const strategyLicenses = pgTable("strategy_licenses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  runId: varchar("run_id"),
+  kind: text("kind").notNull().default("lab"),    // lab | ai_signals
+  name: text("name").notNull(),
+  style: text("style").notNull(),
+  symbols: jsonb("symbols").notNull(),             // shadow/live symbols (up to 3 best vault pairs)
+  genome: jsonb("genome").notNull(),
+  genomeHash: text("genome_hash").notNull(),
+  layers: jsonb("layers").notNull(),               // layer keys, in genome weight order
+  grade: text("grade").notNull(),                  // licensed | probation | scrapped
+  stage: text("stage").notNull(),                  // vault | shadow | live | retired
+  vault: jsonb("vault"),                           // immutable Vault Exam report
+  evidence: jsonb("evidence"),                     // latest Shadow / Tripwire evidence
+  vaultHash: text("vault_hash"),
+  incumbentId: varchar("incumbent_id"),
+  shadowStartedAt: timestamp("shadow_started_at"),
+  liveSince: timestamp("live_since"),
+  publicSlug: text("public_slug"),                 // License Page (opt-in); null = not shared
+  publicName: text("public_name"),                 // optional display name shown on the page (otherwise anonymous)
+  publicSince: timestamp("public_since"),
+  storm: jsonb("storm"),                           // Storm Mode verdict (pass/fail only; never affects the grade)
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (t) => [
+  index("strategy_licenses_user_idx").on(t.userId, t.stage),
+  uniqueIndex("strategy_licenses_run_genome_uq").on(t.runId, t.genomeHash),
+  uniqueIndex("strategy_licenses_public_slug_uq").on(t.publicSlug),
+]);
+
+/** Immutable audit log of every grade/stage change. */
+export const licenseEvents = pgTable("license_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  licenseId: varchar("license_id").notNull(),
+  fromGrade: text("from_grade"), fromStage: text("from_stage"),
+  toGrade: text("to_grade").notNull(), toStage: text("to_stage").notNull(),
+  reason: text("reason").notNull(),
+  data: jsonb("data"),
+  at: timestamp("at").notNull().defaultNow(),
+}, (t) => [index("license_events_license_idx").on(t.licenseId, t.at)]);
+
+/** Shadow Run decisions, written at decision time (append-only; exits filled in when they happen). */
+export const shadowTrades = pgTable("shadow_trades", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  licenseId: varchar("license_id").notNull(),
+  symbol: text("symbol").notNull(),
+  side: text("side"),                     // LONG | SHORT | null when the candidate stayed flat
+  signalTime: text("signal_time").notNull(),
+  score: integer("score"),
+  entry: doublePrecision("entry"), sl: doublePrecision("sl"), tp: doublePrecision("tp"),
+  exit: doublePrecision("exit"), exitTime: text("exit_time"),
+  r: doublePrecision("r"),
+  status: text("status").notNull(),      // pending | open | closed | flat
+  incumbentAction: text("incumbent_action").notNull(), // LONG | SHORT | FLAT
+  incumbentR: doublePrecision("incumbent_r"),
+  attribution: jsonb("attribution"),
+  decidedAt: timestamp("decided_at").notNull().defaultNow(),
+}, (t) => [
+  index("shadow_trades_license_idx").on(t.licenseId, t.signalTime),
+  uniqueIndex("shadow_trades_decision_uq").on(t.licenseId, t.symbol, t.signalTime),
+]);
+
+// ─── Mirror (Phase 2): execution digital twin ─────────────────────────────────
+
+/** One row per real order fill (open or close). Written fire-and-forget; never blocks an order. */
+export const executionFills = pgTable("execution_fills", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  positionId: varchar("position_id"),
+  kind: text("kind").notNull(),                 // open | close
+  broker: text("broker").notNull(),             // demo | oanda | mt5
+  symbol: text("symbol").notNull(),
+  side: text("side").notNull(),                 // BUY | SELL (the order's side)
+  quoteBid: doublePrecision("quote_bid"),
+  quoteAsk: doublePrecision("quote_ask"),
+  requestedAt: timestamp("requested_at").notNull(),
+  filledAt: timestamp("filled_at").notNull(),
+  fillPrice: doublePrecision("fill_price"),
+  latencyMs: integer("latency_ms"),
+  newsWithinMin: integer("news_within_min"),    // minutes to the nearest high-impact event if within 30, else null
+  contribute: boolean("contribute").notNull().default(true), // user's Mirror opt-in at the time
+}, (t) => [index("execution_fills_model_idx").on(t.broker, t.symbol, t.filledAt)]);
+
+/** Fitted cost distributions per (broker, symbol, 4-hour UTC bucket, news flag), pooled and anonymized. */
+export const mirrorModels = pgTable("mirror_models", {
+  broker: text("broker").notNull(),
+  symbol: text("symbol").notNull(),
+  hourBucket: integer("hour_bucket").notNull(),  // 0..5 → 00–04, 04–08, … UTC
+  news: boolean("news").notNull(),
+  n: integer("n").notNull(),
+  spread: jsonb("spread").notNull(),             // { p10, p50, p90, p99 } in pips, shrunk toward the prior
+  slippage: jsonb("slippage").notNull(),         // same, signed against the trader
+  fittedAt: timestamp("fitted_at").notNull().defaultNow(),
+}, (t) => [primaryKey({ columns: [t.broker, t.symbol, t.hourBucket, t.news] })]);
+
+// ─── Forge (Phase 3): layers invented as DSL programs ─────────────────────────
+/** Every layer program ever tested (accepted or not): the MAP-Elites archive and the layerTrials count. */
+export const forgeLayers = pgTable("forge_layers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  authorType: text("author_type").notNull(),     // forge | user (Layer Kit submission)
+  authorId: varchar("author_id"),                // user who ran the Forge job or submitted it
+  style: text("style").notNull(),                // layers are judged per TDCI style (timeframe)
+  dsl: jsonb("dsl").notNull(),                   // validated JSON AST
+  text: text("text").notNull(),                  // printed form, for dedupe and display
+  niche: text("niche").notNull(),                // family:timeframe
+  status: text("status").notNull(),              // accepted | rejected
+  score: doublePrecision("score").notNull(),
+  stats: jsonb("stats").notNull(),               // acceptance result
+  novelty: doublePrecision("novelty"),           // 1 − max |ρ| with existing layers
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => [index("forge_layers_style_idx").on(t.style, t.status), uniqueIndex("forge_layers_style_text_uq").on(t.style, t.text)]);
+
+// ─── Playbook (Phase 3): Licensed strategies as reusable skills (per user) ────
+export const playbookSkills = pgTable("playbook_skills", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  licenseId: varchar("license_id").notNull(),
+  name: text("name").notNull(),
+  style: text("style").notNull(),
+  layers: jsonb("layers").notNull(),             // layer keys in weight order (skills only seed runs with the same layers)
+  genome: jsonb("genome").notNull(),
+  regimeTags: jsonb("regime_tags").notNull(),    // regimes where its Vault result was positive
+  stats: jsonb("stats").notNull(),
+  provenance: jsonb("provenance").notNull(),     // run, vault hash, dates
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => [index("playbook_skills_user_idx").on(t.userId, t.style), uniqueIndex("playbook_skills_license_uq").on(t.licenseId)]);
+
+// ─── Hive (Phase 3): per-bar probability predictions of Licensed strategies ───
+export const hivePredictions = pgTable("hive_predictions", {
+  licenseId: varchar("license_id").notNull(),
+  symbol: text("symbol").notNull(),
+  style: text("style").notNull(),
+  barTime: text("bar_time").notNull(),
+  p: doublePrecision("p").notNull(),             // P(close in icHorizon bars > close now), from its Vault calibration
+  horizon: integer("horizon").notNull(),
+  up: boolean("up"),                             // filled when the horizon has passed
+  logScore: doublePrecision("log_score"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => [primaryKey({ columns: [t.licenseId, t.symbol, t.barTime] }), index("hive_predictions_symbol_idx").on(t.symbol, t.barTime)]);
+
+// ─── Proof of Process (Phase 3, §11.10): append-only hash chains and daily seals ───
+export const proofEntries = pgTable("proof_entries", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),  // global order: leaves of the day's Merkle tree
+  subject: text("subject").notNull(),            // "run:<id>" or "license:<id>"
+  seq: integer("seq").notNull(),
+  kind: text("kind").notNull(),                  // vault_commit | born | event | decision | outcome
+  body: text("body").notNull(),                  // canonical JSON, exactly as hashed
+  prevHash: text("prev_hash").notNull(),
+  hash: text("hash").notNull(),
+  day: text("day").notNull(),                    // UTC YYYY-MM-DD
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => [uniqueIndex("proof_entries_subject_seq_uq").on(t.subject, t.seq), index("proof_entries_day_idx").on(t.day, t.id), uniqueIndex("proof_entries_hash_uq").on(t.hash)]);
+
+export const proofRoots = pgTable("proof_roots", {
+  day: text("day").primaryKey(),
+  count: integer("count").notNull(),
+  root: text("root").notNull(),
+  file: text("file").notNull(),                  // the text whose SHA-256 is timestamped
+  ots: text("ots"),                              // base64 .ots (OpenTimestamps), when anchoring is on
+  anchoredAt: timestamp("anchored_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});

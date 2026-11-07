@@ -1,11 +1,11 @@
 {
-  "name": "TradeAI Terminal",
-  "short_name": "TradeAI",
-  "description": "Autonomous AI trading terminal with live signals, analytics, and multi-broker execution.",
+  "name": "Trade Depot",
+  "short_name": "Trade Depot",
+  "description": "Self-directed strategy testing and trading terminal.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0a0a0f",
-  "theme_color": "#00d4ff",
+  "background_color": "#F4EFE6",
+  "theme_color": "#F4EFE6",
   "orientation": "any",
   "icons": [
     {
@@ -21,6 +21,9 @@
       "purpose": "any maskable"
     }
   ],
-  "categories": ["finance", "utilities"],
+  "categories": [
+    "finance",
+    "utilities"
+  ],
   "screenshots": []
 }

@@ -6,10 +6,9 @@ import { pool as pgPool } from "./db";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
-import { startAutoTradeWorker, startAlertWatcher, startSignalOutcomeWatcher } from "./autotrade";
+import { startBackgroundWorkers, workersEnabledInWeb } from "./workers";
 import { setupWebSocket } from "./ws";
 import { seedExpertKnowledge, seedInstitutionalKnowledge } from "./ai-knowledge";
-import { startPushDigest } from "./push";
 
 // Last line of defense: a stray rejected promise in a background worker (a DB
 // or network blip) is logged instead of taking the whole server down.
@@ -93,10 +92,11 @@ app.use((req, res, next) => {
   setupWebSocket(httpServer);
   seedExpertKnowledge().catch(() => {});
   seedInstitutionalKnowledge().catch(() => {});
-  startAutoTradeWorker();
-  startAlertWatcher();
-  startSignalOutcomeWatcher();
-  startPushDigest();
+  if (workersEnabledInWeb()) {
+    startBackgroundWorkers().catch(e => console.error("[workers] failed to start:", e?.message ?? e));
+  } else {
+    log("background workers disabled here (RUN_WORKERS=false); the worker process runs them");
+  }
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;

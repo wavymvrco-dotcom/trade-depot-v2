@@ -15,6 +15,69 @@
       "when": 1793740446695,
       "tag": "0001_tdci",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794006361511,
+      "tag": "0002_candle_cache",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1794010852458,
+      "tag": "0003_strategy_lab",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1794039644592,
+      "tag": "0004_mirror",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1794040868283,
+      "tag": "0005_license_pages",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794041669910,
+      "tag": "0006_forge",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1794041968285,
+      "tag": "0007_storm",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1794042344218,
+      "tag": "0008_playbook",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1794042543129,
+      "tag": "0009_hive",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1794043072303,
+      "tag": "0010_proof",
+      "breakpoints": true
     }
   ]
 }

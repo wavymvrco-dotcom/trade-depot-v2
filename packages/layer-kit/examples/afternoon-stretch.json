@@ -1,0 +1,1 @@
+{"op":"clamp","lo":-1,"hi":1,"x":{"op":"if","c":{"op":"gt","a":{"op":"series","name":"hour"},"b":{"op":"const","v":12}},"a":{"op":"div","a":{"op":"sub","a":{"op":"series","name":"close"},"b":{"op":"sma","n":24,"x":{"op":"series","name":"close"}}},"b":{"op":"atr","n":24}},"b":{"op":"const","v":0}}}

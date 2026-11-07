@@ -8,18 +8,13 @@ import type { Position } from "@shared/schema";
 
 function useDarkMode() {
   const [isDark, setIsDark] = useState(() => {
-    const saved = localStorage.getItem("tradeai_theme");
-    return saved !== "light";
+    // Research Journal is light by default; dark only when chosen
+    try { return localStorage.getItem("td_theme") === "dark"; } catch { return false; }
   });
 
   useEffect(() => {
-    if (isDark) {
-      document.documentElement.classList.remove("light");
-      localStorage.setItem("tradeai_theme", "dark");
-    } else {
-      document.documentElement.classList.add("light");
-      localStorage.setItem("tradeai_theme", "light");
-    }
+    document.documentElement.classList.toggle("dark", isDark);
+    try { localStorage.setItem("td_theme", isDark ? "dark" : "light"); } catch {}
   }, [isDark]);
 
   return { isDark, toggle: () => setIsDark(v => !v) };
@@ -58,10 +53,10 @@ export function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
 
       {/* Logo */}
       <div className="flex items-center gap-2 shrink-0">
-        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-          <LineChart className="w-5 h-5 text-white" />
+        <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
+          <LineChart className="w-5 h-5 text-foreground" />
         </div>
-        <span className="font-bold text-sm tracking-tight hidden sm:block">TradeAI</span>
+        <span className="font-display font-semibold text-base hidden sm:block">Trade Depot</span>
       </div>
 
       {/* Live Stats */}
@@ -79,12 +74,12 @@ export function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
         </motion.div>
 
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }} className="flex items-center gap-2.5 shrink-0">
-          <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${equityChange >= 0 ? "bg-green-500/10" : "bg-destructive/10"}`}>
-            <TrendingUp className={`w-4 h-4 ${equityChange >= 0 ? "text-green-500" : "text-destructive"}`} />
+          <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${equityChange >= 0 ? "bg-pos/10" : "bg-destructive/10"}`}>
+            <TrendingUp className={`w-4 h-4 ${equityChange >= 0 ? "text-pos" : "text-destructive"}`} />
           </div>
           <div>
             <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Equity</p>
-            <p className={`font-mono font-bold text-sm ${equityChange >= 0 ? "text-green-500" : "text-destructive"}`} data-testid="text-equity">
+            <p className={`font-mono font-bold text-sm ${equityChange >= 0 ? "text-pos" : "text-destructive"}`} data-testid="text-equity">
               ${equity.toFixed(2)}
               <span className="text-[10px] ml-1">({equityPercent >= 0 ? "+" : ""}{equityPercent.toFixed(2)}%)</span>
             </p>
@@ -102,12 +97,12 @@ export function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
         </motion.div>
 
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }} className="items-center gap-2.5 shrink-0 hidden lg:flex">
-          <div className="w-9 h-9 rounded-lg bg-orange-500/10 flex items-center justify-center">
-            <AlertCircle className="w-4 h-4 text-orange-500" />
+          <div className="w-9 h-9 rounded-lg bg-warn/10 flex items-center justify-center">
+            <AlertCircle className="w-4 h-4 text-warn" />
           </div>
           <div>
             <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Open Trades</p>
-            <p className="font-mono font-bold text-sm text-orange-500">{openPositions.length}</p>
+            <p className="font-mono font-bold text-sm text-warn">{openPositions.length}</p>
           </div>
         </motion.div>
       </div>
@@ -116,21 +111,21 @@ export function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
       <div className="flex items-center gap-2 ml-auto shrink-0">
         {/* Demo Mode badge */}
         {!settings?.brokerConnected && (
-          <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 text-[10px] font-bold" title="No broker connected — running on paper money">
-            <span className="w-1.5 h-1.5 rounded-full bg-yellow-400" />
+          <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-warn/10 border border-warn/30 text-warn text-[10px] font-bold" title="No broker connected — running on paper money">
+            <span className="w-1.5 h-1.5 rounded-full bg-warn" />
             DEMO
           </div>
         )}
 
         {/* Auto-trade indicator */}
         {autoTradeOn && settings?.brokerConnected && (
-          <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-500/10 border border-green-500/30 text-green-400 text-[10px] font-bold" title="Auto-trade is live — orders go to your connected broker">
+          <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-pos/10 border border-pos/30 text-pos text-[10px] font-bold" title="Auto-trade is live — orders go to your connected broker">
             <Zap className="w-3 h-3" />
             AUTO
           </div>
         )}
         {autoTradeOn && !settings?.brokerConnected && (
-          <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[10px] font-bold" title="Auto-trade is ON but no live broker connected — trades execute in paper mode only. Connect a broker in Settings.">
+          <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-warn/10 border border-warn/30 text-warn text-[10px] font-bold" title="Auto-trade is ON but no live broker connected — trades execute in paper mode only. Connect a broker in Settings.">
             <Zap className="w-3 h-3" />
             AUTO (DEMO)
           </div>
@@ -138,7 +133,7 @@ export function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
 
         {/* Live indicator */}
         <div className="items-center gap-1.5 hidden sm:flex">
-          <div className={`w-2 h-2 rounded-full animate-pulse ${settings?.brokerConnected ? "bg-green-500" : "bg-yellow-500"}`} />
+          <div className={`w-2 h-2 rounded-full animate-pulse ${settings?.brokerConnected ? "bg-pos" : "bg-warn"}`} />
           <span className="text-xs text-muted-foreground">{settings?.brokerConnected ? "Live" : "Demo"}</span>
         </div>
 

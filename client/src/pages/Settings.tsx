@@ -27,12 +27,12 @@ import { formatDistanceToNow } from "date-fns";
 type TestStatus = "idle" | "testing" | "connected" | "failed";
 
 const AI_PROVIDER_LIST = [
-  { id: "openai", name: "OpenAI", model: "GPT-4o", color: "text-emerald-400", placeholder: "sk-proj-...", hint: "Get key at platform.openai.com → API Keys", logo: "🤖" },
-  { id: "anthropic", name: "Anthropic", model: "Claude 3.5", color: "text-amber-400", placeholder: "sk-ant-...", hint: "Get key at console.anthropic.com", logo: "🧠" },
-  { id: "gemini", name: "Google Gemini", model: "Gemini 1.5 Pro", color: "text-blue-400", placeholder: "AIzaSy...", hint: "Get key at aistudio.google.com", logo: "✨" },
-  { id: "groq", name: "Groq", model: "Llama 3.1 70B", color: "text-orange-400", placeholder: "gsk_...", hint: "Get key at console.groq.com", logo: "⚡" },
-  { id: "xai", name: "Grok by xAI", model: "Grok-2", color: "text-sky-400", placeholder: "xai-...", hint: "Get key at console.x.ai", logo: "𝕏" },
-  { id: "perplexity", name: "Perplexity", model: "Sonar Online", color: "text-violet-400", placeholder: "pplx-...", hint: "Get key at perplexity.ai/settings/api", logo: "🔍" },
+  { id: "openai", name: "OpenAI", model: "GPT-4o", color: "text-pos", placeholder: "sk-proj-...", hint: "Get key at platform.openai.com → API Keys", logo: "" },
+  { id: "anthropic", name: "Anthropic", model: "Claude 3.5", color: "text-warn", placeholder: "sk-ant-...", hint: "Get key at console.anthropic.com", logo: "" },
+  { id: "gemini", name: "Google Gemini", model: "Gemini 1.5 Pro", color: "text-info", placeholder: "AIzaSy...", hint: "Get key at aistudio.google.com", logo: "" },
+  { id: "groq", name: "Groq", model: "Llama 3.1 70B", color: "text-warn", placeholder: "gsk_...", hint: "Get key at console.groq.com", logo: "" },
+  { id: "xai", name: "Grok by xAI", model: "Grok-2", color: "text-info", placeholder: "xai-...", hint: "Get key at console.x.ai", logo: "𝕏" },
+  { id: "perplexity", name: "Perplexity", model: "Sonar Online", color: "text-info", placeholder: "pplx-...", hint: "Get key at perplexity.ai/settings/api", logo: "" },
 ];
 
 interface AIProviderStatus {
@@ -130,9 +130,9 @@ const CHANGELOG: Array<{
 ];
 
 const LABEL_COLOR: Record<string, string> = {
-  new:    "bg-green-500/20 text-green-400 border-green-500/30",
-  update: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-  fix:    "bg-orange-500/20 text-orange-400 border-orange-500/30",
+  new:    "bg-pos/20 text-pos border-pos/30",
+  update: "bg-info/20 text-info border-info/30",
+  fix:    "bg-warn/20 text-warn border-warn/30",
 };
 
 function ChangelogSection() {
@@ -299,6 +299,7 @@ export default function Settings() {
   // Email notifications
   const [emailAddress, setEmailAddress] = useState("");
   const [emailNotifications, setEmailNotifications] = useState(false);
+  const [contributeFills, setContributeFills] = useState(true);
   const [smtpHost, setSmtpHost] = useState("");
   const [smtpPort, setSmtpPort] = useState("587");
   const [smtpUser, setSmtpUser] = useState("");
@@ -322,7 +323,7 @@ export default function Settings() {
     await loadStatus();
     setRefreshing(false); setRefreshed(true);
     setTimeout(() => setRefreshed(false), 3000);
-    toast({ title: "Account refreshed", description: "All data has been reloaded from the server.", className: "border-green-500/50" });
+    toast({ title: "Account refreshed", description: "All data has been reloaded from the server.", className: "border-pos/50" });
   };
 
   const testMT5 = async () => {
@@ -352,7 +353,7 @@ export default function Settings() {
       smtpPort: smtpPort ? parseInt(smtpPort) : undefined,
       smtpUser, smtpPass,
     } as any);
-    toast({ title: "Email settings saved", className: "border-green-500/50" });
+    toast({ title: "Email settings saved", className: "border-pos/50" });
   };
 
   // Market data (Twelve Data)
@@ -368,7 +369,7 @@ export default function Settings() {
       const data = await res.json();
       setMdVerifyStatus(data.connected ? "connected" : "failed");
       setMdVerifyMsg(data.message);
-      if (data.connected) { refetchMarketStatus(); toast({ title: "Market data connected!", description: data.message, className: "border-green-500/50" }); }
+      if (data.connected) { refetchMarketStatus(); toast({ title: "Market data connected!", description: data.message, className: "border-pos/50" }); }
     } catch { setMdVerifyStatus("failed"); setMdVerifyMsg("Network error. Try again."); }
   };
 
@@ -402,7 +403,7 @@ export default function Settings() {
       const data = await res.json();
       setAiProviderStatuses(p => ({ ...p, [providerId]: data.connected ? "connected" : "failed" }));
       setAiMsgs(p => ({ ...p, [providerId]: data.message }));
-      if (data.connected) { await loadStatus(); refetch(); toast({ title: `${data.provider || providerId} connected!`, description: data.message, className: "border-green-500/50" }); }
+      if (data.connected) { await loadStatus(); refetch(); toast({ title: `${data.provider || providerId} connected!`, description: data.message, className: "border-pos/50" }); }
     } catch { setAiProviderStatuses(p => ({ ...p, [providerId]: "failed" })); setAiMsgs(p => ({ ...p, [providerId]: "Network error. Try again." })); }
   };
 
@@ -431,6 +432,7 @@ export default function Settings() {
       // Email settings
       setEmailAddress(s.emailAddress ?? "");
       setEmailNotifications(s.emailNotifications ?? false);
+      setContributeFills(s.contributeExecutionData !== false);
       setSmtpHost(s.smtpHost ?? "");
       setSmtpPort(String(s.smtpPort ?? "587"));
       setSmtpUser(s.smtpUser ?? "");
@@ -444,7 +446,7 @@ export default function Settings() {
       const data = await res.json();
       setTvStatus(data.connected ? "connected" : "failed");
       setTvMsg(data.message);
-      if (data.connected) { await loadStatus(); refetch(); toast({ title: "TradingView linked!", description: data.message, className: "border-green-500/50" }); }
+      if (data.connected) { await loadStatus(); refetch(); toast({ title: "TradingView linked!", description: data.message, className: "border-pos/50" }); }
     } catch { setTvStatus("failed"); setTvMsg("Network error. Try again."); }
   };
 
@@ -457,7 +459,7 @@ export default function Settings() {
       const data = await res.json();
       setBkStatus(data.connected ? "connected" : "failed");
       setBkMsg(data.message);
-      if (data.connected) { await loadStatus(); refetch(); toast({ title: "Broker connected!", description: data.message, className: "border-green-500/50" }); }
+      if (data.connected) { await loadStatus(); refetch(); toast({ title: "Broker connected!", description: data.message, className: "border-pos/50" }); }
     } catch { setBkStatus("failed"); setBkMsg("Network error. Try again."); }
   };
 
@@ -472,7 +474,7 @@ export default function Settings() {
       await queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
       await queryClient.invalidateQueries({ queryKey: ["/api/risk/dashboard"] });
       await queryClient.invalidateQueries({ queryKey: ["/api/portfolio/risk"] });
-      toast({ title: "Balance updated!", description: `Account balance set to $${parseFloat(brokerBalance).toLocaleString()}.`, className: "border-green-500/50" });
+      toast({ title: "Balance updated!", description: `Account balance set to $${parseFloat(brokerBalance).toLocaleString()}.`, className: "border-pos/50" });
     } catch { toast({ title: "Failed to save balance", variant: "destructive" }); }
     finally { setBalanceSaving(false); }
   };
@@ -480,7 +482,7 @@ export default function Settings() {
   const savePrefs = async () => {
     try {
       await saveSettings.mutateAsync({ notifications, autoTrade, riskMode } as any);
-      toast({ title: "Preferences saved", className: "border-green-500/50" });
+      toast({ title: "Preferences saved", className: "border-pos/50" });
     } catch (e: any) { toast({ title: "Save failed", description: e.message, variant: "destructive" }); }
   };
 
@@ -489,7 +491,7 @@ export default function Settings() {
       await saveSettings.mutateAsync({
         tradingTimezone, activeSessions, offHoursBehavior, offHoursRiskReduction,
       } as any);
-      toast({ title: "Trading hours saved", className: "border-green-500/50" });
+      toast({ title: "Trading hours saved", className: "border-pos/50" });
     } catch (e: any) { toast({ title: "Save failed", description: e.message, variant: "destructive" }); }
   };
 
@@ -501,12 +503,12 @@ export default function Settings() {
   const StatusPill = ({ status, connectedAt }: { status: TestStatus; connectedAt?: string | null }) => (
     <div className={cn(
       "flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border",
-      status === "connected" && "text-green-400 bg-green-500/10 border-green-500/25",
-      status === "failed" && "text-red-400 bg-red-500/10 border-red-500/25",
-      status === "testing" && "text-amber-400 bg-amber-500/10 border-amber-500/25",
+      status === "connected" && "text-pos bg-pos/10 border-pos/25",
+      status === "failed" && "text-neg bg-neg/10 border-neg/25",
+      status === "testing" && "text-warn bg-warn/10 border-warn/25",
       status === "idle" && "text-muted-foreground bg-muted/50 border-border",
     )}>
-      {status === "connected" && <><div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" /> Connected</>}
+      {status === "connected" && <><div className="w-1.5 h-1.5 rounded-full bg-pos animate-pulse" /> Connected</>}
       {status === "failed" && <><XCircle className="w-3 h-3" /> Failed</>}
       {status === "testing" && <><Loader2 className="w-3 h-3 animate-spin" /> Testing…</>}
       {status === "idle" && <><div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40" /> Not connected</>}
@@ -526,9 +528,9 @@ export default function Settings() {
         animate={{ opacity: 1, y: 0 }}
         className={cn(
           "flex items-start gap-2 text-xs px-3 py-2.5 rounded-lg border",
-          status === "connected" && "bg-green-500/8 border-green-500/25 text-green-400",
-          status === "failed" && "bg-red-500/8 border-red-500/25 text-red-400",
-          status === "testing" && "bg-amber-500/8 border-amber-500/25 text-amber-400",
+          status === "connected" && "bg-pos/8 border-pos/25 text-pos",
+          status === "failed" && "bg-neg/8 border-neg/25 text-neg",
+          status === "testing" && "bg-warn/8 border-warn/25 text-warn",
         )}
       >
         {status === "connected" && <CheckCircle2 className="w-3.5 h-3.5 shrink-0 mt-0.5" />}
@@ -575,8 +577,8 @@ export default function Settings() {
                     {user?.username?.charAt(0).toUpperCase()}
                   </div>
                   {(user as any)?.isAdmin && (
-                    <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-amber-500 flex items-center justify-center border-2 border-background">
-                      <Crown className="w-2.5 h-2.5 text-white" />
+                    <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-warn flex items-center justify-center border-2 border-background">
+                      <Crown className="w-2.5 h-2.5 text-foreground" />
                     </div>
                   )}
                 </div>
@@ -584,13 +586,13 @@ export default function Settings() {
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="font-semibold">{user?.username}</p>
                     {(user as any)?.isAdmin && (
-                      <span className="text-[10px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded font-bold">ADMIN</span>
+                      <span className="text-[10px] bg-warn/20 text-warn px-1.5 py-0.5 rounded font-bold">ADMIN</span>
                     )}
                   </div>
                   <p className="text-xs text-muted-foreground">Active session · All data synced</p>
                 </div>
-                <div className="flex items-center gap-1.5 text-xs text-green-400 font-medium shrink-0">
-                  <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+                <div className="flex items-center gap-1.5 text-xs text-pos font-medium shrink-0">
+                  <div className="w-1.5 h-1.5 rounded-full bg-pos animate-pulse" />
                   Online
                 </div>
               </div>
@@ -603,7 +605,7 @@ export default function Settings() {
                 className={cn(
                   "w-full flex items-center justify-center gap-2 rounded-lg border py-2 text-xs font-semibold transition-all duration-200",
                   refreshed
-                    ? "border-green-500/40 bg-green-500/10 text-green-400"
+                    ? "border-pos/40 bg-pos/10 text-pos"
                     : "border-border bg-background/50 text-muted-foreground hover:text-foreground hover:bg-muted/30",
                   refreshing && "opacity-60"
                 )}
@@ -627,8 +629,8 @@ export default function Settings() {
                 className="bg-card/50 border border-border rounded-xl overflow-hidden mb-3">
                 <div className="px-5 py-4 border-b border-border/60 bg-card/30 flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-lg bg-green-500/15 flex items-center justify-center">
-                      <BarChart2 className="w-4 h-4 text-green-400" />
+                    <div className="w-8 h-8 rounded-lg bg-pos/15 flex items-center justify-center">
+                      <BarChart2 className="w-4 h-4 text-pos" />
                     </div>
                     <div>
                       <p className="font-semibold text-sm">Yahoo Finance — Live Prices</p>
@@ -649,7 +651,7 @@ export default function Settings() {
                 <div className="p-5 space-y-3">
                   <div className="bg-muted/20 border border-border rounded-lg p-3 text-xs space-y-1">
                     <p className="font-semibold text-foreground flex items-center gap-1.5">
-                      <Radio className="w-3.5 h-3.5 text-green-400" /> No API key required
+                      <Radio className="w-3.5 h-3.5 text-pos" /> No API key required
                     </p>
                     <p className="text-muted-foreground">Prices come directly from Yahoo Finance — completely free, no account or key needed. All users get real-time forex data automatically.</p>
                     {marketStatus?.cacheAge != null && (
@@ -659,7 +661,7 @@ export default function Settings() {
                   <Button
                     onClick={verifyMarketData}
                     disabled={mdVerifyStatus === "testing"}
-                    className={cn("w-full gap-2", mdVerifyStatus === "connected" && "bg-green-600 hover:bg-green-700")}
+                    className={cn("w-full gap-2", mdVerifyStatus === "connected" && "bg-pos hover:bg-pos")}
                     data-testid="button-verify-marketdata"
                   >
                     {mdVerifyStatus === "testing" ? <><Loader2 className="w-4 h-4 animate-spin" />Pinging Twelve Data…</>
@@ -675,8 +677,8 @@ export default function Settings() {
                 className="bg-card/50 border border-border rounded-xl overflow-hidden mb-3">
                 <div className="px-5 py-4 border-b border-border/60 bg-card/30 flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-lg bg-blue-500/15 flex items-center justify-center">
-                      <LineChart className="w-4 h-4 text-blue-400" />
+                    <div className="w-8 h-8 rounded-lg bg-info/15 flex items-center justify-center">
+                      <LineChart className="w-4 h-4 text-info" />
                     </div>
                     <div>
                       <p className="font-semibold text-sm">TradingView</p>
@@ -701,7 +703,7 @@ export default function Settings() {
                       <Button
                         onClick={testTradingView}
                         disabled={tvStatus === "testing" || !tvUsername.trim()}
-                        className={cn("h-10 px-4 gap-2 shrink-0", tvStatus === "connected" && "bg-green-600 hover:bg-green-700")}
+                        className={cn("h-10 px-4 gap-2 shrink-0", tvStatus === "connected" && "bg-pos hover:bg-pos")}
                         data-testid="button-test-tradingview"
                       >
                         {tvStatus === "testing" ? <Loader2 className="w-4 h-4 animate-spin" />
@@ -721,8 +723,8 @@ export default function Settings() {
                 className="bg-card/50 border border-border rounded-xl overflow-hidden mb-3">
                 <div className="px-5 py-4 border-b border-border/60 bg-card/30 flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-lg bg-violet-500/15 flex items-center justify-center">
-                      <Bot className="w-4 h-4 text-violet-400" />
+                    <div className="w-8 h-8 rounded-lg bg-info/15 flex items-center justify-center">
+                      <Bot className="w-4 h-4 text-info" />
                     </div>
                     <div>
                       <p className="font-semibold text-sm">AI Providers</p>
@@ -734,8 +736,8 @@ export default function Settings() {
                     </div>
                   </div>
                   {integrations?.ai.selectedProvider && integrations.ai.selectedProvider !== "none" && (
-                    <div className="flex items-center gap-1.5 text-xs font-semibold text-green-400">
-                      <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" /> Active
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-pos">
+                      <div className="w-1.5 h-1.5 rounded-full bg-pos animate-pulse" /> Active
                     </div>
                   )}
                 </div>
@@ -777,7 +779,7 @@ export default function Settings() {
                             size="sm"
                             onClick={() => testAiProvider(p.id)}
                             disabled={provStatus === "testing" || !aiKeys[p.id]?.trim()}
-                            className={cn("h-10 px-3 gap-1.5 shrink-0 text-xs", isConnected && "bg-green-600 hover:bg-green-700")}
+                            className={cn("h-10 px-3 gap-1.5 shrink-0 text-xs", isConnected && "bg-pos hover:bg-pos")}
                             data-testid={`button-test-ai-${p.id}`}
                           >
                             {provStatus === "testing" ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -789,7 +791,7 @@ export default function Settings() {
                         {aiMsgs[p.id] && (
                           <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                             className={cn("text-xs mt-1.5 flex items-center gap-1",
-                              displayStatus === "connected" ? "text-green-400" : "text-red-400"
+                              displayStatus === "connected" ? "text-pos" : "text-neg"
                             )}>
                             {displayStatus === "connected" ? <CheckCircle2 className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
                             {aiMsgs[p.id]}
@@ -855,8 +857,8 @@ export default function Settings() {
                   <AnimatePresence mode="wait">
                     {brokerType === "demo" && (
                       <motion.div key="demo" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-2.5">
-                        <div className="p-3 bg-green-500/8 border border-green-500/20 rounded-lg text-xs text-muted-foreground">
-                          <p className="font-semibold text-green-400 mb-0.5">Paper Trading Mode</p>
+                        <div className="p-3 bg-pos/8 border border-pos/20 rounded-lg text-xs text-muted-foreground">
+                          <p className="font-semibold text-pos mb-0.5">Paper Trading Mode</p>
                           All trades simulated — zero real-money risk.
                         </div>
                         <div className="space-y-1">
@@ -924,7 +926,7 @@ export default function Settings() {
                   <Button
                     onClick={testBroker}
                     disabled={bkStatus === "testing"}
-                    className={cn("w-full gap-2 h-10", bkStatus === "connected" && "bg-green-600 hover:bg-green-700")}
+                    className={cn("w-full gap-2 h-10", bkStatus === "connected" && "bg-pos hover:bg-pos")}
                     data-testid="button-test-broker"
                   >
                     {bkStatus === "testing" ? <><Loader2 className="w-4 h-4 animate-spin" /> Connecting…</>
@@ -1019,11 +1021,11 @@ export default function Settings() {
                   <p className="text-[11px] text-muted-foreground mb-3">Select the sessions the AI is allowed to trade. Leave all unselected to trade 24/7.</p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {[
-                      { id: "sydney",            label: "Sydney",              hours: "21:00 – 06:00 UTC", color: "text-sky-400" },
-                      { id: "tokyo",             label: "Tokyo",               hours: "23:00 – 08:00 UTC", color: "text-red-400" },
-                      { id: "london",            label: "London",              hours: "07:00 – 16:00 UTC", color: "text-blue-400" },
-                      { id: "new_york",          label: "New York",            hours: "12:00 – 21:00 UTC", color: "text-green-400" },
-                      { id: "us_london_overlap", label: "US/London Overlap",   hours: "12:00 – 16:00 UTC", color: "text-amber-400" },
+                      { id: "sydney",            label: "Sydney",              hours: "21:00 – 06:00 UTC", color: "text-info" },
+                      { id: "tokyo",             label: "Tokyo",               hours: "23:00 – 08:00 UTC", color: "text-neg" },
+                      { id: "london",            label: "London",              hours: "07:00 – 16:00 UTC", color: "text-info" },
+                      { id: "new_york",          label: "New York",            hours: "12:00 – 21:00 UTC", color: "text-pos" },
+                      { id: "us_london_overlap", label: "US/London Overlap",   hours: "12:00 – 16:00 UTC", color: "text-warn" },
                     ].map(s => {
                       const active = activeSessions.includes(s.id);
                       return (
@@ -1049,9 +1051,9 @@ export default function Settings() {
                   <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">Off-Hours AI Behavior</Label>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     {[
-                      { id: "pause",         label: "Pause",          desc: "AI stops all trading outside sessions", icon: "⏸" },
-                      { id: "ai_autonomous", label: "AI Autonomous",  desc: "AI trades at reduced risk autonomously", icon: "🤖" },
-                      { id: "alert_only",    label: "Alert Only",     desc: "AI generates signals but doesn't execute", icon: "🔔" },
+                      { id: "pause",         label: "Pause",          desc: "AI stops all trading outside sessions", icon: "" },
+                      { id: "ai_autonomous", label: "AI Autonomous",  desc: "AI trades at reduced risk autonomously", icon: "" },
+                      { id: "alert_only",    label: "Alert Only",     desc: "AI generates signals but doesn't execute", icon: "" },
                     ].map(b => (
                       <button key={b.id} onClick={() => setOffHoursBehavior(b.id)}
                         className={cn("p-3 rounded-lg border text-left transition-all",
@@ -1097,6 +1099,26 @@ export default function Settings() {
               </motion.div>
             </div>
 
+            {/* ━━━━ DATA SHARING (Mirror) ━━━━ */}
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3 px-1">Data sharing</p>
+              <div className="bg-card/50 border border-border rounded-xl p-5">
+                <div className="flex items-start justify-between gap-4 py-1">
+                  <div>
+                    <p className="text-sm font-medium" id="mirror-toggle-label">Contribute anonymized execution data to improve Mirror</p>
+                    <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                      When your broker fills an order, Trade Depot records the quoted spread, the fill price and how long it took.
+                      Pooled with other traders on the same broker, this teaches the Lab what trading really costs, so its tests use
+                      realistic costs. Only these numbers are pooled — never your name, account, balance, positions or strategies.
+                      Turning this off removes all of your fills from the pool at the next nightly update.
+                    </p>
+                  </div>
+                  <Switch aria-labelledby="mirror-toggle-label" checked={contributeFills}
+                    onCheckedChange={v => { setContributeFills(v); saveSettings.mutate({ contributeExecutionData: v } as any); }} />
+                </div>
+              </div>
+            </div>
+
             {/* ━━━━ EMAIL NOTIFICATIONS ━━━━ */}
             <div>
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3 px-1">Email Notifications</p>
@@ -1132,7 +1154,7 @@ export default function Settings() {
                   </div>
                 </div>
                 {emailTestMsg && (
-                  <p className={cn("text-xs flex items-center gap-1.5", emailTestStatus === "connected" ? "text-green-400" : "text-red-400")}>
+                  <p className={cn("text-xs flex items-center gap-1.5", emailTestStatus === "connected" ? "text-pos" : "text-neg")}>
                     {emailTestStatus === "connected" ? <CheckCircle2 className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
                     {emailTestMsg}
                   </p>
@@ -1168,19 +1190,19 @@ export default function Settings() {
                 </div>
 
                 {push.state === "unsupported" && (
-                  <div className="flex items-center gap-2 text-xs text-yellow-400 bg-yellow-400/10 rounded-lg px-3 py-2">
+                  <div className="flex items-center gap-2 text-xs text-warn bg-warn/10 rounded-lg px-3 py-2">
                     <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                     Push notifications are not supported in this browser. Try Chrome or Firefox.
                   </div>
                 )}
                 {push.state === "denied" && (
-                  <div className="flex items-center gap-2 text-xs text-red-400 bg-red-400/10 rounded-lg px-3 py-2">
+                  <div className="flex items-center gap-2 text-xs text-neg bg-neg/10 rounded-lg px-3 py-2">
                     <XCircle className="w-3.5 h-3.5 shrink-0" />
                     Notifications blocked. Open your browser site settings and allow notifications for this site, then reload.
                   </div>
                 )}
                 {push.error && (
-                  <p className="text-xs text-red-400 flex items-center gap-1.5">
+                  <p className="text-xs text-neg flex items-center gap-1.5">
                     <XCircle className="w-3.5 h-3.5" />{push.error}
                   </p>
                 )}
@@ -1190,7 +1212,7 @@ export default function Settings() {
                     <div>
                       <p className="text-sm font-medium">Enable Push Alerts</p>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        {push.state === "subscribed" ? "🟢 Active — digest sends every 10 min" : "Off — tap to enable"}
+                        {push.state === "subscribed" ? "Active — digest sends every 10 min" : "Off — tap to enable"}
                       </p>
                     </div>
                     {push.state === "loading" ? (
@@ -1219,7 +1241,7 @@ export default function Settings() {
                     }}
                   >
                     {pushTestDone ? (
-                      <><CheckCircle2 className="w-3.5 h-3.5 text-green-400" /> Notification sent to your device!</>
+                      <><CheckCircle2 className="w-3.5 h-3.5 text-pos" /> Notification sent to your device!</>
                     ) : (
                       <><Send className="w-3.5 h-3.5" /> Send Test Notification</>
                     )}
@@ -1239,7 +1261,7 @@ export default function Settings() {
                   <Input value={mt5BridgeUrl} onChange={e => setMt5BridgeUrl(e.target.value)} placeholder="http://localhost:8080" data-testid="input-mt5-bridge-url" />
                 </div>
                 {mt5Msg && (
-                  <p className={cn("text-xs flex items-center gap-1.5", mt5Status === "connected" ? "text-green-400" : "text-red-400")}>
+                  <p className={cn("text-xs flex items-center gap-1.5", mt5Status === "connected" ? "text-pos" : "text-neg")}>
                     {mt5Status === "connected" ? <CheckCircle2 className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
                     {mt5Msg}
                   </p>
@@ -1287,7 +1309,7 @@ export default function Settings() {
               <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}
                 className="bg-card/50 border border-border rounded-xl p-5 space-y-3">
                 <div className="flex items-start gap-2.5 p-3 bg-background/50 rounded-lg border border-border/50 text-xs text-muted-foreground">
-                  <Shield className="w-4 h-4 text-green-500 shrink-0 mt-0.5" />
+                  <Shield className="w-4 h-4 text-pos shrink-0 mt-0.5" />
                   <span>All credentials are encrypted server-side, stored only on your account, and never shared with third parties.</span>
                 </div>
                 <Button variant="outline" className="w-full gap-2 text-muted-foreground" onClick={resetTour} data-testid="button-replay-tour">
@@ -1296,7 +1318,7 @@ export default function Settings() {
                 <Button variant="outline" className="w-full gap-2 text-muted-foreground" onClick={() => { localStorage.removeItem("tradeai_onboarded"); window.location.href = "/onboarding"; }}>
                   Re-run Setup Wizard
                 </Button>
-                <Button variant="outline" className="w-full border-destructive/30 text-destructive hover:bg-destructive hover:text-white gap-2" onClick={logout}>
+                <Button variant="outline" className="w-full border-destructive/30 text-destructive hover:bg-destructive hover:text-on-strong gap-2" onClick={logout}>
                   <LogOut className="w-4 h-4" /> Sign Out
                 </Button>
               </motion.div>

@@ -63,7 +63,7 @@ export default function Alerts() {
         targetPrice: parseFloat(form.targetPrice),
       });
       setForm({ ...form, targetPrice: "", label: "" });
-      toast({ title: "Alert Created", description: `Alert set for ${form.symbol} ${form.direction} ${form.targetPrice}`, className: "border-green-500/50" });
+      toast({ title: "Alert Created", description: `Alert set for ${form.symbol} ${form.direction} ${form.targetPrice}`, className: "border-pos/50" });
     } catch (e: any) {
       toast({ title: "Failed", description: e.message, variant: "destructive" });
     }
@@ -179,8 +179,8 @@ export default function Alerts() {
                     return (
                       <motion.div key={alert.id} initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
                         className="bg-card/40 border border-border rounded-lg p-4 flex items-center gap-4" data-testid={`alert-card-${alert.id}`}>
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${isBuy ? "bg-green-500/15" : "bg-red-500/15"}`}>
-                          {isBuy ? <TrendingUp className="w-5 h-5 text-green-500" /> : <TrendingDown className="w-5 h-5 text-red-400" />}
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${isBuy ? "bg-pos/15" : "bg-neg/15"}`}>
+                          {isBuy ? <TrendingUp className="w-5 h-5 text-pos" /> : <TrendingDown className="w-5 h-5 text-neg" />}
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-0.5">
@@ -191,7 +191,7 @@ export default function Alerts() {
                           {alert.label && <p className="text-xs text-muted-foreground">{alert.label}</p>}
                           <div className="flex items-center gap-3 mt-1 text-[11px] text-muted-foreground">
                             {current && <span>Current: <span className="font-mono font-bold text-foreground">{current.toFixed(alert.symbol === "XAUUSD" ? 2 : 5)}</span></span>}
-                            {pct !== null && <span className={Math.abs(pct) < 0.2 ? "text-orange-400 font-bold" : ""}>{Math.abs(pct).toFixed(2)}% away</span>}
+                            {pct !== null && <span className={Math.abs(pct) < 0.2 ? "text-warn font-bold" : ""}>{Math.abs(pct).toFixed(2)}% away</span>}
                             <span>Set {alert.createdAt ? formatDistanceToNow(new Date(alert.createdAt), { addSuffix: true }) : ""}</span>
                           </div>
                         </div>
@@ -209,11 +209,11 @@ export default function Alerts() {
             {triggered.length > 0 && (
               <div className="space-y-3">
                 <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider font-mono flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-green-500" /> Triggered ({triggered.length})
+                  <CheckCircle2 className="w-4 h-4 text-pos" /> Triggered ({triggered.length})
                 </h3>
                 {triggered.map((alert: any) => (
-                  <div key={alert.id} className="bg-green-500/5 border border-green-500/20 rounded-lg p-4 flex items-center gap-4 opacity-70" data-testid={`alert-triggered-${alert.id}`}>
-                    <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0" />
+                  <div key={alert.id} className="bg-pos/5 border border-pos/20 rounded-lg p-4 flex items-center gap-4 opacity-70" data-testid={`alert-triggered-${alert.id}`}>
+                    <CheckCircle2 className="w-5 h-5 text-pos shrink-0" />
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
                         <span className="font-bold font-mono">{alert.symbol}</span>
@@ -221,7 +221,7 @@ export default function Alerts() {
                         <span className="font-mono font-bold text-sm">{alert.targetPrice}</span>
                       </div>
                       {alert.label && <p className="text-xs text-muted-foreground">{alert.label}</p>}
-                      <p className="text-[11px] text-green-400 mt-0.5">Triggered {alert.triggeredAt ? formatDistanceToNow(new Date(alert.triggeredAt), { addSuffix: true }) : ""}</p>
+                      <p className="text-[11px] text-pos mt-0.5">Triggered {alert.triggeredAt ? formatDistanceToNow(new Date(alert.triggeredAt), { addSuffix: true }) : ""}</p>
                     </div>
                     <button onClick={() => deleteAlert.mutate(alert.id)} className="text-muted-foreground hover:text-destructive transition-colors">
                       <Trash2 className="w-4 h-4" />

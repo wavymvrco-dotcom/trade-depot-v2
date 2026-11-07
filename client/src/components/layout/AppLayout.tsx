@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, createContext, useContext } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { Link, useLocation } from "wouter";
 import {
@@ -6,7 +6,7 @@ import {
   Bot, Bell, HelpCircle, Menu, X, Target, Zap,
   TrendingUp, TrendingDown, CheckCircle2, Clock,
   CalendarDays, BarChart2, BellRing, Check, GraduationCap, BookMarked, Store, Activity, Shield,
-  RefreshCw, LogOut, Crown, ShoppingCart, Gauge,
+  RefreshCw, LogOut, Crown, ShoppingCart, Gauge, FlaskConical,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
@@ -32,14 +32,14 @@ function EmailVerificationBanner() {
   const u = user as any;
   if (dismissed || !u?.email || u?.emailVerified) return null;
   return (
-    <div className="flex items-center gap-3 px-4 py-2.5 bg-amber-500/10 border-b border-amber-500/20 text-xs shrink-0">
-      <div className="w-4 h-4 rounded-full bg-amber-500/20 flex items-center justify-center shrink-0">
-        <span className="text-amber-400 text-[9px] font-bold">!</span>
+    <div className="flex items-center gap-3 px-4 py-2.5 bg-warn/10 border-b border-warn/20 text-xs shrink-0">
+      <div className="w-4 h-4 rounded-full bg-warn/20 flex items-center justify-center shrink-0">
+        <span className="text-warn text-[9px] font-bold">!</span>
       </div>
-      <span className="text-amber-300/80 flex-1">
-        Check your inbox — we sent a verification link to <span className="font-semibold text-amber-300">{u.email}</span>
+      <span className="text-warn/80 flex-1">
+        Check your inbox — we sent a verification link to <span className="font-semibold text-warn">{u.email}</span>
       </span>
-      <button onClick={() => setDismissed(true)} className="text-amber-400/50 hover:text-amber-400 transition-colors text-base leading-none">×</button>
+      <button onClick={() => setDismissed(true)} className="text-warn/50 hover:text-warn transition-colors text-base leading-none">×</button>
     </div>
   );
 }
@@ -51,14 +51,14 @@ function BrokerAutoTradeBanner() {
   if (dismissed) return null;
   if (!settings?.autoTrade || settings?.brokerConnected) return null;
   return (
-    <div className="flex items-center gap-3 px-4 py-2.5 bg-orange-500/10 border-b border-orange-500/20 text-xs shrink-0">
-      <div className="w-4 h-4 rounded-full bg-orange-500/20 flex items-center justify-center shrink-0">
-        <Zap className="w-2.5 h-2.5 text-orange-400" />
+    <div className="flex items-center gap-3 px-4 py-2.5 bg-warn/10 border-b border-warn/20 text-xs shrink-0">
+      <div className="w-4 h-4 rounded-full bg-warn/20 flex items-center justify-center shrink-0">
+        <Zap className="w-2.5 h-2.5 text-warn" />
       </div>
-      <span className="text-orange-300/90 flex-1">
-        <span className="font-semibold text-orange-300">Auto-trade is ON but no live broker is connected</span> — trades are executing in paper mode only. <Link href="/settings" className="underline hover:text-orange-200 transition-colors">Connect a broker in Settings</Link> to trade real funds.
+      <span className="text-warn/90 flex-1">
+        <span className="font-semibold text-warn">Auto-trade is ON but no live broker is connected</span> — trades are executing in paper mode only. <Link href="/settings" className="underline hover:text-warn transition-colors">Connect a broker in Settings</Link> to trade real funds.
       </span>
-      <button onClick={() => setDismissed(true)} className="text-orange-400/50 hover:text-orange-400 transition-colors text-base leading-none">×</button>
+      <button onClick={() => setDismissed(true)} className="text-warn/50 hover:text-warn transition-colors text-base leading-none">×</button>
     </div>
   );
 }
@@ -81,8 +81,8 @@ function NotificationsPanel() {
   const totalBadge = unread + activeAlerts;
 
   const typeIcon = (type: string) => {
-    if (type === "alert") return <BellRing className="w-4 h-4 text-orange-400" />;
-    if (type === "trade") return <Zap className="w-4 h-4 text-green-500" />;
+    if (type === "alert") return <BellRing className="w-4 h-4 text-warn" />;
+    if (type === "trade") return <Zap className="w-4 h-4 text-pos" />;
     if (type === "signal") return <TrendingUp className="w-4 h-4 text-primary" />;
     return <Bell className="w-4 h-4 text-muted-foreground" />;
   };
@@ -96,7 +96,7 @@ function NotificationsPanel() {
             <motion.span
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
-              className="absolute top-1 right-1 w-4 h-4 bg-destructive rounded-full border-2 border-background flex items-center justify-center text-[9px] font-bold text-white"
+              className="absolute top-1 right-1 w-4 h-4 bg-destructive rounded-full border-2 border-background flex items-center justify-center text-[9px] font-bold text-on-strong"
             >
               {totalBadge > 9 ? "9+" : totalBadge}
             </motion.span>
@@ -155,9 +155,9 @@ function NotificationsPanel() {
         </ScrollArea>
 
         {activeAlerts > 0 && (
-          <div className="px-4 py-2 border-t border-border bg-orange-500/5">
+          <div className="px-4 py-2 border-t border-border bg-warn/5">
             <Link href="/alerts">
-              <div className="flex items-center gap-2 text-[11px] text-orange-400 hover:text-orange-300 cursor-pointer transition-colors">
+              <div className="flex items-center gap-2 text-[11px] text-warn hover:text-warn cursor-pointer transition-colors">
                 <BellRing className="w-3 h-3" />
                 {activeAlerts} active price alert{activeAlerts !== 1 ? "s" : ""} — view all
               </div>
@@ -184,7 +184,7 @@ function UserMenuPopover() {
     setRefreshing(false);
     setRefreshed(true);
     setTimeout(() => { setRefreshed(false); setOpen(false); }, 1500);
-    toast({ title: "Account refreshed", description: "All data reloaded.", className: "border-green-500/50" });
+    toast({ title: "Account refreshed", description: "All data reloaded.", className: "border-pos/50" });
   };
 
   const initial = (user?.username ?? "?").charAt(0).toUpperCase();
@@ -199,8 +199,8 @@ function UserMenuPopover() {
         >
           {initial}
           {isAdmin && (
-            <span className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-amber-500 flex items-center justify-center border-2 border-background">
-              <Crown className="w-2 h-2 text-white" />
+            <span className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-warn flex items-center justify-center border-2 border-background">
+              <Crown className="w-2 h-2 text-foreground" />
             </span>
           )}
           <span className="absolute left-14 bg-popover text-popover-foreground px-2 py-1 rounded text-xs opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap border border-border pointer-events-none z-50 shadow-lg">
@@ -217,15 +217,15 @@ function UserMenuPopover() {
               {initial}
             </div>
             {isAdmin && (
-              <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-amber-500 flex items-center justify-center border border-background">
-                <Crown className="w-2 h-2 text-white" />
+              <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-warn flex items-center justify-center border border-background">
+                <Crown className="w-2 h-2 text-foreground" />
               </span>
             )}
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold truncate">{user?.username}</p>
             {isAdmin && (
-              <span className="text-[10px] font-bold text-amber-400">Admin</span>
+              <span className="text-[10px] font-bold text-warn">Admin</span>
             )}
             {!isAdmin && (
               <p className="text-[11px] text-muted-foreground">Active session</p>
@@ -242,14 +242,14 @@ function UserMenuPopover() {
             className={cn(
               "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors",
               refreshed
-                ? "text-green-400 bg-green-500/10"
+                ? "text-pos bg-pos/10"
                 : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
             )}
           >
             {refreshing ? (
               <RefreshCw className="w-4 h-4 animate-spin shrink-0" />
             ) : refreshed ? (
-              <CheckCircle2 className="w-4 h-4 shrink-0 text-green-400" />
+              <CheckCircle2 className="w-4 h-4 shrink-0 text-pos" />
             ) : (
               <RefreshCw className="w-4 h-4 shrink-0" />
             )}
@@ -292,7 +292,26 @@ function UserMenuPopover() {
   );
 }
 
+// The five hubs. A hub is active on its own path and on the older pages it now contains.
+export const HUBS = [
+  { icon: LayoutDashboard, label: "Terminal",    path: "/",            match: ["/", "/analysis", "/trade", "/news", "/calendar", "/alerts"] },
+  { icon: FlaskConical,    label: "Lab",         path: "/lab",         match: ["/lab"] },
+  { icon: BarChart2,       label: "Performance", path: "/performance", match: ["/performance", "/analytics", "/journal"] },
+  { icon: GraduationCap,   label: "Learn",       path: "/learn",       match: ["/learn", "/ai"] },
+  { icon: Settings,        label: "Settings",    path: "/settings",    match: ["/settings"] },
+];
+
+// Pages wrap themselves in AppLayout. A hub page shows other pages as tabs, so
+// a nested AppLayout renders only its children (no second sidebar or top bar).
+const LayoutNested = createContext(false);
+
 export function AppLayout({ children }: { children: React.ReactNode }) {
+  const nested = useContext(LayoutNested);
+  if (nested) return <>{children}</>;
+  return <LayoutNested.Provider value={true}><AppLayoutShell>{children}</AppLayoutShell></LayoutNested.Provider>;
+}
+
+function AppLayoutShell({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
@@ -309,31 +328,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   }, []);
 
   const navItems = [
-    { icon: LayoutDashboard, label: "Terminal",    path: "/" },
-    { icon: LineChart,       label: "Analysis",    path: "/analysis" },
-    { icon: Gauge,           label: "TDCI",        path: "/tdci" },
-    { icon: Target,          label: "Strategy",    path: "/strategy" },
-    { icon: BarChart2,       label: "Analytics",   path: "/analytics" },
-    { icon: CalendarDays,    label: "Calendar",    path: "/calendar" },
-    { icon: Bell,            label: "Alerts",      path: "/alerts" },
-    { icon: Newspaper,       label: "News",        path: "/news" },
-    { icon: Bot,             label: "AI Advisor",  path: "/ai" },
-    { icon: GraduationCap,   label: "Learn",       path: "/learn" },
-    { icon: BookMarked,      label: "Journal",     path: "/journal" },
-    { icon: Store,           label: "Marketplace", path: "/marketplace" },
-    { icon: Activity,        label: "Health Score", path: "/health" },
-    { icon: Settings,        label: "Settings",    path: "/settings" },
-    ...((user as any)?.isAdmin ? [{ icon: Shield, label: "Admin Panel", path: "/admin" }] : []),
+    ...HUBS,
+    ...((user as any)?.isAdmin ? [{ icon: Shield, label: "Admin Panel", path: "/admin", match: ["/admin", "/health", "/admin/tdci"] }] : []),
   ];
+  const isActive = (match: string[]) => match.includes(location);
 
-  // Primary nav items shown in mobile bottom bar
-  const mobileNavItems = [
-    { icon: LayoutDashboard, label: "Terminal",  path: "/" },
-    { icon: LineChart,       label: "Analysis",  path: "/analysis" },
-    { icon: ShoppingCart,    label: "Trade",     path: "/trade" },
-    { icon: Bell,            label: "Alerts",    path: "/alerts" },
-    { icon: Menu,            label: "More",      path: "__more__" },
-  ];
+  // Mobile bottom bar: the same five hubs
+  const mobileNavItems = HUBS;
 
   return (
     <div className="flex h-screen bg-background text-foreground flex-col overflow-hidden">
@@ -370,7 +371,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         >
           <motion.div
             initial={{ scale: 0 }} animate={{ scale: 1 }}
-            className="w-9 h-9 rounded-lg bg-gradient-to-br from-primary to-accent text-white flex items-center justify-center mb-2 shadow-lg shadow-primary/20 shrink-0"
+            className="w-9 h-9 rounded-lg bg-primary text-on-strong flex items-center justify-center mb-2 shadow-lg shrink-0"
           >
             <LineChart className="w-5 h-5" />
           </motion.div>
@@ -378,7 +379,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           <div className="flex flex-col items-center gap-0.5 w-full px-2">
             {navItems.map((item) => (
               <div key={item.path} className="w-full">
-                <Link href={item.path}>
+                <Link href={item.path} aria-label={item.label}>
                   <div
                     data-testid={`nav-link-${item.label.toLowerCase().replace(/ /g, "-")}`}
                     onClick={() => setSidebarOpen(false)}
@@ -386,8 +387,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                     onMouseLeave={() => setHoverTip(null)}
                     className={cn(
                       "w-full h-10 rounded-lg flex items-center justify-center cursor-pointer transition-all duration-150 hover:bg-muted",
-                      location === item.path
-                        ? "bg-primary text-primary-foreground shadow-lg shadow-primary/30"
+                      isActive(item.match)
+                        ? "bg-primary text-primary-foreground shadow-lg "
                         : "text-muted-foreground hover:text-foreground"
                     )}
                   >
@@ -429,7 +430,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
         )}
 
-        <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
+        <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative pb-16 md:pb-0">
           <UpdateBanner />
           <EmailVerificationBanner />
           <BrokerAutoTradeBanner />
@@ -437,35 +438,19 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         </main>
       </div>
 
-      {/* ── Mobile Bottom Navigation Bar (not on terminal which has its own) ─── */}
-      <nav className={cn("md:hidden fixed bottom-0 left-0 right-0 z-50 h-16 bg-card/95 backdrop-blur-xl border-t border-border flex items-stretch", location === "/" && "hidden")}>
-        {mobileNavItems.map(({ icon: Icon, label, path }) => {
-          const isActive = path !== "__more__" && location === path;
-          return (
-            <button
-              key={path}
-              onClick={() => {
-                if (path === "__more__") { setSidebarOpen(o => !o); }
-              }}
-              className={cn("flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors",
-                isActive ? "text-primary" : "text-muted-foreground"
-              )}
-              data-testid={`mobile-bottom-nav-${label.toLowerCase()}`}
-            >
-              {path === "__more__" ? (
-                <>
-                  <Icon className="w-5 h-5" />
-                  <span className="text-[10px] font-medium">More</span>
-                </>
-              ) : (
-                <Link href={path} className="flex flex-col items-center justify-center gap-0.5 w-full h-full">
-                  <Icon className="w-5 h-5" />
-                  <span className="text-[10px] font-medium">{label}</span>
-                </Link>
-              )}
-            </button>
-          );
-        })}
+      {/* ── Mobile bottom bar: the five hubs ─── */}
+      <nav aria-label="Main" className="md:hidden fixed bottom-0 left-0 right-0 z-50 h-16 bg-card/95 backdrop-blur-xl border-t border-border flex items-stretch">
+        {mobileNavItems.map(({ icon: Icon, label, path, match }) => (
+          <Link key={path} href={path}
+            aria-current={isActive(match) ? "page" : undefined}
+            className={cn("flex-1 min-h-[44px] flex flex-col items-center justify-center gap-0.5 transition-colors",
+              isActive(match) ? "text-primary" : "text-muted-foreground")}
+            data-testid={`mobile-bottom-nav-${label.toLowerCase()}`}
+          >
+            <Icon className="w-5 h-5" aria-hidden="true" />
+            <span className="text-[10px] font-medium">{label}</span>
+          </Link>
+        ))}
       </nav>
 
       <KeyboardShortcuts open={shortcutsOpen} onOpenChange={setShortcutsOpen} />

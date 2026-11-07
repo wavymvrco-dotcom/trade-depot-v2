@@ -122,8 +122,8 @@ function QuizBlock({ subtopicId, onComplete }: { subtopicId: string; onComplete:
               {done ? (
                 <div className="text-center py-4 space-y-2">
                   <p className="text-2xl font-bold">{score}/{questions.length}</p>
-                  <p className={cn("text-sm font-semibold", score === questions.length ? "text-green-400" : score >= questions.length / 2 ? "text-amber-400" : "text-red-400")}>
-                    {score === questions.length ? "🎯 Perfect!" : score >= questions.length / 2 ? "Good effort!" : "Review the material and try again"}
+                  <p className={cn("text-sm font-semibold", score === questions.length ? "text-pos" : score >= questions.length / 2 ? "text-warn" : "text-neg")}>
+                    {score === questions.length ? "Perfect!" : score >= questions.length / 2 ? "Good effort!" : "Review the material and try again"}
                   </p>
                   <button onClick={() => { setCurrent(0); setSelected(null); setAnswered(false); setScore(0); setDone(false); }}
                     className="text-xs text-primary underline mt-1">Retry quiz</button>
@@ -140,8 +140,8 @@ function QuizBlock({ subtopicId, onComplete }: { subtopicId: string; onComplete:
                       <button key={i} onClick={() => handleSelect(i)} disabled={answered}
                         className={cn("w-full text-left text-xs px-3 py-2.5 rounded-lg border transition-all",
                           !answered ? "border-border hover:border-primary/50 hover:bg-primary/5" :
-                          i === q.correct ? "border-green-500 bg-green-500/10 text-green-400" :
-                          i === selected ? "border-red-500 bg-red-500/10 text-red-400" :
+                          i === q.correct ? "border-pos bg-pos/10 text-pos" :
+                          i === selected ? "border-neg bg-neg/10 text-neg" :
                           "border-border opacity-50"
                         )}>
                         <span className="font-medium mr-2">{String.fromCharCode(65 + i)}.</span>{opt}
@@ -150,7 +150,7 @@ function QuizBlock({ subtopicId, onComplete }: { subtopicId: string; onComplete:
                     ))}
                   </div>
                   {answered && (
-                    <div className={cn("text-xs p-2.5 rounded-lg border", isCorrect ? "bg-green-500/8 border-green-500/20 text-green-300" : "bg-red-500/8 border-red-500/20 text-red-300")}>
+                    <div className={cn("text-xs p-2.5 rounded-lg border", isCorrect ? "bg-pos/8 border-pos/20 text-pos" : "bg-neg/8 border-neg/20 text-neg")}>
                       <p className="font-semibold mb-0.5">{isCorrect ? "✓ Correct!" : "✗ Not quite"}</p>
                       <p className="text-muted-foreground">{q.explanation}</p>
                     </div>
@@ -184,7 +184,7 @@ type Level = { id: string; label: string; color: string; bg: string; icon: React
 
 const LEVELS: Level[] = [
   {
-    id: "beginner", label: "Beginner", color: "text-green-400", bg: "bg-green-500/10 border-green-500/25",
+    id: "beginner", label: "Beginner", color: "text-pos", bg: "bg-pos/10 border-pos/25",
     icon: BookOpen,
     topics: [
       {
@@ -272,8 +272,8 @@ const LEVELS: Level[] = [
               <div className="space-y-3 text-sm leading-relaxed text-foreground/90">
                 <p><strong>Minor pairs</strong> (also called crosses) don't include the USD but still involve major currencies. Examples: EUR/GBP, EUR/JPY, GBP/JPY. They're liquid but have wider spreads than majors.</p>
                 <p><strong>Exotic pairs</strong> pair a major currency with one from a developing economy: USD/TRY (Turkish Lira), USD/ZAR (South African Rand), USD/MXN (Mexican Peso). They have wide spreads, low liquidity, and can be extremely volatile.</p>
-                <div className="bg-amber-500/8 rounded-lg p-3 border border-amber-500/20">
-                  <p className="font-semibold text-xs mb-1 text-amber-400">⚠️ Beginners: stick to majors</p>
+                <div className="bg-warn/8 rounded-lg p-3 border border-warn/20">
+                  <p className="font-semibold text-xs mb-1 text-warn">Beginners: stick to majors</p>
                   <p className="text-xs text-muted-foreground">Exotic pairs can gap violently on news, have much higher trading costs, and are harder to analyze. Master EUR/USD and GBP/USD first.</p>
                 </div>
               </div>
@@ -288,10 +288,10 @@ const LEVELS: Level[] = [
                 <div className="bg-muted/30 rounded-lg p-4 border border-border font-mono text-center">
                   <p className="text-2xl font-bold mb-1">EUR/USD <span className="text-muted-foreground">1.0850 / 1.0852</span></p>
                   <div className="grid grid-cols-2 gap-4 text-xs mt-3">
-                    <div><p className="text-red-400 font-bold">BID: 1.0850</p><p className="text-muted-foreground">You SELL at this price</p></div>
-                    <div><p className="text-green-400 font-bold">ASK: 1.0852</p><p className="text-muted-foreground">You BUY at this price</p></div>
+                    <div><p className="text-neg font-bold">BID: 1.0850</p><p className="text-muted-foreground">You SELL at this price</p></div>
+                    <div><p className="text-pos font-bold">ASK: 1.0852</p><p className="text-muted-foreground">You BUY at this price</p></div>
                   </div>
-                  <p className="text-xs text-amber-400 mt-2">Spread = 2 pips (cost to enter the trade)</p>
+                  <p className="text-xs text-warn mt-2">Spread = 2 pips (cost to enter the trade)</p>
                 </div>
                 <p>The <strong>base currency</strong> is the first in the pair (EUR), and the <strong>quote currency</strong> is the second (USD). The price tells you how many USD you need to buy 1 EUR.</p>
               </div>
@@ -333,12 +333,12 @@ const LEVELS: Level[] = [
                   <div className="space-y-1 text-xs font-mono">
                     <p>Account balance: <span className="text-primary">$1,000</span></p>
                     <p>Position size: <span className="text-primary">$100,000</span> (1 standard lot)</p>
-                    <p>1 pip move: <span className="text-green-400">+$10 profit</span> or <span className="text-red-400">-$10 loss</span></p>
-                    <p>50 pip loss: <span className="text-red-400">-$500 (50% of account!)</span></p>
+                    <p>1 pip move: <span className="text-pos">+$10 profit</span> or <span className="text-neg">-$10 loss</span></p>
+                    <p>50 pip loss: <span className="text-neg">-$500 (50% of account!)</span></p>
                   </div>
                 </div>
-                <div className="bg-red-500/8 rounded-lg p-3 border border-red-500/20">
-                  <p className="font-semibold text-xs text-red-400 mb-1">⚠️ Leverage is a double-edged sword</p>
+                <div className="bg-neg/8 rounded-lg p-3 border border-neg/20">
+                  <p className="font-semibold text-xs text-neg mb-1">Leverage is a double-edged sword</p>
                   <p className="text-xs text-muted-foreground">High leverage amplifies both profits AND losses. A professional trader using 50:1 might risk 1% per trade. A beginner using 500:1 can blow up in minutes. Start low — 10:1 or 20:1 maximum as a beginner.</p>
                 </div>
               </div>
@@ -367,10 +367,10 @@ const LEVELS: Level[] = [
             content: (
               <div className="space-y-3 text-sm leading-relaxed text-foreground/90">
                 {[
-                  { t: "Market Order", c: "text-blue-400", d: "Executes immediately at the current market price. Fast but you pay the spread. Used when you want in NOW regardless of exact price.", ex: "EUR/USD at 1.1000 — buy now at whatever the ask is" },
-                  { t: "Limit Order", c: "text-green-400", d: "Executes only at your specified price or better. Buy limit below current price, sell limit above. You get the price you want or better.", ex: "EUR/USD at 1.1000 — buy if price drops to 1.0950" },
-                  { t: "Stop Order", c: "text-orange-400", d: "Executes when price reaches a specified level, then becomes a market order. Buy stop above price (breakout trades), sell stop below (breakdown).", ex: "EUR/USD at 1.1000 — buy if price breaks above 1.1050" },
-                  { t: "Stop-Limit", c: "text-violet-400", d: "Triggers at the stop price, then places a limit order. More control but risk of no fill if price moves through.", ex: "Trigger at 1.1050 → limit buy at 1.1055" },
+                  { t: "Market Order", c: "text-info", d: "Executes immediately at the current market price. Fast but you pay the spread. Used when you want in NOW regardless of exact price.", ex: "EUR/USD at 1.1000 — buy now at whatever the ask is" },
+                  { t: "Limit Order", c: "text-pos", d: "Executes only at your specified price or better. Buy limit below current price, sell limit above. You get the price you want or better.", ex: "EUR/USD at 1.1000 — buy if price drops to 1.0950" },
+                  { t: "Stop Order", c: "text-warn", d: "Executes when price reaches a specified level, then becomes a market order. Buy stop above price (breakout trades), sell stop below (breakdown).", ex: "EUR/USD at 1.1000 — buy if price breaks above 1.1050" },
+                  { t: "Stop-Limit", c: "text-info", d: "Triggers at the stop price, then places a limit order. More control but risk of no fill if price moves through.", ex: "Trigger at 1.1050 → limit buy at 1.1055" },
                 ].map(x => (
                   <div key={x.t} className="p-3 bg-muted/20 rounded-lg border border-border/50">
                     <p className={cn("font-bold text-sm mb-1", x.c)}>{x.t}</p>
@@ -388,12 +388,12 @@ const LEVELS: Level[] = [
               <div className="space-y-3 text-sm leading-relaxed text-foreground/90">
                 <p>These are the most important orders you'll ever place — they define your risk and reward before you enter a trade.</p>
                 <div className="space-y-2">
-                  <div className="p-3 bg-red-500/8 rounded-lg border border-red-500/20">
-                    <p className="font-bold text-red-400 text-sm mb-1">Stop Loss (SL)</p>
+                  <div className="p-3 bg-neg/8 rounded-lg border border-neg/20">
+                    <p className="font-bold text-neg text-sm mb-1">Stop Loss (SL)</p>
                     <p className="text-xs text-foreground/80">Automatically closes your position at a loss if price moves against you by your defined amount. It's your maximum risk on the trade. <strong>Never trade without one.</strong> Professional traders treat the stop loss as sacred — they never move it further away once placed.</p>
                   </div>
-                  <div className="p-3 bg-green-500/8 rounded-lg border border-green-500/20">
-                    <p className="font-bold text-green-400 text-sm mb-1">Take Profit (TP)</p>
+                  <div className="p-3 bg-pos/8 rounded-lg border border-pos/20">
+                    <p className="font-bold text-pos text-sm mb-1">Take Profit (TP)</p>
                     <p className="text-xs text-foreground/80">Closes your position automatically when price hits your target. Locks in profits even when you're away from the screen. Plan your TP at a realistic level — key support/resistance, a round number, or based on your risk:reward ratio.</p>
                   </div>
                 </div>
@@ -410,7 +410,7 @@ const LEVELS: Level[] = [
     ],
   },
   {
-    id: "intermediate", label: "Intermediate", color: "text-blue-400", bg: "bg-blue-500/10 border-blue-500/25",
+    id: "intermediate", label: "Intermediate", color: "text-info", bg: "bg-info/10 border-info/25",
     icon: TrendingUp,
     topics: [
       {
@@ -447,9 +447,9 @@ const LEVELS: Level[] = [
                 <p>"The trend is your friend" is the most quoted rule in trading for good reason. Trading with the trend increases your probability of success dramatically.</p>
                 <div className="space-y-2">
                   {[
-                    { t: "Uptrend", c: "text-green-400", d: "Higher highs (HH) and higher lows (HL). Each rally exceeds the last; each pullback holds above the previous pullback low. Buy on pullbacks to support." },
-                    { t: "Downtrend", c: "text-red-400", d: "Lower highs (LH) and lower lows (LL). Each rally fails below the previous high; each drop exceeds the previous low. Sell on bounces to resistance." },
-                    { t: "Ranging/Sideways", c: "text-amber-400", d: "Price oscillates between horizontal S/R. Buy at support, sell at resistance. Avoid trend-following strategies here." },
+                    { t: "Uptrend", c: "text-pos", d: "Higher highs (HH) and higher lows (HL). Each rally exceeds the last; each pullback holds above the previous pullback low. Buy on pullbacks to support." },
+                    { t: "Downtrend", c: "text-neg", d: "Lower highs (LH) and lower lows (LL). Each rally fails below the previous high; each drop exceeds the previous low. Sell on bounces to resistance." },
+                    { t: "Ranging/Sideways", c: "text-warn", d: "Price oscillates between horizontal S/R. Buy at support, sell at resistance. Avoid trend-following strategies here." },
                   ].map(x => (
                     <div key={x.t} className="p-2.5 bg-muted/20 rounded-lg border border-border/50">
                       <p className={cn("font-bold text-xs mb-1", x.c)}>{x.t}</p>
@@ -483,8 +483,8 @@ const LEVELS: Level[] = [
                     </div>
                   ))}
                 </div>
-                <div className="bg-amber-500/8 rounded-lg p-2.5 border border-amber-500/20 text-xs">
-                  <strong className="text-amber-400">Context matters:</strong> A hammer at random is meaningless. A hammer at a major support level after a strong downtrend = high-probability setup.
+                <div className="bg-warn/8 rounded-lg p-2.5 border border-warn/20 text-xs">
+                  <strong className="text-warn">Context matters:</strong> A hammer at random is meaningless. A hammer at a major support level after a strong downtrend = high-probability setup.
                 </div>
               </div>
             ),
@@ -502,7 +502,7 @@ const LEVELS: Level[] = [
                 <p>Moving averages smooth out price action to reveal the underlying trend. They're one of the most widely used indicators — meaning they become self-fulfilling as millions of traders watch the same levels.</p>
                 <div className="space-y-2">
                   <div className="p-3 bg-muted/20 rounded-lg border border-border/50">
-                    <p className="font-bold text-blue-400 text-xs mb-1">SMA (Simple Moving Average)</p>
+                    <p className="font-bold text-info text-xs mb-1">SMA (Simple Moving Average)</p>
                     <p className="text-xs text-muted-foreground">Equal weight to all periods. Slower to react. The 200 SMA on the daily chart is the most watched level in all of finance — institutions watch it religiously.</p>
                   </div>
                   <div className="p-3 bg-muted/20 rounded-lg border border-border/50">
@@ -529,9 +529,9 @@ const LEVELS: Level[] = [
               <div className="space-y-3 text-sm leading-relaxed text-foreground/90">
                 <p>RSI measures the speed and magnitude of price changes on a 0-100 scale. It's the most widely used momentum indicator.</p>
                 <div className="grid grid-cols-3 gap-2 text-center text-xs">
-                  <div className="bg-green-500/10 rounded-lg p-2.5 border border-green-500/25"><p className="font-bold text-green-400">RSI &lt; 30</p><p className="text-muted-foreground mt-1">Oversold — potential buy signal. Asset may have fallen too fast.</p></div>
+                  <div className="bg-pos/10 rounded-lg p-2.5 border border-pos/25"><p className="font-bold text-pos">RSI &lt; 30</p><p className="text-muted-foreground mt-1">Oversold — potential buy signal. Asset may have fallen too fast.</p></div>
                   <div className="bg-muted/30 rounded-lg p-2.5 border border-border"><p className="font-bold">RSI 30–70</p><p className="text-muted-foreground mt-1">Neutral zone — trend continues. Use other signals for entries.</p></div>
-                  <div className="bg-red-500/10 rounded-lg p-2.5 border border-red-500/25"><p className="font-bold text-red-400">RSI &gt; 70</p><p className="text-muted-foreground mt-1">Overbought — potential sell signal. Asset may have risen too fast.</p></div>
+                  <div className="bg-neg/10 rounded-lg p-2.5 border border-neg/25"><p className="font-bold text-neg">RSI &gt; 70</p><p className="text-muted-foreground mt-1">Overbought — potential sell signal. Asset may have risen too fast.</p></div>
                 </div>
                 <div className="bg-primary/8 rounded-lg p-2.5 border border-primary/20 text-xs">
                   <strong className="text-primary">Advanced: RSI Divergence</strong>
@@ -570,10 +570,10 @@ const LEVELS: Level[] = [
                 <p>Bollinger Bands consist of a middle SMA (usually 20-period) with two bands set 2 standard deviations above and below. They dynamically expand and contract with volatility.</p>
                 <div className="space-y-2 text-xs">
                   {[
-                    { t: "Band Squeeze", c: "text-amber-400", d: "When bands narrow, volatility is low. A squeeze often precedes a major breakout — price is coiling. Watch for the direction of the breakout." },
-                    { t: "Walking the Band", c: "text-green-400", d: "In strong trends, price 'walks' along the upper (uptrend) or lower (downtrend) band. This is NOT an overbought/sold signal — it confirms the trend strength." },
-                    { t: "Mean Reversion", c: "text-blue-400", d: "In ranging markets, price touching the upper band = potential sell; touching lower band = potential buy. But only works in ranges, not trends." },
-                    { t: "%B Indicator", c: "text-violet-400", d: "Shows where price is relative to the bands: above 1.0 = above upper band; below 0 = below lower band; 0.5 = at middle." },
+                    { t: "Band Squeeze", c: "text-warn", d: "When bands narrow, volatility is low. A squeeze often precedes a major breakout — price is coiling. Watch for the direction of the breakout." },
+                    { t: "Walking the Band", c: "text-pos", d: "In strong trends, price 'walks' along the upper (uptrend) or lower (downtrend) band. This is NOT an overbought/sold signal — it confirms the trend strength." },
+                    { t: "Mean Reversion", c: "text-info", d: "In ranging markets, price touching the upper band = potential sell; touching lower band = potential buy. But only works in ranges, not trends." },
+                    { t: "%B Indicator", c: "text-info", d: "Shows where price is relative to the bands: above 1.0 = above upper band; below 0 = below lower band; 0.5 = at middle." },
                   ].map(x => (
                     <div key={x.t} className="p-2.5 bg-muted/20 rounded-lg border border-border/50">
                       <p className={cn("font-bold mb-0.5", x.c)}>{x.t}</p>
@@ -596,10 +596,10 @@ const LEVELS: Level[] = [
               <div className="space-y-3 text-sm leading-relaxed text-foreground/90">
                 <div className="space-y-2">
                   {[
-                    { session: "Sydney", time: "10PM–7AM GMT", pairs: "AUD, NZD pairs", c: "text-green-400", d: "Quietest session. Low volatility except AUD/NZD news. Good for careful position management but avoid breakout trading." },
-                    { session: "Tokyo", time: "12AM–9AM GMT", pairs: "JPY pairs, AUD", c: "text-red-400", d: "Japanese banks active. JPY pairs move most. Range-bound for other pairs. BOJ interventions can cause sharp moves." },
-                    { session: "London", time: "8AM–5PM GMT", pairs: "EUR, GBP, CHF", c: "text-blue-400", d: "Most liquid session — ~35% of all forex volume. Trends start here. Major economic data from Europe moves markets significantly." },
-                    { session: "New York", time: "1PM–10PM GMT", pairs: "USD pairs", c: "text-amber-400", d: "Heavy volume especially when overlapping with London (1-5PM GMT). US data releases (NFP, CPI, FOMC) cause extreme volatility." },
+                    { session: "Sydney", time: "10PM–7AM GMT", pairs: "AUD, NZD pairs", c: "text-pos", d: "Quietest session. Low volatility except AUD/NZD news. Good for careful position management but avoid breakout trading." },
+                    { session: "Tokyo", time: "12AM–9AM GMT", pairs: "JPY pairs, AUD", c: "text-neg", d: "Japanese banks active. JPY pairs move most. Range-bound for other pairs. BOJ interventions can cause sharp moves." },
+                    { session: "London", time: "8AM–5PM GMT", pairs: "EUR, GBP, CHF", c: "text-info", d: "Most liquid session — ~35% of all forex volume. Trends start here. Major economic data from Europe moves markets significantly." },
+                    { session: "New York", time: "1PM–10PM GMT", pairs: "USD pairs", c: "text-warn", d: "Heavy volume especially when overlapping with London (1-5PM GMT). US data releases (NFP, CPI, FOMC) cause extreme volatility." },
                   ].map(x => (
                     <div key={x.session} className="p-3 bg-muted/20 rounded-lg border border-border/50">
                       <div className="flex items-center justify-between mb-1">
@@ -623,7 +623,7 @@ const LEVELS: Level[] = [
     ],
   },
   {
-    id: "advanced", label: "Advanced", color: "text-violet-400", bg: "bg-violet-500/10 border-violet-500/25",
+    id: "advanced", label: "Advanced", color: "text-info", bg: "bg-info/10 border-info/25",
     icon: Brain,
     topics: [
       {
@@ -636,15 +636,15 @@ const LEVELS: Level[] = [
                 <p>Market structure is the backbone of price action trading. Understanding it means you can read where the market is likely to go before an indicator tells you.</p>
                 <div className="space-y-2">
                   <div className="p-3 bg-muted/20 rounded-lg border border-border/50">
-                    <p className="font-bold text-green-400 text-xs mb-1.5">Bullish Market Structure</p>
+                    <p className="font-bold text-pos text-xs mb-1.5">Bullish Market Structure</p>
                     <p className="text-xs text-muted-foreground">Price makes Higher Highs (HH) and Higher Lows (HL). As long as each pullback holds above the previous HL, the trend is intact. A break below the previous HL = structure shift warning. A break below a significant HL = confirmed trend reversal.</p>
                   </div>
                   <div className="p-3 bg-muted/20 rounded-lg border border-border/50">
-                    <p className="font-bold text-red-400 text-xs mb-1.5">Break of Structure (BOS)</p>
+                    <p className="font-bold text-neg text-xs mb-1.5">Break of Structure (BOS)</p>
                     <p className="text-xs text-muted-foreground">A BOS occurs when price breaks the most recent significant high (in a downtrend) or low (in an uptrend). This signals the trend is weakening. Combine with other confluence for high-quality entries after a BOS.</p>
                   </div>
                   <div className="p-3 bg-muted/20 rounded-lg border border-border/50">
-                    <p className="font-bold text-amber-400 text-xs mb-1.5">Change of Character (ChoCH)</p>
+                    <p className="font-bold text-warn text-xs mb-1.5">Change of Character (ChoCH)</p>
                     <p className="text-xs text-muted-foreground">A ChoCH is a more significant structural shift — price aggressively breaks a key swing point. More reliable than a minor BOS. Smart money traders wait for ChoCH before calling a reversal.</p>
                   </div>
                 </div>
@@ -660,8 +660,8 @@ const LEVELS: Level[] = [
                 <div className="space-y-2">
                   {[
                     { t: "Pin Bar", c: "text-primary", d: "A single candle with a long wick and small body. The wick shows strong rejection of a price level. Bullish pin at support (long lower wick) = buyers took over. Bearish pin at resistance (long upper wick) = sellers in control. Minimum 2/3 of the candle should be wick.", tip: "Best with: trend alignment + key level + strong wick with small body" },
-                    { t: "Inside Bar", c: "text-violet-400", d: "The entire candle fits within the previous candle's range. Represents consolidation and indecision. After a breakout, inside bars show the market 'resting'. A breakout of the inside bar in the trend direction = continuation entry.", tip: "Best with: trending market + recent momentum candle + breakout in trend direction" },
-                    { t: "Fakey / False Break", c: "text-amber-400", d: "Price breaks an inside bar or key level, then quickly reverses — trapping breakout traders. One of the highest-probability setups. The reversal candle often becomes a strong pin bar.", tip: "Best with: false breakout of key level + reversal candle + volume spike" },
+                    { t: "Inside Bar", c: "text-info", d: "The entire candle fits within the previous candle's range. Represents consolidation and indecision. After a breakout, inside bars show the market 'resting'. A breakout of the inside bar in the trend direction = continuation entry.", tip: "Best with: trending market + recent momentum candle + breakout in trend direction" },
+                    { t: "Fakey / False Break", c: "text-warn", d: "Price breaks an inside bar or key level, then quickly reverses — trapping breakout traders. One of the highest-probability setups. The reversal candle often becomes a strong pin bar.", tip: "Best with: false breakout of key level + reversal candle + volume spike" },
                   ].map(x => (
                     <div key={x.t} className="p-3 bg-muted/20 rounded-lg border border-border/50">
                       <p className={cn("font-bold text-sm mb-1", x.c)}>{x.t}</p>
@@ -717,7 +717,7 @@ const LEVELS: Level[] = [
                     { e: "Overtrading", d: "Taking 10 trades a day when your edge only appears 2-3 times. More trades = more exposure to bad setups. Quality over quantity." },
                   ].map(x => (
                     <div key={x.e} className="p-2.5 bg-muted/20 rounded-lg border border-border/50">
-                      <p className="font-semibold text-xs text-red-400 mb-1">{x.e}</p>
+                      <p className="font-semibold text-xs text-neg mb-1">{x.e}</p>
                       <p className="text-xs text-muted-foreground">{x.d}</p>
                     </div>
                   ))}
@@ -756,7 +756,7 @@ const LEVELS: Level[] = [
     ],
   },
   {
-    id: "expert", label: "Expert", color: "text-amber-400", bg: "bg-amber-500/10 border-amber-500/25",
+    id: "expert", label: "Expert", color: "text-warn", bg: "bg-warn/10 border-warn/25",
     icon: Trophy,
     topics: [
       {
@@ -774,12 +774,12 @@ const LEVELS: Level[] = [
                     <p className="font-mono text-xs bg-muted/30 p-2 rounded">Lot Size = (Account × Risk%) ÷ (SL pips × Pip Value)</p>
                   </div>
                   <div className="p-3 bg-muted/20 rounded-lg border border-border/50">
-                    <p className="font-bold text-violet-400 text-xs mb-1.5">Kelly Criterion</p>
+                    <p className="font-bold text-info text-xs mb-1.5">Kelly Criterion</p>
                     <p className="text-xs text-muted-foreground mb-2">Mathematical formula for optimal bet sizing: f = (bp - q) ÷ b, where b = win/loss ratio, p = win probability, q = loss probability. In practice, use half-Kelly to reduce variance.</p>
                     <p className="text-[10px] text-muted-foreground">Example: 55% win rate, 1.5:1 R:R → Kelly = 18.3%, Half-Kelly = 9.2% max risk</p>
                   </div>
                   <div className="p-3 bg-muted/20 rounded-lg border border-border/50">
-                    <p className="font-bold text-amber-400 text-xs mb-1.5">Pyramiding (Scaling In)</p>
+                    <p className="font-bold text-warn text-xs mb-1.5">Pyramiding (Scaling In)</p>
                     <p className="text-xs text-muted-foreground">Adding to a winning position at logical technical levels. Each add must use a smaller size. Move your SL to breakeven after first add. Never add to a losing position.</p>
                   </div>
                 </div>
@@ -796,7 +796,7 @@ const LEVELS: Level[] = [
                   <p className="font-sans font-semibold text-sm mb-2 font-sans">Recovery math — why preserving capital matters:</p>
                   {[["10% drawdown","11.1% gain to recover"],["20% drawdown","25% gain to recover"],["30% drawdown","42.9% gain to recover"],["50% drawdown","100% gain to recover"],["75% drawdown","300% gain to recover"]].map(([d,r])=>(
                     <div key={d} className="flex justify-between py-0.5 border-b border-border/30">
-                      <span className="text-red-400">{d}</span><span className="text-green-400">{r}</span>
+                      <span className="text-neg">{d}</span><span className="text-pos">{r}</span>
                     </div>
                   ))}
                 </div>
@@ -816,8 +816,8 @@ const LEVELS: Level[] = [
               <div className="space-y-3 text-sm leading-relaxed text-foreground/90">
                 <p>Backtesting runs a trading strategy on historical data to estimate its real-world performance. It's the foundation of quant trading — but it's full of pitfalls that fool even experienced traders.</p>
                 <div className="space-y-2">
-                  <div className="p-3 bg-red-500/8 rounded-lg border border-red-500/20">
-                    <p className="font-bold text-red-400 text-xs mb-1">⚠️ Overfitting (Curve Fitting)</p>
+                  <div className="p-3 bg-neg/8 rounded-lg border border-neg/20">
+                    <p className="font-bold text-neg text-xs mb-1">Overfitting (Curve Fitting)</p>
                     <p className="text-xs text-muted-foreground">Optimising parameters to fit past data perfectly doesn't mean the strategy will work going forward. If your strategy has 15+ parameters and works only on specific years, it's likely overfitted. Use out-of-sample testing and walk-forward analysis.</p>
                   </div>
                   <div className="p-3 bg-muted/20 rounded-lg border border-border/50">
@@ -828,8 +828,8 @@ const LEVELS: Level[] = [
                       ))}
                     </div>
                   </div>
-                  <div className="p-3 bg-green-500/8 rounded-lg border border-green-500/20">
-                    <p className="font-bold text-green-400 text-xs mb-1">Monte Carlo Simulation</p>
+                  <div className="p-3 bg-pos/8 rounded-lg border border-pos/20">
+                    <p className="font-bold text-pos text-xs mb-1">Monte Carlo Simulation</p>
                     <p className="text-xs text-muted-foreground">Randomly reshuffles your trade sequence thousands of times to show the range of possible outcomes. Reveals worst-case drawdown scenarios. If even 5% of scenarios show ruin, your sizing is too aggressive.</p>
                   </div>
                 </div>
@@ -845,9 +845,9 @@ const LEVELS: Level[] = [
                 <div className="space-y-2">
                   {[
                     { t: "Order Blocks (OB)", c: "text-primary", d: "The last bearish candle before a strong bullish impulse (bullish OB) or last bullish before bearish impulse (bearish OB). This is where institutions placed their orders. Price often returns to OBs to fill remaining orders before continuing." },
-                    { t: "Fair Value Gaps (FVG)", c: "text-violet-400", d: "A 3-candle pattern where the wicks of the 1st and 3rd candle don't overlap, creating an imbalance. Institutions often drive price back to fill these gaps before continuing the move." },
-                    { t: "Liquidity Sweeps", c: "text-amber-400", d: "Stop hunts — price briefly breaks above a swing high (to trigger retail buy stops) or below a swing low (to trigger sell stops), then reverses. This is institutions filling orders at retail's expense." },
-                    { t: "Premium & Discount Zones", c: "text-green-400", d: "Use the Fibonacci 0.5 level on a range. Above 0.5 = premium (institutions sell). Below 0.5 = discount (institutions buy). This is the institutional version of buying low and selling high." },
+                    { t: "Fair Value Gaps (FVG)", c: "text-info", d: "A 3-candle pattern where the wicks of the 1st and 3rd candle don't overlap, creating an imbalance. Institutions often drive price back to fill these gaps before continuing the move." },
+                    { t: "Liquidity Sweeps", c: "text-warn", d: "Stop hunts — price briefly breaks above a swing high (to trigger retail buy stops) or below a swing low (to trigger sell stops), then reverses. This is institutions filling orders at retail's expense." },
+                    { t: "Premium & Discount Zones", c: "text-pos", d: "Use the Fibonacci 0.5 level on a range. Above 0.5 = premium (institutions sell). Below 0.5 = discount (institutions buy). This is the institutional version of buying low and selling high." },
                   ].map(x => (
                     <div key={x.t} className="p-3 bg-muted/20 rounded-lg border border-border/50">
                       <p className={cn("font-bold text-xs mb-1", x.c)}>{x.t}</p>
@@ -872,9 +872,9 @@ const LEVELS: Level[] = [
                 <div className="space-y-2">
                   {[
                     { t: "Interest Rates (Most Important)", c: "text-primary", d: "Higher interest rates → currency appreciates. Capital flows to higher-yielding currencies. When the Fed raises rates, USD typically strengthens. Follow central bank decisions, dot plots, and meeting minutes closely." },
-                    { t: "Inflation (CPI, PCE)", c: "text-orange-400", d: "High inflation forces central banks to raise rates → bullish currency. But hyperinflation is destructive. Watch CPI releases — they directly influence rate expectations and currency pairs." },
-                    { t: "Employment Data (NFP)", c: "text-green-400", d: "Strong jobs data → higher rates likely → stronger currency. The US Non-Farm Payrolls (NFP) is the single most market-moving monthly release. It drops first Friday of each month." },
-                    { t: "GDP & Growth", c: "text-blue-400", d: "Strong GDP growth suggests currency strength. Slowdowns signal weakness. Compare relative growth between two countries — the stronger economy's currency tends to outperform." },
+                    { t: "Inflation (CPI, PCE)", c: "text-warn", d: "High inflation forces central banks to raise rates → bullish currency. But hyperinflation is destructive. Watch CPI releases — they directly influence rate expectations and currency pairs." },
+                    { t: "Employment Data (NFP)", c: "text-pos", d: "Strong jobs data → higher rates likely → stronger currency. The US Non-Farm Payrolls (NFP) is the single most market-moving monthly release. It drops first Friday of each month." },
+                    { t: "GDP & Growth", c: "text-info", d: "Strong GDP growth suggests currency strength. Slowdowns signal weakness. Compare relative growth between two countries — the stronger economy's currency tends to outperform." },
                   ].map(x => (
                     <div key={x.t} className="p-3 bg-muted/20 rounded-lg border border-border/50">
                       <p className={cn("font-bold text-xs mb-1", x.c)}>{x.t}</p>
@@ -891,7 +891,7 @@ const LEVELS: Level[] = [
     ],
   },
   {
-    id: "institutional", label: "Institutional", color: "text-violet-400", bg: "bg-violet-500/10 border-violet-500/25",
+    id: "institutional", label: "Institutional", color: "text-info", bg: "bg-info/10 border-info/25",
     icon: Building2,
     topics: [
       {
@@ -910,7 +910,7 @@ const LEVELS: Level[] = [
                     { t: "Inducement (IDM)", d: "Before a true reversal, institutions must induce retail traders to enter the wrong direction. A small liquidity grab below/above a minor swing — just before the real move — is the inducement. It's the fake-out before the real move." },
                   ].map(x => (
                     <div key={x.t} className="flex gap-2.5 p-2.5 bg-muted/20 rounded-lg border border-border/50">
-                      <span className="font-semibold text-violet-400 text-xs w-44 shrink-0 mt-0.5">{x.t}</span>
+                      <span className="font-semibold text-info text-xs w-44 shrink-0 mt-0.5">{x.t}</span>
                       <span className="text-muted-foreground text-xs leading-relaxed">{x.d}</span>
                     </div>
                   ))}
@@ -932,7 +932,7 @@ const LEVELS: Level[] = [
                     { t: "Breaker Block", d: "A failed order block that gets taken out. When price sweeps through an OB and continues, that original OB becomes a breaker — it now acts as a resistance (former bullish OB becomes bearish resistance after BOS failure)." },
                   ].map(x => (
                     <div key={x.t} className="flex gap-2.5 p-2.5 bg-muted/20 rounded-lg border border-border/50">
-                      <span className="font-semibold text-violet-400 text-xs w-44 shrink-0 mt-0.5">{x.t}</span>
+                      <span className="font-semibold text-info text-xs w-44 shrink-0 mt-0.5">{x.t}</span>
                       <span className="text-muted-foreground text-xs leading-relaxed">{x.d}</span>
                     </div>
                   ))}
@@ -954,7 +954,7 @@ const LEVELS: Level[] = [
                     { t: "Kill Zones", d: "Specific time windows with highest institutional activity: London Open (2–5 AM EST), New York Open (7–10 AM EST), London Close (10 AM–12 PM EST). These are the highest-probability windows for OTE entries. Avoid trading outside kill zones for setups." },
                   ].map(x => (
                     <div key={x.t} className="flex gap-2.5 p-2.5 bg-muted/20 rounded-lg border border-border/50">
-                      <span className="font-semibold text-violet-400 text-xs w-44 shrink-0 mt-0.5">{x.t}</span>
+                      <span className="font-semibold text-info text-xs w-44 shrink-0 mt-0.5">{x.t}</span>
                       <span className="text-muted-foreground text-xs leading-relaxed">{x.d}</span>
                     </div>
                   ))}
@@ -975,7 +975,7 @@ const LEVELS: Level[] = [
                 <p>The momentum factor is one of the most documented and persistent anomalies in financial markets — first formally described by Jegadeesh & Titman (1993). It works in forex, equities, and commodities.</p>
                 <p>The core principle: rank all instruments in your universe by their trailing 1–12 month returns. <strong>Long the top quintile. Short (or avoid) the bottom quintile.</strong> Rebalance periodically. The spread generates consistent positive expected value.</p>
                 <div className="bg-muted/30 rounded-lg p-3 border border-border">
-                  <p className="font-semibold text-xs mb-2 text-violet-400">Why does momentum persist?</p>
+                  <p className="font-semibold text-xs mb-2 text-info">Why does momentum persist?</p>
                   <ul className="text-xs space-y-1 text-muted-foreground">
                     <li>→ Slow institutional repositioning (large funds can't move instantly)</li>
                     <li>→ Anchoring bias (investors anchor to old prices, underreact to new trends)</li>
@@ -1022,8 +1022,8 @@ const LEVELS: Level[] = [
                     { pair: "XAU/USD (Gold)", corr: "−0.70 to −0.85", note: "DXY up = Gold pressure. Breaks down in risk-off crisis (gold rises despite USD)." },
                   ].map(x => (
                     <div key={x.pair} className="flex gap-2.5 p-2 bg-muted/20 rounded border border-border/40">
-                      <span className="font-bold text-violet-400 text-xs w-28 shrink-0">{x.pair}</span>
-                      <span className="text-green-400 text-xs w-24 shrink-0 font-mono">{x.corr}</span>
+                      <span className="font-bold text-info text-xs w-28 shrink-0">{x.pair}</span>
+                      <span className="text-pos text-xs w-24 shrink-0 font-mono">{x.corr}</span>
                       <span className="text-muted-foreground text-xs">{x.note}</span>
                     </div>
                   ))}
@@ -1039,7 +1039,7 @@ const LEVELS: Level[] = [
               <div className="space-y-3 text-sm leading-relaxed text-foreground/90">
                 <p>Government bond yields are the primary driver of long-term currency trends. When a country's yields rise relative to others, capital flows in to capture higher returns, bidding up its currency.</p>
                 <div className="bg-muted/30 rounded-lg p-3 border border-border mb-3">
-                  <p className="font-semibold text-xs mb-2 text-violet-400">Key Yield Relationships</p>
+                  <p className="font-semibold text-xs mb-2 text-info">Key Yield Relationships</p>
                   <div className="space-y-1 text-xs text-muted-foreground">
                     <p>→ <strong className="text-foreground">US 10yr ↑</strong> → USD/JPY ↑ (strongest yield/FX relationship)</p>
                     <p>→ <strong className="text-foreground">US−EU 2yr spread ↑</strong> → EUR/USD ↓ (rate differential drives direction)</p>
@@ -1071,7 +1071,7 @@ const LEVELS: Level[] = [
                     { t: "Delta", d: "Cumulative Delta = net difference between buys at ask (aggressor buyers) vs sells at bid (aggressor sellers). Rising price with negative delta = institutions selling into retail buying — bearish divergence, expect reversal." },
                   ].map(x => (
                     <div key={x.t} className="flex gap-2.5 p-2.5 bg-muted/20 rounded-lg border border-border/50">
-                      <span className="font-semibold text-violet-400 text-xs w-36 shrink-0 mt-0.5">{x.t}</span>
+                      <span className="font-semibold text-info text-xs w-36 shrink-0 mt-0.5">{x.t}</span>
                       <span className="text-muted-foreground text-xs leading-relaxed">{x.d}</span>
                     </div>
                   ))}
@@ -1086,12 +1086,12 @@ const LEVELS: Level[] = [
               <div className="space-y-3 text-sm leading-relaxed text-foreground/90">
                 <p>Delta divergence is one of the most powerful microstructure signals. When price moves in one direction but the order flow tells a different story, institutions are quietly positioning against the visible move.</p>
                 <div className="bg-muted/30 rounded-lg p-3 border border-border mb-3">
-                  <p className="font-semibold text-xs mb-2 text-violet-400">Key Delta Divergence Patterns</p>
+                  <p className="font-semibold text-xs mb-2 text-info">Key Delta Divergence Patterns</p>
                   <div className="space-y-1.5 text-xs">
-                    <div className="flex gap-2"><span className="text-red-400 font-bold w-32 shrink-0">Price up, Delta ↓</span><span className="text-muted-foreground">Bearish: institutions selling into retail buying. Reversal likely.</span></div>
-                    <div className="flex gap-2"><span className="text-green-400 font-bold w-32 shrink-0">Price down, Delta ↑</span><span className="text-muted-foreground">Bullish: institutions buying into retail selling. Reversal likely.</span></div>
-                    <div className="flex gap-2"><span className="text-blue-400 font-bold w-32 shrink-0">Absorption</span><span className="text-muted-foreground">Large aggressive orders fail to move price — opposing institutions absorbing every hit.</span></div>
-                    <div className="flex gap-2"><span className="text-orange-400 font-bold w-32 shrink-0">Exhaustion</span><span className="text-muted-foreground">Very large delta spike that fails to produce new price high/low — buying/selling exhaustion.</span></div>
+                    <div className="flex gap-2"><span className="text-neg font-bold w-32 shrink-0">Price up, Delta ↓</span><span className="text-muted-foreground">Bearish: institutions selling into retail buying. Reversal likely.</span></div>
+                    <div className="flex gap-2"><span className="text-pos font-bold w-32 shrink-0">Price down, Delta ↑</span><span className="text-muted-foreground">Bullish: institutions buying into retail selling. Reversal likely.</span></div>
+                    <div className="flex gap-2"><span className="text-info font-bold w-32 shrink-0">Absorption</span><span className="text-muted-foreground">Large aggressive orders fail to move price — opposing institutions absorbing every hit.</span></div>
+                    <div className="flex gap-2"><span className="text-warn font-bold w-32 shrink-0">Exhaustion</span><span className="text-muted-foreground">Very large delta spike that fails to produce new price high/low — buying/selling exhaustion.</span></div>
                   </div>
                 </div>
                 <p>Absorption is the highest-conviction microstructure signal: when large market orders are being relentlessly absorbed at a price level without moving it, a massive resting institutional order is there. Price will eventually either break it with enormous force or reverse sharply.</p>
@@ -1173,7 +1173,7 @@ function TradingCalculators() {
         {/* Pip Value Calculator */}
         <div className="bg-card/40 border border-border rounded-xl overflow-hidden">
           <div className="bg-card/60 px-5 py-3.5 border-b border-border flex items-center gap-2">
-            <TrendingUp className="w-4 h-4 text-green-400" />
+            <TrendingUp className="w-4 h-4 text-pos" />
             <h3 className="font-bold text-sm">Pip Value Calculator</h3>
             <span className="text-xs text-muted-foreground ml-1">— How much is each pip worth?</span>
           </div>
@@ -1200,7 +1200,7 @@ function TradingCalculators() {
             <div className="grid grid-cols-3 gap-3">
               {[
                 { label: "Value per Pip", value: `$${pipDollar.toFixed(2)}`, color: "text-primary" },
-                { label: `Value × ${pipCount} pips`, value: `$${totalPips}`, color: "text-green-400" },
+                { label: `Value × ${pipCount} pips`, value: `$${totalPips}`, color: "text-pos" },
                 { label: "Pip Size", value: pipSz(pipSymbol).toString(), color: "text-muted-foreground" },
               ].map(({ label, value, color }) => (
                 <div key={label} className="bg-background/50 rounded-lg p-3 border border-border/50 text-center">
@@ -1215,7 +1215,7 @@ function TradingCalculators() {
         {/* Position Size Calculator */}
         <div className="bg-card/40 border border-border rounded-xl overflow-hidden">
           <div className="bg-card/60 px-5 py-3.5 border-b border-border flex items-center gap-2">
-            <Shield className="w-4 h-4 text-blue-400" />
+            <Shield className="w-4 h-4 text-info" />
             <h3 className="font-bold text-sm">Position Size Calculator</h3>
             <span className="text-xs text-muted-foreground ml-1">— How many lots should you trade?</span>
           </div>
@@ -1262,7 +1262,7 @@ function TradingCalculators() {
         {/* Risk/Reward Analyser */}
         <div className="bg-card/40 border border-border rounded-xl overflow-hidden">
           <div className="bg-card/60 px-5 py-3.5 border-b border-border flex items-center gap-2">
-            <Target className="w-4 h-4 text-yellow-400" />
+            <Target className="w-4 h-4 text-warn" />
             <h3 className="font-bold text-sm">Risk/Reward & Expected Value</h3>
             <span className="text-xs text-muted-foreground ml-1">— Is your trade worth taking?</span>
           </div>
@@ -1285,10 +1285,10 @@ function TradingCalculators() {
             {/* Visual R:R bar */}
             <div className="mb-4">
               <div className="flex gap-1 h-8 rounded-lg overflow-hidden">
-                <div className="bg-red-500/70 flex items-center justify-center text-[10px] font-bold text-white transition-all" style={{ width: `${(rrRisk / (rrRisk + rrReward)) * 100}%` }}>
+                <div className="bg-neg/70 flex items-center justify-center text-[10px] font-bold text-foreground transition-all" style={{ width: `${(rrRisk / (rrRisk + rrReward)) * 100}%` }}>
                   Risk
                 </div>
-                <div className="bg-green-500/70 flex-1 flex items-center justify-center text-[10px] font-bold text-white">
+                <div className="bg-pos/70 flex-1 flex items-center justify-center text-[10px] font-bold text-foreground">
                   Reward
                 </div>
               </div>
@@ -1296,8 +1296,8 @@ function TradingCalculators() {
 
             <div className="grid grid-cols-3 gap-3">
               {[
-                { label: "R:R Ratio", value: `1:${rrRatio}`, color: parseFloat(rrRatio as string) >= 2 ? "text-green-400" : "text-orange-400" },
-                { label: "Expected Value", value: `${evPositive ? "+" : ""}${expectedValue}`, color: evPositive ? "text-green-400" : "text-destructive" },
+                { label: "R:R Ratio", value: `1:${rrRatio}`, color: parseFloat(rrRatio as string) >= 2 ? "text-pos" : "text-warn" },
+                { label: "Expected Value", value: `${evPositive ? "+" : ""}${expectedValue}`, color: evPositive ? "text-pos" : "text-destructive" },
                 { label: "Break-even Win%", value: `${(rrRisk / (rrRisk + rrReward) * 100).toFixed(1)}%`, color: "text-muted-foreground" },
               ].map(({ label, value, color }) => (
                 <div key={label} className="bg-background/50 rounded-lg p-3 border border-border/50 text-center">
@@ -1306,8 +1306,8 @@ function TradingCalculators() {
                 </div>
               ))}
             </div>
-            <div className={cn("mt-3 rounded-lg px-4 py-2.5 text-xs font-semibold text-center border", evPositive ? "bg-green-500/10 border-green-500/20 text-green-400" : "bg-destructive/10 border-destructive/20 text-destructive")}>
-              {evPositive ? `✅ Positive expected value — this setup is mathematically favourable at your win rate.` : `⚠️ Negative expected value — improve your R:R ratio or win rate before trading this setup.`}
+            <div className={cn("mt-3 rounded-lg px-4 py-2.5 text-xs font-semibold text-center border", evPositive ? "bg-pos/10 border-pos/20 text-pos" : "bg-destructive/10 border-destructive/20 text-destructive")}>
+              {evPositive ? `Positive expected value — this setup is mathematically favourable at your win rate.` : `Negative expected value — improve your R:R ratio or win rate before trading this setup.`}
             </div>
           </div>
         </div>
@@ -1379,10 +1379,10 @@ export default function Learn() {
                 <div className="space-y-1.5">
                   <div className="flex justify-between text-[11px]">
                     <span className="text-muted-foreground">{completed}/{total} lessons</span>
-                    <span className={cn("font-bold", pct === 100 ? "text-green-400" : "text-primary")}>{pct}%</span>
+                    <span className={cn("font-bold", pct === 100 ? "text-pos" : "text-primary")}>{pct}%</span>
                   </div>
                   <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                    <motion.div className="h-full bg-gradient-to-r from-primary to-accent rounded-full" animate={{ width: `${pct}%` }} transition={{ duration: 0.5 }} />
+                    <motion.div className="h-full bg-primary rounded-full" animate={{ width: `${pct}%` }} transition={{ duration: 0.5 }} />
                   </div>
                 </div>
                 <div className="relative mt-3">
@@ -1450,7 +1450,7 @@ export default function Learn() {
                                           )}
                                         >
                                           {progress[sub.id]
-                                            ? <CheckCircle2 className="w-3 h-3 text-green-500 shrink-0" />
+                                            ? <CheckCircle2 className="w-3 h-3 text-pos shrink-0" />
                                             : <Circle className="w-3 h-3 shrink-0 opacity-40" />}
                                           <span className="flex-1 leading-snug">{sub.title}</span>
                                           <span className="text-[10px] opacity-50 shrink-0 flex items-center gap-0.5">
@@ -1496,8 +1496,8 @@ export default function Learn() {
             /* Welcome screen */
             <div className="h-full flex flex-col items-center justify-center p-8 text-center">
               <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", bounce: 0.4 }}
-                className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center mb-5 shadow-lg shadow-primary/20">
-                <BookOpen className="w-8 h-8 text-white" />
+                className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center mb-5 shadow-lg">
+                <BookOpen className="w-8 h-8 text-foreground" />
               </motion.div>
               <h1 className="text-2xl font-bold mb-2">Trading Knowledge Library</h1>
               <p className="text-muted-foreground text-sm max-w-md mb-8 leading-relaxed">
@@ -1513,7 +1513,7 @@ export default function Learn() {
                       <l.icon className={cn("w-6 h-6 mx-auto mb-2", l.color)} />
                       <p className={cn("font-bold text-sm", l.color)}>{l.label}</p>
                       <p className="text-[10px] text-muted-foreground mt-1">{levelTotal} lessons</p>
-                      {levelDone > 0 && <p className="text-[10px] text-green-400 mt-0.5">{levelDone} completed</p>}
+                      {levelDone > 0 && <p className="text-[10px] text-pos mt-0.5">{levelDone} completed</p>}
                     </div>
                   );
                 })}
@@ -1551,7 +1551,7 @@ export default function Learn() {
                   <button
                     onClick={() => toggleRead(selected.sub.id)}
                     className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all shrink-0",
-                      progress[selected.sub.id] ? "border-green-500/50 bg-green-500/10 text-green-400" : "border-border bg-muted/30 text-muted-foreground hover:text-foreground"
+                      progress[selected.sub.id] ? "border-pos/50 bg-pos/10 text-pos" : "border-border bg-muted/30 text-muted-foreground hover:text-foreground"
                     )}
                     data-testid="button-mark-read"
                   >

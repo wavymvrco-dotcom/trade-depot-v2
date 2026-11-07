@@ -133,10 +133,10 @@ function MarketSessionClock() {
   }, []);
 
   const SESSIONS = [
-    { name: "Sydney",   color: "#10b981", open: 21, close: 6  },
-    { name: "Tokyo",    color: "#3b82f6", open: 23, close: 8  },
-    { name: "London",   color: "#f59e0b", open: 7,  close: 16 },
-    { name: "New York", color: "#ef4444", open: 12, close: 21 },
+    { name: "Sydney",   color: "var(--rj-pos)", open: 21, close: 6  },
+    { name: "Tokyo",    color: "var(--rj-info)", open: 23, close: 8  },
+    { name: "London",   color: "var(--rj-warn)", open: 7,  close: 16 },
+    { name: "New York", color: "var(--rj-neg)", open: 12, close: 21 },
   ];
 
   const utcHour = now.getUTCHours() + now.getUTCMinutes() / 60;
@@ -170,7 +170,7 @@ function MarketSessionClock() {
               <div className="flex items-center gap-2 mb-2">
                 <div className={`w-2 h-2 rounded-full ${open ? "animate-pulse" : "opacity-30"}`} style={{ background: s.color }} />
                 <span className="font-semibold text-xs">{s.name}</span>
-                <span className={`ml-auto text-[10px] font-bold ${open ? "text-green-500" : "text-muted-foreground"}`}>
+                <span className={`ml-auto text-[10px] font-bold ${open ? "text-pos" : "text-muted-foreground"}`}>
                   {open ? "OPEN" : "CLOSED"}
                 </span>
               </div>
@@ -246,9 +246,9 @@ function SessionWinRate({ history }: { history: Position[] }) {
       </div>
 
       {bestSession && bestSession.trades >= 2 && (
-        <div className="bg-green-500/8 border border-green-500/20 rounded-lg px-4 py-2.5 flex items-center gap-3">
-          <Trophy className="w-4 h-4 text-green-400 shrink-0" />
-          <p className="text-xs text-green-300">
+        <div className="bg-pos/8 border border-pos/20 rounded-lg px-4 py-2.5 flex items-center gap-3">
+          <Trophy className="w-4 h-4 text-pos shrink-0" />
+          <p className="text-xs text-pos">
             <strong>Best session:</strong> {bestSession.label.split("\n")[0]} with <strong>{bestSession.winRate}% win rate</strong> over {bestSession.trades} trades (${bestSession.totalPL >= 0 ? "+" : ""}{bestSession.totalPL})
           </p>
         </div>
@@ -262,7 +262,7 @@ function SessionWinRate({ history }: { history: Position[] }) {
               <p className="text-xs text-muted-foreground italic">Need 2+ trades</p>
             ) : (
               <>
-                <p className={cn("text-2xl font-bold font-mono", s.winRate >= 60 ? "text-green-500" : s.winRate >= 45 ? "text-orange-400" : "text-destructive")}>{s.winRate}%</p>
+                <p className={cn("text-2xl font-bold font-mono", s.winRate >= 60 ? "text-pos" : s.winRate >= 45 ? "text-warn" : "text-destructive")}>{s.winRate}%</p>
                 <p className="text-[10px] text-muted-foreground mt-1">{s.trades} trades · {s.totalPL >= 0 ? "+" : ""}${s.totalPL}</p>
               </>
             )}
@@ -280,11 +280,11 @@ function SessionWinRate({ history }: { history: Position[] }) {
               <YAxis tick={{ fontSize: 9, fill: "#666" }} domain={[0, 100]} />
               <Tooltip
                 formatter={(v: any, name: string) => [v != null ? `${v}%` : "—", "Win Rate"]}
-                contentStyle={{ background: "#1a1a2e", border: "1px solid #333", fontSize: 11 }}
+                contentStyle={{ background: "var(--rj-chart-grid)", border: "1px solid #333", fontSize: 11 }}
               />
               <Bar dataKey="winRate" radius={[3, 3, 0, 0]}>
                 {hourlyData.map((d, i) => (
-                  <Cell key={i} fill={(d.winRate ?? 0) >= 60 ? "#22c55e" : (d.winRate ?? 0) >= 45 ? "#f97316" : "#ef4444"} />
+                  <Cell key={i} fill={(d.winRate ?? 0) >= 60 ? "var(--rj-pos)" : (d.winRate ?? 0) >= 45 ? "var(--rj-warn)" : "var(--rj-neg)"} />
                 ))}
               </Bar>
             </BarChart>
@@ -322,8 +322,8 @@ function DailyPLBar({ history }: { history: Position[] }) {
       <div className="flex items-center justify-between">
         <h3 className="font-semibold text-sm flex items-center gap-2"><DollarSign className="w-4 h-4 text-primary" /> Daily P&amp;L</h3>
         <div className="flex items-center gap-3 text-xs text-muted-foreground">
-          <span>Yesterday: <span className={yesterdayPL >= 0 ? "text-green-400" : "text-red-400"}>{yesterdayPL >= 0 ? "+" : ""}${yesterdayPL.toFixed(2)}</span></span>
-          <span className={cn("font-bold text-sm", todayPL >= 0 ? "text-green-500" : "text-destructive")}>
+          <span>Yesterday: <span className={yesterdayPL >= 0 ? "text-pos" : "text-neg"}>{yesterdayPL >= 0 ? "+" : ""}${yesterdayPL.toFixed(2)}</span></span>
+          <span className={cn("font-bold text-sm", todayPL >= 0 ? "text-pos" : "text-destructive")}>
             Today: {todayPL >= 0 ? "+" : ""}${todayPL.toFixed(2)}
           </span>
         </div>
@@ -334,10 +334,10 @@ function DailyPLBar({ history }: { history: Position[] }) {
             <CartesianGrid strokeDasharray="3 3" stroke="#ffffff06" />
             <XAxis dataKey="day" tick={{ fontSize: 8, fill: "#666" }} />
             <YAxis tick={{ fontSize: 8, fill: "#666" }} tickFormatter={v => `$${v}`} />
-            <Tooltip formatter={(v: any) => [`$${Number(v).toFixed(2)}`, "P&L"]} contentStyle={{ background: "#1a1a2e", border: "1px solid #333", fontSize: 11 }} />
+            <Tooltip formatter={(v: any) => [`$${Number(v).toFixed(2)}`, "P&L"]} contentStyle={{ background: "var(--rj-chart-grid)", border: "1px solid #333", fontSize: 11 }} />
             <ReferenceLine y={0} stroke="#444" strokeDasharray="4 4" />
             <Bar dataKey="pl" radius={[3, 3, 0, 0]}>
-              {last14.map((d, i) => <Cell key={i} fill={d.pl >= 0 ? "#22c55e" : "#ef4444"} />)}
+              {last14.map((d, i) => <Cell key={i} fill={d.pl >= 0 ? "var(--rj-pos)" : "var(--rj-neg)"} />)}
             </Bar>
           </BarChart>
         </ResponsiveContainer>
@@ -381,13 +381,13 @@ function TradeStreaks({ history }: { history: Position[] }) {
       <div className="grid grid-cols-3 gap-3">
         <div className="text-center">
           <p className="text-[10px] text-muted-foreground uppercase font-mono mb-1">Current</p>
-          <p className={cn("text-xl font-bold font-mono", currentType === "win" ? "text-green-500" : currentType === "loss" ? "text-destructive" : "text-muted-foreground")}>
+          <p className={cn("text-xl font-bold font-mono", currentType === "win" ? "text-pos" : currentType === "loss" ? "text-destructive" : "text-muted-foreground")}>
             {sorted.length === 0 ? "—" : `${currentStreak}${currentType === "win" ? "W" : "L"}`}
           </p>
         </div>
         <div className="text-center">
           <p className="text-[10px] text-muted-foreground uppercase font-mono mb-1">Best Win</p>
-          <p className="text-xl font-bold font-mono text-green-500">{maxWinStreak}W</p>
+          <p className="text-xl font-bold font-mono text-pos">{maxWinStreak}W</p>
         </div>
         <div className="text-center">
           <p className="text-[10px] text-muted-foreground uppercase font-mono mb-1">Worst Loss</p>
@@ -398,7 +398,7 @@ function TradeStreaks({ history }: { history: Position[] }) {
         <div className="flex gap-1 justify-center flex-wrap">
           <span className="text-[10px] text-muted-foreground mr-1">Last {recentTen.length}:</span>
           {recentTen.map((r, i) => (
-            <span key={i} className={cn("w-5 h-5 rounded text-[9px] font-bold flex items-center justify-center", r === "W" ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400")}>{r}</span>
+            <span key={i} className={cn("w-5 h-5 rounded text-[9px] font-bold flex items-center justify-center", r === "W" ? "bg-pos/20 text-pos" : "bg-neg/20 text-neg")}>{r}</span>
           ))}
         </div>
       )}
@@ -422,7 +422,7 @@ function LiveCorrelationMatrix() {
     const opacity = v === 1 ? 0.15 : abs > 0.8 ? 0.85 : abs > 0.6 ? 0.65 : abs > 0.4 ? 0.45 : abs > 0.2 ? 0.25 : 0.12;
     if (v === 1) return { background: `hsl(var(--primary) / ${opacity})`, color: "hsl(var(--primary))" };
     const rgb = v > 0 ? "34,197,94" : "239,68,68";
-    return { background: `rgba(${rgb},${opacity})`, color: abs > 0.4 ? (v > 0 ? "#16a34a" : "#dc2626") : "hsl(var(--foreground))" };
+    return { background: `rgba(${rgb},${opacity})`, color: abs > 0.4 ? (v > 0 ? "var(--rj-pos)" : "var(--rj-neg)") : "hsl(var(--foreground))" };
   };
 
   return (
@@ -484,9 +484,9 @@ function SessionHeatmap({ history }: { history: Position[] }) {
   const maxTrades = Math.max(...heatmap.flat(), 1);
 
   const sessions = [
-    { label: "Tokyo", hours: [0, 1, 2, 3, 4, 5, 6, 7, 8], color: "bg-blue-500/30" },
-    { label: "London", hours: [7, 8, 9, 10, 11, 12, 13, 14, 15, 16], color: "bg-green-500/30" },
-    { label: "NY", hours: [13, 14, 15, 16, 17, 18, 19, 20, 21], color: "bg-orange-500/30" },
+    { label: "Tokyo", hours: [0, 1, 2, 3, 4, 5, 6, 7, 8], color: "bg-info/30" },
+    { label: "London", hours: [7, 8, 9, 10, 11, 12, 13, 14, 15, 16], color: "bg-pos/30" },
+    { label: "NY", hours: [13, 14, 15, 16, 17, 18, 19, 20, 21], color: "bg-warn/30" },
   ];
 
   return (
@@ -507,7 +507,7 @@ function SessionHeatmap({ history }: { history: Position[] }) {
               const pl = plMap[di][hi];
               const intensity = trades / maxTrades;
               const bgColor = trades === 0 ? "bg-muted/20"
-                : pl >= 0 ? `bg-green-500` : `bg-red-500`;
+                : pl >= 0 ? `bg-pos` : `bg-neg`;
               return (
                 <div
                   key={hi}
@@ -521,8 +521,8 @@ function SessionHeatmap({ history }: { history: Position[] }) {
         ))}
       </div>
       <div className="flex items-center gap-4 mt-3 text-[10px] text-muted-foreground">
-        <div className="flex items-center gap-1"><div className="w-4 h-3 rounded bg-green-500/70" /> Profitable hour</div>
-        <div className="flex items-center gap-1"><div className="w-4 h-3 rounded bg-red-500/70" /> Losing hour</div>
+        <div className="flex items-center gap-1"><div className="w-4 h-3 rounded bg-pos/70" /> Profitable hour</div>
+        <div className="flex items-center gap-1"><div className="w-4 h-3 rounded bg-neg/70" /> Losing hour</div>
         {history.length === 0 && <span className="ml-2 italic">No trade history yet</span>}
       </div>
     </div>
@@ -554,7 +554,7 @@ function HistoricalBacktestPanel({ strategy }: { strategy: Strategy | null | und
   const Stat = ({ label, value, good }: { label: string; value: string; good?: boolean }) => (
     <div className="bg-muted/20 rounded-lg p-2.5">
       <p className="text-[9px] text-muted-foreground uppercase">{label}</p>
-      <p className={cn("font-mono font-bold text-sm", good === undefined ? "" : good ? "text-green-500" : "text-red-500")}>{value}</p>
+      <p className={cn("font-mono font-bold text-sm", good === undefined ? "" : good ? "text-pos" : "text-neg")}>{value}</p>
     </div>
   );
   const sel = "bg-background border border-border rounded px-2 py-1 text-xs font-mono";
@@ -583,7 +583,7 @@ function HistoricalBacktestPanel({ strategy }: { strategy: Strategy | null | und
           <label className="text-[10px] text-muted-foreground">R:R<input type="number" step="0.5" min="0.5" max="10" className={cn(sel, "w-16 ml-1")} value={p.rrRatio} onChange={e => setP({ ...p, rrRatio: parseFloat(e.target.value) || 2 })} /></label>
           <Button size="sm" onClick={run} disabled={loading} className="h-8">{loading ? "Running…" : "Run on history"}</Button>
         </div>
-        {error && <p className="text-xs text-red-500">{error}</p>}
+        {error && <p className="text-xs text-neg">{error}</p>}
         {result && (
           <div className="space-y-3">
             <p className="text-[11px] text-muted-foreground">{result.startDate} → {result.endDate} · {result.totalTrades} trades · costs assumed: {result.assumptions.spreadPips} pip spread, {result.assumptions.slippagePips} pip slippage, ${result.assumptions.commissionPerLot}/lot</p>
@@ -672,12 +672,12 @@ function BacktestPanel({ strategy }: { strategy: Strategy | null | undefined }) 
           <div className="space-y-4">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               {[
-                { label: "Profit Factor", value: result.stats.profitFactor?.toFixed(2) ?? "—", color: result.stats.profitFactor > 1.5 ? "text-green-500" : "text-orange-400" },
-                { label: "Win Probability", value: `${result.stats.winProbability}%`, color: result.stats.winProbability > 60 ? "text-green-500" : "text-orange-400" },
-                { label: "Median Return", value: `${result.stats.medianReturn > 0 ? "+" : ""}${result.stats.medianReturn}%`, color: result.stats.medianReturn > 0 ? "text-green-500" : "text-destructive" },
+                { label: "Profit Factor", value: result.stats.profitFactor?.toFixed(2) ?? "—", color: result.stats.profitFactor > 1.5 ? "text-pos" : "text-warn" },
+                { label: "Win Probability", value: `${result.stats.winProbability}%`, color: result.stats.winProbability > 60 ? "text-pos" : "text-warn" },
+                { label: "Median Return", value: `${result.stats.medianReturn > 0 ? "+" : ""}${result.stats.medianReturn}%`, color: result.stats.medianReturn > 0 ? "text-pos" : "text-destructive" },
                 { label: "Median Balance", value: `$${result.stats.medianFinal?.toLocaleString()}`, color: "text-foreground" },
                 { label: "Worst 10% Case", value: `$${result.stats.worstCase?.toLocaleString()}`, color: "text-destructive" },
-                { label: "Best 10% Case", value: `$${result.stats.bestCase?.toLocaleString()}`, color: "text-green-500" },
+                { label: "Best 10% Case", value: `$${result.stats.bestCase?.toLocaleString()}`, color: "text-pos" },
               ].map((s, i) => (
                 <div key={i} className="bg-background/50 rounded p-3 border border-border/50 text-center">
                   <p className="text-[10px] text-muted-foreground font-mono uppercase mb-1">{s.label}</p>
@@ -695,9 +695,9 @@ function BacktestPanel({ strategy }: { strategy: Strategy | null | undefined }) 
                 </div>
                 <div className="grid grid-cols-3 gap-2">
                   {[
-                    { label: "≥30% Drawdown", pct: result.stats.ruin.at30pct, color: result.stats.ruin.at30pct > 30 ? "text-destructive" : result.stats.ruin.at30pct > 15 ? "text-orange-400" : "text-green-500" },
-                    { label: "≥50% Drawdown", pct: result.stats.ruin.at50pct, color: result.stats.ruin.at50pct > 15 ? "text-destructive" : result.stats.ruin.at50pct > 5 ? "text-orange-400" : "text-green-500" },
-                    { label: "≥80% Drawdown", pct: result.stats.ruin.at80pct, color: result.stats.ruin.at80pct > 5 ? "text-destructive" : "text-green-500" },
+                    { label: "≥30% Drawdown", pct: result.stats.ruin.at30pct, color: result.stats.ruin.at30pct > 30 ? "text-destructive" : result.stats.ruin.at30pct > 15 ? "text-warn" : "text-pos" },
+                    { label: "≥50% Drawdown", pct: result.stats.ruin.at50pct, color: result.stats.ruin.at50pct > 15 ? "text-destructive" : result.stats.ruin.at50pct > 5 ? "text-warn" : "text-pos" },
+                    { label: "≥80% Drawdown", pct: result.stats.ruin.at80pct, color: result.stats.ruin.at80pct > 5 ? "text-destructive" : "text-pos" },
                   ].map(s => (
                     <div key={s.label} className="bg-background/50 border border-border/50 rounded p-2.5 text-center">
                       <p className="text-[9px] text-muted-foreground uppercase font-mono mb-1">{s.label}</p>
@@ -708,7 +708,7 @@ function BacktestPanel({ strategy }: { strategy: Strategy | null | undefined }) 
                 </div>
                 {result.stats.ruin.at50pct > 20 && (
                   <p className="text-[10px] text-destructive/80">
-                    ⚠ High ruin risk detected. Consider reducing position size or improving win rate before trading live.
+                    High ruin risk detected. Consider reducing position size or improving win rate before trading live.
                   </p>
                 )}
               </div>
@@ -721,12 +721,12 @@ function BacktestPanel({ strategy }: { strategy: Strategy | null | undefined }) 
                   <CartesianGrid strokeDasharray="3 3" stroke="#ffffff08" />
                   <XAxis dataKey="trade" type="number" domain={[0, params.numTrades]} tick={{ fontSize: 9, fill: "#666" }} />
                   <YAxis tick={{ fontSize: 9, fill: "#666" }} tickFormatter={v => `$${(v/1000).toFixed(0)}k`} />
-                  <Tooltip formatter={(v: any) => [`$${Number(v).toFixed(0)}`, "Balance"]} contentStyle={{ background: "#1a1a2e", border: "1px solid #333" }} />
+                  <Tooltip formatter={(v: any) => [`$${Number(v).toFixed(0)}`, "Balance"]} contentStyle={{ background: "var(--rj-chart-grid)", border: "1px solid #333" }} />
                   {result.paths?.map((path: number[], i: number) => (
                     <Line
                       key={i} data={path.map((b, t) => ({ trade: t, balance: b }))}
                       dataKey="balance" dot={false} strokeWidth={1}
-                      stroke={path[path.length - 1] > liveBalance ? "#22c55e" : "#ef4444"}
+                      stroke={path[path.length - 1] > liveBalance ? "var(--rj-pos)" : "var(--rj-neg)"}
                       opacity={0.35}
                     />
                   ))}
@@ -753,7 +753,7 @@ function CopyStrategyModal({ trader, onClose, onCopied }: { trader: any; onClose
   const copyMutation = useMutation({
     mutationFn: () => apiRequest("POST", "/api/strategy/copy", { fromUserId: trader.userId }).then(r => r.json()),
     onSuccess: () => {
-      toast({ title: "Strategy Copied!", description: `Now using ${trader.username}'s strategy.`, className: "border-green-500/50" });
+      toast({ title: "Strategy Copied!", description: `Now using ${trader.username}'s strategy.`, className: "border-pos/50" });
       onCopied();
       onClose();
     },
@@ -772,7 +772,7 @@ function CopyStrategyModal({ trader, onClose, onCopied }: { trader: any; onClose
             <h3 className="font-bold text-lg">{trader.username}'s Strategy</h3>
             <p className="text-xs text-muted-foreground">
               {trader.trades} trades · {trader.winRate}% win rate ·
-              <span className={trader.totalPL >= 0 ? "text-green-500" : "text-destructive"}>
+              <span className={trader.totalPL >= 0 ? "text-pos" : "text-destructive"}>
                 {" "}{trader.totalPL >= 0 ? "+" : ""}${trader.totalPL.toFixed(2)} P&L
               </span>
             </p>
@@ -875,14 +875,14 @@ function LeaderboardPanel() {
             {board.map((trader: any, i: number) => (
               <button
                 key={trader.userId}
-                className={`w-full flex items-center px-5 py-3 gap-4 hover:bg-muted/20 transition-colors text-left ${i === 0 ? "bg-yellow-500/5" : ""}`}
+                className={`w-full flex items-center px-5 py-3 gap-4 hover:bg-muted/20 transition-colors text-left ${i === 0 ? "bg-warn/5" : ""}`}
                 onClick={() => setSelectedTrader(trader)}
                 data-testid={`leaderboard-row-${i}`}
               >
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${
-                  i === 0 ? "bg-yellow-500/20 text-yellow-400" :
-                  i === 1 ? "bg-gray-500/20 text-gray-300" :
-                  i === 2 ? "bg-orange-500/20 text-orange-400" :
+                  i === 0 ? "bg-warn/20 text-warn" :
+                  i === 1 ? "bg-gray-500/20 text-muted-foreground" :
+                  i === 2 ? "bg-warn/20 text-warn" :
                   "bg-muted text-muted-foreground"
                 }`}>
                   {i === 0 ? <Trophy className="w-4 h-4" /> : i + 1}
@@ -891,7 +891,7 @@ function LeaderboardPanel() {
                   <p className="font-semibold text-sm">{trader.username}</p>
                   <p className="text-[11px] text-muted-foreground">{trader.trades} trades · {trader.winRate}% win rate</p>
                 </div>
-                <div className={`font-mono font-bold text-sm ${trader.totalPL >= 0 ? "text-green-500" : "text-destructive"}`}>
+                <div className={`font-mono font-bold text-sm ${trader.totalPL >= 0 ? "text-pos" : "text-destructive"}`}>
                   {trader.totalPL >= 0 ? "+" : ""}${trader.totalPL.toFixed(2)}
                 </div>
                 <Copy className="w-4 h-4 text-muted-foreground shrink-0" />
@@ -952,9 +952,9 @@ function RiskDashboard() {
     </div>
   );
 
-  const RiskGauge = ({ label, current, limit, breached, percentUsed, barHue = "#3b82f6" }: any) => {
+  const RiskGauge = ({ label, current, limit, breached, percentUsed, barHue = "var(--rj-info)" }: any) => {
     const pct = Math.min(100, percentUsed);
-    const barColor = breached ? "#ef4444" : pct > 70 ? "#f59e0b" : barHue;
+    const barColor = breached ? "var(--rj-neg)" : pct > 70 ? "var(--rj-warn)" : barHue;
     return (
       <div className={`rounded-xl border p-4 ${breached ? "border-destructive/50 bg-destructive/5" : "border-border bg-card/40"}`}>
         <div className="flex items-center justify-between mb-2">
@@ -995,7 +995,7 @@ function RiskDashboard() {
           limit={`$${dash?.daily?.limit ?? 500} limit`}
           breached={dash?.daily?.breached}
           percentUsed={dash?.daily?.percentUsed ?? 0}
-          barHue="#ef4444"
+          barHue="var(--rj-neg)"
         />
         <RiskGauge
           label="Drawdown"
@@ -1003,7 +1003,7 @@ function RiskDashboard() {
           limit={`$${dash?.drawdown?.limit ?? 2000} max`}
           breached={dash?.drawdown?.breached}
           percentUsed={dash?.drawdown?.percentUsed ?? 0}
-          barHue="#f97316"
+          barHue="var(--rj-warn)"
         />
         <RiskGauge
           label="Open Positions"
@@ -1012,7 +1012,7 @@ function RiskDashboard() {
           breached={dash?.positions?.breached}
           percentUsed={dash?.positions?.open != null && dash?.positions?.limit
             ? Math.round((dash.positions.open / dash.positions.limit) * 100) : 0}
-          barHue="#3b82f6"
+          barHue="var(--rj-info)"
         />
       </div>
 
@@ -1122,7 +1122,6 @@ export default function Analytics() {
             {[
               { id: "overview", label: "Overview" },
               { id: "risk", label: "Risk" },
-              { id: "backtest", label: "Backtest" },
               { id: "correlation", label: "Correlation" },
               { id: "sessions", label: "Sessions" },
               { id: "leaderboard", label: "Leaderboard" },
@@ -1149,9 +1148,9 @@ export default function Analytics() {
                 ) : (
                   <>
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-                      <StatCard icon={Percent} label="Win Rate" value={`${metrics?.winRate}%`} color={metrics && metrics.winRate >= 50 ? "text-green-500" : "text-destructive"} sub={`${metrics?.wins}W / ${metrics?.losses}L`} />
-                      <StatCard icon={TrendingUp} label="Profit Factor" value={metrics?.profitFactor ?? "—"} color={metrics?.profitFactor && metrics.profitFactor >= 1.5 ? "text-green-500" : "text-orange-400"} sub="Gross win / gross loss" />
-                      <StatCard icon={AlertTriangle} label="Max Drawdown" value={`${metrics?.maxDrawdownPct}%`} color={metrics?.maxDrawdownPct && metrics.maxDrawdownPct > 10 ? "text-destructive" : "text-orange-400"} sub="Peak-to-trough" />
+                      <StatCard icon={Percent} label="Win Rate" value={`${metrics?.winRate}%`} color={metrics && metrics.winRate >= 50 ? "text-pos" : "text-destructive"} sub={`${metrics?.wins}W / ${metrics?.losses}L`} />
+                      <StatCard icon={TrendingUp} label="Profit Factor" value={metrics?.profitFactor ?? "—"} color={metrics?.profitFactor && metrics.profitFactor >= 1.5 ? "text-pos" : "text-warn"} sub="Gross win / gross loss" />
+                      <StatCard icon={AlertTriangle} label="Max Drawdown" value={`${metrics?.maxDrawdownPct}%`} color={metrics?.maxDrawdownPct && metrics.maxDrawdownPct > 10 ? "text-destructive" : "text-warn"} sub="Peak-to-trough" />
                       <StatCard icon={DollarSign} label="Avg Win vs Loss" value={`$${metrics?.avgWin}`} sub={`Avg loss: $${metrics?.avgLoss}`} color="text-primary" />
                     </div>
 
@@ -1159,13 +1158,13 @@ export default function Analytics() {
                       <StatCard icon={Activity}
                         label="Current Streak"
                         value={metrics?.currentStreak === 0 ? "—" : `${Math.abs(metrics?.currentStreak ?? 0)}x ${(metrics?.currentStreak ?? 0) > 0 ? "W" : "L"}`}
-                        color={(metrics?.currentStreak ?? 0) > 0 ? "text-green-500" : (metrics?.currentStreak ?? 0) < 0 ? "text-destructive" : "text-foreground"}
+                        color={(metrics?.currentStreak ?? 0) > 0 ? "text-pos" : (metrics?.currentStreak ?? 0) < 0 ? "text-destructive" : "text-foreground"}
                         sub={(metrics?.currentStreak ?? 0) > 0 ? "Keep it going!" : (metrics?.currentStreak ?? 0) < 0 ? "Break the losing run" : "No active streak"}
                       />
                       <StatCard icon={Trophy}
                         label="Best Win Streak"
                         value={`${metrics?.bestWinStreak ?? 0} trades`}
-                        color="text-green-500"
+                        color="text-pos"
                         sub="Consecutive wins"
                       />
                       <StatCard icon={TrendingDown}
@@ -1177,7 +1176,7 @@ export default function Analytics() {
                       <StatCard icon={DollarSign}
                         label="Best / Worst Trade"
                         value={`+$${(metrics?.bestTrade ?? 0).toFixed(0)}`}
-                        color="text-green-500"
+                        color="text-pos"
                         sub={`Worst: -$${Math.abs(metrics?.worstTrade ?? 0).toFixed(0)}`}
                       />
                     </div>
@@ -1196,9 +1195,9 @@ export default function Analytics() {
                             <CartesianGrid strokeDasharray="3 3" stroke="#ffffff08" />
                             <XAxis dataKey="trade" tick={{ fontSize: 9, fill: "#666" }} label={{ value: "Trade #", position: "insideBottom", offset: -5, fontSize: 9, fill: "#666" }} />
                             <YAxis tick={{ fontSize: 9, fill: "#666" }} tickFormatter={v => `$${(v / 1000).toFixed(1)}k`} />
-                            <Tooltip formatter={(v: any) => [`$${Number(v).toFixed(2)}`, "Balance"]} contentStyle={{ background: "#1a1a2e", border: "1px solid #333", borderRadius: 8 }} />
+                            <Tooltip formatter={(v: any) => [`$${Number(v).toFixed(2)}`, "Balance"]} contentStyle={{ background: "var(--rj-chart-grid)", border: "1px solid #333", borderRadius: 8 }} />
                             <ReferenceLine y={startingBalance} stroke="#444" strokeDasharray="4 4" />
-                            <Line type="monotone" dataKey="balance" stroke="#7c3aed" strokeWidth={2} dot={false} />
+                            <Line type="monotone" dataKey="balance" stroke="var(--rj-info)" strokeWidth={2} dot={false} />
                           </LineChart>
                         </ResponsiveContainer>
                       </div>
@@ -1215,10 +1214,10 @@ export default function Analytics() {
                               <CartesianGrid strokeDasharray="3 3" stroke="#ffffff08" />
                               <XAxis dataKey="symbol" tick={{ fontSize: 9, fill: "#666" }} />
                               <YAxis tick={{ fontSize: 9, fill: "#666" }} tickFormatter={v => `$${v}`} />
-                              <Tooltip formatter={(v: any) => [`$${Number(v).toFixed(2)}`, "P&L"]} contentStyle={{ background: "#1a1a2e", border: "1px solid #333", borderRadius: 8 }} />
+                              <Tooltip formatter={(v: any) => [`$${Number(v).toFixed(2)}`, "P&L"]} contentStyle={{ background: "var(--rj-chart-grid)", border: "1px solid #333", borderRadius: 8 }} />
                               <Bar dataKey="pl" radius={[4, 4, 0, 0]}>
                                 {bySymbol.map((entry, i) => (
-                                  <Cell key={i} fill={entry.pl >= 0 ? "#22c55e" : "#ef4444"} />
+                                  <Cell key={i} fill={entry.pl >= 0 ? "var(--rj-pos)" : "var(--rj-neg)"} />
                                 ))}
                               </Bar>
                             </BarChart>
@@ -1228,7 +1227,7 @@ export default function Analytics() {
 
                       <div className="bg-card/40 border border-border rounded-xl p-4 md:p-5">
                         <p className="text-sm font-bold mb-4 flex items-center gap-2">
-                          <Award className="w-4 h-4 text-yellow-400" /> Win Rate by Symbol
+                          <Award className="w-4 h-4 text-warn" /> Win Rate by Symbol
                         </p>
                         <div className="space-y-2">
                           {bySymbol.map(s => (
@@ -1238,7 +1237,7 @@ export default function Analytics() {
                                 <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${s.winRate}%` }} />
                               </div>
                               <span className="font-mono text-xs w-10 text-right">{s.winRate}%</span>
-                              <span className={`font-mono text-xs w-16 text-right ${s.pl >= 0 ? "text-green-500" : "text-destructive"}`}>
+                              <span className={`font-mono text-xs w-16 text-right ${s.pl >= 0 ? "text-pos" : "text-destructive"}`}>
                                 {s.pl >= 0 ? "+" : ""}${s.pl}
                               </span>
                             </div>
@@ -1265,10 +1264,10 @@ export default function Analytics() {
                             {[...history].sort((a, b) => new Date(b.closedAt!).getTime() - new Date(a.closedAt!).getTime()).slice(0, 20).map((p) => (
                               <tr key={p.id} className="border-b border-border/30 hover:bg-muted/20 transition-colors">
                                 <td className="px-4 py-2.5 font-mono font-bold">{p.symbol}</td>
-                                <td className={`px-4 py-2.5 font-bold ${p.type === "BUY" ? "text-green-500" : "text-red-400"}`}>{p.type}</td>
+                                <td className={`px-4 py-2.5 font-bold ${p.type === "BUY" ? "text-pos" : "text-neg"}`}>{p.type}</td>
                                 <td className="px-4 py-2.5 font-mono">{p.entryPrice.toFixed(5)}</td>
                                 <td className="px-4 py-2.5 font-mono">{(p.currentPrice || p.entryPrice).toFixed(5)}</td>
-                                <td className={`px-4 py-2.5 font-mono font-bold ${(p.profit || 0) >= 0 ? "text-green-500" : "text-destructive"}`}>
+                                <td className={`px-4 py-2.5 font-mono font-bold ${(p.profit || 0) >= 0 ? "text-pos" : "text-destructive"}`}>
                                   {(p.profit || 0) >= 0 ? "+" : ""}${(p.profit || 0).toFixed(2)}
                                 </td>
                                 <td className="px-4 py-2.5 text-muted-foreground">{p.closedAt ? format(new Date(p.closedAt), "MMM d, HH:mm") : "—"}</td>

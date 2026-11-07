@@ -27,7 +27,7 @@ export function StrategyAdvisor({
               initial={{ scaleX: 0 }}
               animate={{ scaleX: 1 }}
               transition={{ duration: 2 }}
-              className={`h-1 ${advice.approved ? "bg-green-500" : "bg-destructive"} origin-left`}
+              className={`h-1 ${advice.approved ? "bg-pos" : "bg-destructive"} origin-left`}
             />
 
             <div className="p-6 space-y-4">
@@ -38,8 +38,8 @@ export function StrategyAdvisor({
                 className="flex items-center gap-3"
               >
                 {advice.approved ? (
-                  <div className="w-12 h-12 rounded-full bg-green-500/20 flex items-center justify-center">
-                    <CheckCircle2 className="w-6 h-6 text-green-500" />
+                  <div className="w-12 h-12 rounded-full bg-pos/20 flex items-center justify-center">
+                    <CheckCircle2 className="w-6 h-6 text-pos" />
                   </div>
                 ) : (
                   <div className="w-12 h-12 rounded-full bg-destructive/20 flex items-center justify-center">
@@ -90,7 +90,7 @@ export function StrategyAdvisor({
                   transition={{ delay: 0.5 }}
                   className="bg-accent/10 border border-accent/30 rounded-lg p-3"
                 >
-                  <p className="text-xs text-accent font-semibold mb-1">💡 Suggestion</p>
+                  <p className="text-xs text-accent font-semibold mb-1">Suggestion</p>
                   <p className="text-xs text-muted-foreground">{advice.suggestion}</p>
                 </motion.div>
               )}
@@ -102,13 +102,13 @@ export function StrategyAdvisor({
                 transition={{ delay: 0.6 }}
                 className={`text-xs font-semibold p-2 rounded text-center ${
                   advice.approved
-                    ? "bg-green-500/20 text-green-600"
-                    : "bg-orange-500/20 text-orange-600"
+                    ? "bg-pos/20 text-pos"
+                    : "bg-warn/20 text-warn"
                 }`}
               >
                 {advice.approved
                   ? "✓ Strategy is ready to execute. Monitor carefully."
-                  : "⚠ Review strategy parameters before deployment."}
+                  : "Review strategy parameters before deployment."}
               </motion.div>
 
               {/* Action */}

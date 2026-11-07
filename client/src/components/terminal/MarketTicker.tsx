@@ -45,7 +45,7 @@ export const MarketTicker = memo(function MarketTicker() {
       {/* Source badge */}
       <div className={cn(
         "flex items-center gap-1 px-2 h-full border-r border-border/50 shrink-0 text-[10px] font-semibold",
-        isSimulated ? "text-amber-500" : isLive ? "text-green-500" : "text-blue-400"
+        isSimulated ? "text-warn" : isLive ? "text-pos" : "text-info"
       )}>
         {isSimulated
           ? <><AlertCircle className="w-3 h-3" /> SIM</>
@@ -64,12 +64,12 @@ export const MarketTicker = memo(function MarketTicker() {
             <div key={symbol} className="flex items-center gap-1.5 shrink-0 text-[11px] font-mono">
               <span className="text-muted-foreground font-semibold">{symbol}</span>
               <span className="font-bold tabular-nums">{q.bid.toFixed(dec)}</span>
-              <span className={cn("flex items-center gap-0.5 text-[10px]", up ? "text-green-500" : "text-red-500")}>
+              <span className={cn("flex items-center gap-0.5 text-[10px]", up ? "text-pos" : "text-neg")}>
                 {up ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
                 {up ? "+" : ""}{(q.change ?? 0).toFixed(2)}%
               </span>
               {q.changePips !== undefined && q.changePips !== 0 && (
-                <span className={cn("text-[9px] tabular-nums", up ? "text-green-500/70" : "text-red-500/70")}>
+                <span className={cn("text-[9px] tabular-nums", up ? "text-pos/70" : "text-neg/70")}>
                   {up ? "+" : ""}{q.changePips}p
                 </span>
               )}

@@ -1,0 +1,15 @@
+{
+  "name": "@trade-depot/layer-kit",
+  "version": "0.1.0",
+  "description": "Write, check and try Trade Depot layers: the Forge grammar, its interpreter, and a CLI.",
+  "private": true,
+  "type": "module",
+  "bin": { "layer-kit": "dist/cli.mjs" },
+  "main": "dist/kit.mjs",
+  "files": ["dist", "examples", "README.md", "LICENSE"],
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "build": "esbuild src/cli.ts --bundle --platform=node --format=esm --outfile=dist/cli.mjs && esbuild src/kit.ts --bundle --platform=node --format=esm --outfile=dist/kit.mjs"
+  },
+  "license": "SEE LICENSE IN LICENSE"
+}

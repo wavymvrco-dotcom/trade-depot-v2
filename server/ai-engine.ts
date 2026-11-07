@@ -142,6 +142,11 @@ export async function callAiProvider(provider: string, settings: Record<string, 
 
 export const callAiProviderForForecast = callAiProvider;
 
+/** JSON-mode call with a caller-supplied system prompt (Blueprint AI). Returns the parsed object or null. */
+export async function callAiProviderJson(provider: string, settings: Record<string, any>, system: string, prompt: string, maxTokens = 2000): Promise<any> {
+  return extractJson(await callProviderText(provider, settings, system, prompt, { json: true, maxTokens }));
+}
+
 /** Free-text (markdown) call. */
 export async function callAiProviderMarkdown(provider: string, settings: Record<string, any>, prompt: string, system = TEXT_SYSTEM): Promise<string> {
   const text = await callProviderText(provider, settings, system, prompt, { maxTokens: 1500 });

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, memo } from 'react';
+import { tvTheme, tvGridColor, tvBackground } from "@/lib/theme";
 
 type ChartState = "loading" | "ready" | "failed";
 
@@ -39,12 +40,12 @@ export const TradingViewAdvancedChart = memo(function TradingViewAdvancedChart({
           "symbol": `FX:${symbol}`,
           "interval": "15",
           "timezone": "Etc/UTC",
-          "theme": "dark",
+          "theme": tvTheme(),
           "style": "1",
           "locale": "en",
           "enable_publishing": false,
           "backgroundColor": "rgba(0, 0, 0, 0)",
-          "gridColor": "rgba(255, 255, 255, 0.06)",
+          "gridColor": tvGridColor(),
           "hide_top_toolbar": false,
           "hide_legend": false,
           "save_image": false,

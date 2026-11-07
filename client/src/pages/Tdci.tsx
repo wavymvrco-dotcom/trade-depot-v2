@@ -19,11 +19,11 @@ type Period = {
 };
 
 const fmtR = (r: number) => `${r >= 0 ? "+" : ""}${r.toFixed(2)}R`;
-const rColor = (r: number) => r > 0.02 ? "text-green-500" : r < -0.02 ? "text-red-500" : "text-muted-foreground";
+const rColor = (r: number) => r > 0.02 ? "text-pos" : r < -0.02 ? "text-neg" : "text-muted-foreground";
 
 function ScoreRing({ score, direction }: { score: number; direction: string }) {
   const r = 54, c = 2 * Math.PI * r, off = c * (1 - score / 100);
-  const color = direction === "LONG" ? "#22c55e" : direction === "SHORT" ? "#ef4444" : "hsl(var(--muted-foreground))";
+  const color = direction === "LONG" ? "var(--rj-pos)" : direction === "SHORT" ? "var(--rj-neg)" : "hsl(var(--muted-foreground))";
   return (
     <div className="relative w-36 h-36 shrink-0">
       <svg viewBox="0 0 128 128" className="w-full h-full -rotate-90">
@@ -52,7 +52,7 @@ function LayerBar({ value, regime }: { value: number; regime?: boolean }) {
     <div className="relative h-2 bg-muted rounded-full overflow-hidden">
       <div className="absolute top-0 bottom-0 left-1/2 w-px bg-border" />
       <div
-        className={cn("absolute top-0 bottom-0 rounded-full", value >= 0 ? "bg-green-500" : "bg-red-500")}
+        className={cn("absolute top-0 bottom-0 rounded-full", value >= 0 ? "bg-pos" : "bg-neg")}
         style={value >= 0 ? { left: "50%", width: `${pct}%` } : { right: "50%", width: `${pct}%` }}
       />
     </div>
@@ -221,11 +221,11 @@ export default function Tdci() {
           <div className="grid lg:grid-cols-[320px_1fr] gap-4">
             <div className="bg-card/50 border border-border rounded-xl p-5 flex flex-col items-center text-center gap-3">
               {live.isLoading ? <p className="text-xs text-muted-foreground py-16">Scoring {symbol}…</p>
-                : live.error ? <p className="text-xs text-red-500 py-16">{(live.error as Error).message.replace(/^\d+:\s*/, "")}</p>
+                : live.error ? <p className="text-xs text-neg py-16">{(live.error as Error).message.replace(/^\d+:\s*/, "")}</p>
                 : t && (<>
                   <ScoreRing score={t.score} direction={t.direction} />
                   <div className={cn("flex items-center gap-1 px-3 py-1 rounded-full text-sm font-bold border",
-                    t.direction === "LONG" ? "text-green-500 border-green-500/30 bg-green-500/10" : t.direction === "SHORT" ? "text-red-500 border-red-500/30 bg-red-500/10" : "text-muted-foreground border-border")}>
+                    t.direction === "LONG" ? "text-pos border-pos/30 bg-pos/10" : t.direction === "SHORT" ? "text-neg border-neg/30 bg-neg/10" : "text-muted-foreground border-border")}>
                     <DirIcon className="w-4 h-4" /> {t.direction}
                   </div>
                   <div className="grid grid-cols-2 gap-2 w-full text-[11px]">
@@ -299,7 +299,7 @@ export default function Tdci() {
                 </div>
                 {activeItem && <p className="text-muted-foreground mt-1.5">{activeItem.symbol} {activeItem.style}: {activeItem.message ?? "starting"}</p>}
                 {job.data.items.filter((i: any) => i.status === "failed").slice(-3).map((i: any) => (
-                  <p key={`${i.symbol}${i.style}`} className="text-red-500 mt-1">{i.symbol} {i.style} failed: {i.message}</p>
+                  <p key={`${i.symbol}${i.style}`} className="text-neg mt-1">{i.symbol} {i.style} failed: {i.message}</p>
                 ))}
                 <p className="text-muted-foreground mt-1.5">Data is rate-limited to 8 requests/minute on the free plan, so a full run takes a while. You can leave this page.</p>
               </div>
@@ -310,8 +310,8 @@ export default function Tdci() {
             ) : (
               <>
                 <div className={cn("flex gap-2 items-start rounded-lg p-3 text-xs border",
-                  c.recommendedMin != null ? "border-green-500/30 bg-green-500/5" : "border-amber-500/30 bg-amber-500/5")}>
-                  {c.recommendedMin != null ? <ShieldCheck className="w-4 h-4 text-green-500 shrink-0" /> : <ShieldAlert className="w-4 h-4 text-amber-500 shrink-0" />}
+                  c.recommendedMin != null ? "border-pos/30 bg-pos/5" : "border-warn/30 bg-warn/5")}>
+                  {c.recommendedMin != null ? <ShieldCheck className="w-4 h-4 text-pos shrink-0" /> : <ShieldAlert className="w-4 h-4 text-warn shrink-0" />}
                   <div>
                     <p className="font-semibold">{c.recommendedMin != null ? `Edge found: scores ≥ ${c.recommendedMin}` : "No proven edge — auto-trade stays off for this market and style"}</p>
                     <p className="text-muted-foreground mt-0.5">{c.verdict}</p>
@@ -376,7 +376,7 @@ export default function Tdci() {
                               onClick={() => { setSymbol(sym); setStyle(p.key); }}
                               title={o ? o.verdict : "Not calibrated"}
                               className={cn("px-2 py-0.5 rounded border w-full",
-                                !o ? "border-border/50 text-muted-foreground/60" : o.recommendedMin != null ? "border-green-500/40 bg-green-500/10 text-green-500" : "border-border text-muted-foreground",
+                                !o ? "border-border/50 text-muted-foreground/60" : o.recommendedMin != null ? "border-pos/40 bg-pos/10 text-pos" : "border-border text-muted-foreground",
                                 symbol === sym && style === p.key && "ring-1 ring-primary")}
                             >
                               {!o ? "—" : o.recommendedMin != null ? `≥${o.recommendedMin}` : fmtR(o.oosAnySignalAvgR)}

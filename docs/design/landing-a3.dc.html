@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>A3 — Console and system reel</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&amp;family=Inter:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1F3A5F}a:hover{color:#0F2440}
+</style>
+</helmet>
+<div style="width: 1440px; height: 1240px; box-sizing: border-box; background: #F4EFE6; color: #1A1A1A; font-family: Inter, system-ui, sans-serif; display: flex; flex-direction: column">
+
+  <nav aria-label="Main" style="display: flex; justify-content: space-between; align-items: center; padding: 24px 96px; border-bottom: 1px solid #D9D0C1">
+    <span style="font-family: Fraunces, Georgia, serif; font-size: 26px; font-weight: 600">Trade Depot</span>
+    <div style="display: flex; gap: 34px; font-size: 15px; align-items: center">
+      <a href="#reel" style="color: #3D3A35; text-decoration: none">The systems</a>
+      <a href="#prop" style="color: #3D3A35; text-decoration: none">Prop traders</a>
+      <a href="#pricing" style="color: #3D3A35; text-decoration: none">Pricing</a>
+      <a href="#signin" style="color: #3D3A35; text-decoration: none">Sign in</a>
+      <a href="#start" style="padding: 12px 20px; background: #1F3A5F; color: #F4EFE6; text-decoration: none; border-radius: 6px; font-weight: 500">Start free</a>
+    </div>
+  </nav>
+
+  <div style="display: flex; gap: 64px; padding: 56px 96px 48px; align-items: center">
+    <div style="flex: 1; display: flex; flex-direction: column; gap: 22px">
+      <p style="margin: 0; font-size: 13px; letter-spacing: 0.14em; color: #5C5650; font-weight: 600">STRATEGY VALIDATION LAB · EARLY ACCESS</p>
+      <h1 style="margin: 0; font-family: Fraunces, Georgia, serif; font-weight: 500; font-size: 64px; line-height: 1.03; letter-spacing: -0.02em">Your strategies, examined like a fund would examine them.</h1>
+      <p style="margin: 0; font-size: 19px; line-height: 1.55; color: #3D3A35; max-width: 540px">Invent, attack, examine and shadow-test every idea before it trades. One honest record for each strategy you own.</p>
+      <a href="#start" style="align-self: flex-start; padding: 15px 22px; background: #1F3A5F; color: #F4EFE6; text-decoration: none; border-radius: 6px; font-weight: 500">Write your first Blueprint</a>
+    </div>
+
+    <div style="flex: 0 0 600px; background: #FFFFFF; border: 1px solid #E2DACB; border-radius: 14px; box-shadow: 0 16px 40px rgba(26, 26, 26, 0.07); overflow: hidden">
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid #EEE7DA">
+        <span style="font-weight: 600; font-size: 15px">Your strategies</span>
+        <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #5C5650">EXAMPLE ACCOUNT</span>
+      </div>
+      <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; padding: 10px 20px; font-size: 12px; color: #5C5650; border-bottom: 1px solid #EEE7DA">
+        <span>Strategy</span><span>Stage</span><span>Vault</span><span>Shadow</span>
+      </div>
+      <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; padding: 14px 20px; font-size: 14px; border-bottom: 1px solid #F3EEE4; align-items: center">
+        <span style="font-weight: 600">London Breakout</span><span><span style="padding: 3px 9px; border-radius: 999px; background: #E9EEF5; color: #1F3A5F; font-size: 12px; font-weight: 600">Licensed</span></span><span style="font-family: 'IBM Plex Mono', monospace">+9.1R</span><span style="font-family: 'IBM Plex Mono', monospace">31 d</span>
+      </div>
+      <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; padding: 14px 20px; font-size: 14px; border-bottom: 1px solid #F3EEE4; align-items: center">
+        <span style="font-weight: 600">Asia Range Fade</span><span><span style="padding: 3px 9px; border-radius: 999px; background: #FBF0DF; color: #8A4B00; font-size: 12px; font-weight: 600">Shadow</span></span><span style="font-family: 'IBM Plex Mono', monospace">+4.6R</span><span style="font-family: 'IBM Plex Mono', monospace">18 d</span>
+      </div>
+      <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; padding: 14px 20px; font-size: 14px; border-bottom: 1px solid #F3EEE4; align-items: center">
+        <span style="font-weight: 600">NY Open Momentum</span><span><span style="padding: 3px 9px; border-radius: 999px; background: #F1EDE6; color: #5C5650; font-size: 12px; font-weight: 600">Arena</span></span><span style="font-family: 'IBM Plex Mono', monospace">—</span><span style="font-family: 'IBM Plex Mono', monospace">—</span>
+      </div>
+      <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; padding: 14px 20px; font-size: 14px; align-items: center">
+        <span style="font-weight: 600; color: #5C5650">Gold Mean Revert</span><span><span style="padding: 3px 9px; border-radius: 999px; background: #F6E6E3; color: #8C2F22; font-size: 12px; font-weight: 600">Rejected</span></span><span style="font-family: 'IBM Plex Mono', monospace; color: #5C5650">−2.3R</span><span style="font-family: 'IBM Plex Mono', monospace; color: #5C5650">—</span>
+      </div>
+    </div>
+  </div>
+
+  <section id="reel" style="margin: 0 96px; background: #FFFFFF; border: 1px solid #E2DACB; border-radius: 16px; padding: 28px; display: flex; flex-direction: column; gap: 22px">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px">
+      <h2 style="margin: 0; font-family: Fraunces, Georgia, serif; font-weight: 500; font-size: 34px">Watch each system work.</h2>
+      <div role="tablist" aria-label="Systems" style="display: flex; gap: 8px; flex-wrap: wrap">
+        <sc-for list="{{systems}}" as="s" hint-placeholder-count="5">
+          <button type="button" role="tab" aria-selected="{{s.selected}}" onClick="{{s.pick}}" style="{{s.tabStyle}}">{{s.name}}</button>
+        </sc-for>
+      </div>
+    </div>
+    <div style="display: flex; gap: 32px; align-items: stretch">
+      <div style="flex: 0 0 760px; height: 428px; border-radius: 12px; background: #12161C; display: flex; flex-direction: column; justify-content: space-between; padding: 24px; box-sizing: border-box">
+        <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 0.08em; color: #C9D2DD">3D FILM PLACEHOLDER · {{active.code}}</span>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 16px; text-align: center">
+          <button type="button" aria-label="Play this system's film" style="width: 68px; height: 68px; border-radius: 50%; border: 1px solid #F4EFE6; background: transparent; display: flex; align-items: center; justify-content: center; cursor: pointer"><svg width="24" height="24" viewBox="0 0 24 24" fill="#F4EFE6" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg></button>
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 14px; color: #C9D2DD; max-width: 520px; line-height: 1.6">{{active.film}}</span>
+        </div>
+        <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #C9D2DD">0:20 LOOP</span>
+      </div>
+      <div style="flex: 1; display: flex; flex-direction: column; gap: 14px; justify-content: center">
+        <p style="margin: 0; font-size: 13px; letter-spacing: 0.14em; color: #5C5650; font-weight: 600">{{active.step}}</p>
+        <h3 style="margin: 0; font-family: Fraunces, Georgia, serif; font-weight: 500; font-size: 32px; line-height: 1.12">{{active.headline}}</h3>
+        <p style="margin: 0; font-size: 16px; line-height: 1.6; color: #3D3A35">{{active.body}}</p>
+      </div>
+    </div>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1240}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { sel: 0 };
+  }
+  renderVals() {
+    var data = [
+      { name: 'Arena', code: 'ARENA', step: 'STAGE 03', film: '[Glowing agents race across terrain made of price charts; the weak fade to grey]', headline: 'Thousands of versions trade the same markets.', body: 'Every variation faces identical randomized worlds, easy to hard, with real costs and missed fills. Only consistent survivors move on.' },
+      { name: 'Gauntlet', code: 'GAUNTLET', step: 'STAGE 04', film: '[A strategy crosses a corridor of hazards while a hunter drone strikes at its stop]', headline: 'Then we try to break what survived.', body: 'Hunter attacks its stops and fills. Rewind replays your real losses. Storm Mode throws crises history has not shown yet.' },
+      { name: 'Vault Exam', code: 'VAULT', step: 'STAGE 05', film: '[A vault door opens once, one strategy enters, and the door seals behind it]', headline: 'One exam on data it has never seen.', body: 'The score is discounted for every attempt made and rerun at double costs. Rejected is a real answer.' },
+      { name: 'Shadow Run', code: 'SHADOW', step: 'STAGE 06', film: '[A translucent twin of the strategy trades beside a live chart, mirroring every decision]', headline: 'It trades silently beside you first.', body: 'On live prices, with every disagreement logged, until the evidence says it is ready.' },
+      { name: 'Licensed', code: 'LICENSE', step: 'STAGE 07', film: '[A gold seal is stamped onto a strategy card and a timestamp locks into a chain]', headline: 'Only then can it touch real money.', body: 'Its whole record is fingerprinted and timestamped, and Tripwire pulls it back if live results drift.' }
+    ];
+    var self = this;
+    var sel = this.state.sel;
+    var systems = data.map(function (d, i) {
+      var on = i === sel;
+      return {
+        name: d.name,
+        selected: on ? 'true' : 'false',
+        pick: function () { self.setState({ sel: i }); },
+        tabStyle: on
+          ? 'padding: 11px 16px; border-radius: 999px; border: 1px solid #1F3A5F; background: #1F3A5F; color: #F4EFE6; font: 600 14px Inter, sans-serif; cursor: pointer; min-height: 44px'
+          : 'padding: 11px 16px; border-radius: 999px; border: 1px solid #D9D0C1; background: #FFFFFF; color: #1A1A1A; font: 500 14px Inter, sans-serif; cursor: pointer; min-height: 44px'
+      };
+    });
+    return { systems: systems, active: data[sel] };
+  }
+}
+</script>
+</body>
+</html>

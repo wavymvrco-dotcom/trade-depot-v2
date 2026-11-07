@@ -1,0 +1,1 @@
+ALTER TABLE "strategy_licenses" ADD COLUMN "storm" jsonb;

@@ -1,4 +1,5 @@
 import { useEffect, useRef, memo } from 'react';
+import { tvTheme, tvGridColor, tvBackground } from "@/lib/theme";
 
 export const TradingViewNews = memo(function TradingViewNews() {
   const container = useRef<HTMLDivElement>(null);
@@ -17,7 +18,7 @@ export const TradingViewNews = memo(function TradingViewNews() {
             displayMode: "regular",
             width: "100%",
             height: "100%",
-            colorTheme: "dark",
+            colorTheme: tvTheme(),
             locale: "en",
           })}
         <\/script>

@@ -71,7 +71,7 @@ const EnhancedOrderPanelContent = memo(function EnhancedOrderPanel({ symbol = "E
       toast({
         title: `${side} filled`,
         description: `${pos.size.toFixed(2)} lots ${symbol} @ ${pos.entryPrice.toFixed(dp)}`,
-        className: side === "BUY" ? "border-green-500/50" : "border-red-500/50",
+        className: side === "BUY" ? "border-pos/50" : "border-neg/50",
       });
     } catch (e: any) {
       toast({ title: "Order rejected", description: e.message.replace(/^\d+:\s*/, ""), variant: "destructive" });
@@ -134,24 +134,24 @@ const EnhancedOrderPanelContent = memo(function EnhancedOrderPanel({ symbol = "E
       </div>
 
       <div className="bg-background/40 p-2.5 rounded border border-border/50 text-xs space-y-1.5 font-mono">
-        <div className="flex justify-between"><span className="text-muted-foreground text-[10px] uppercase font-sans">Risk if stopped</span><span className="text-red-400">-${fmt(riskUSD)} ({balance > 0 ? ((riskUSD / balance) * 100).toFixed(2) : "0"}%)</span></div>
-        <div className="flex justify-between"><span className="text-muted-foreground text-[10px] uppercase font-sans">Reward at target</span><span className="text-green-500">+${fmt(rewardUSD)}</span></div>
+        <div className="flex justify-between"><span className="text-muted-foreground text-[10px] uppercase font-sans">Risk if stopped</span><span className="text-neg">-${fmt(riskUSD)} ({balance > 0 ? ((riskUSD / balance) * 100).toFixed(2) : "0"}%)</span></div>
+        <div className="flex justify-between"><span className="text-muted-foreground text-[10px] uppercase font-sans">Reward at target</span><span className="text-pos">+${fmt(rewardUSD)}</span></div>
         <div className="flex justify-between"><span className="text-muted-foreground text-[10px] uppercase font-sans">Bid / Ask</span>
-          <span>{quote ? <><span className="text-red-400">{quote.bid.toFixed(dp)}</span> / <span className="text-green-400">{quote.ask.toFixed(dp)}</span></> : "—"}</span>
+          <span>{quote ? <><span className="text-neg">{quote.bid.toFixed(dp)}</span> / <span className="text-pos">{quote.ask.toFixed(dp)}</span></> : "—"}</span>
         </div>
-        {!live && <p className="text-amber-500 text-[10px] font-sans">No live price — orders are disabled until data returns.</p>}
+        {!live && <p className="text-warn text-[10px] font-sans">No live price — orders are disabled until data returns.</p>}
       </div>
 
       <div className="grid grid-cols-2 gap-3 pt-1">
         <Button
-          className="bg-red-500/10 border border-red-500/30 hover:bg-red-500 hover:text-white text-red-500 h-14 flex flex-col items-center justify-center gap-0.5 shadow-none"
+          className="bg-neg/10 border border-neg/30 hover:bg-neg hover:text-on-strong text-neg h-14 flex flex-col items-center justify-center gap-0.5 shadow-none"
           onClick={() => handleOrder("SELL")} disabled={!live || createPosition.isPending}
         >
           <span className="font-bold text-sm tracking-widest">SELL</span>
           <span className="text-[10px] font-mono opacity-90">{levels ? `SL ${levels.sell.sl.toFixed(dp)}` : "—"}</span>
         </Button>
         <Button
-          className="bg-green-500/10 border border-green-500/30 hover:bg-green-500 hover:text-white text-green-500 h-14 flex flex-col items-center justify-center gap-0.5 shadow-none"
+          className="bg-pos/10 border border-pos/30 hover:bg-pos hover:text-on-strong text-pos h-14 flex flex-col items-center justify-center gap-0.5 shadow-none"
           onClick={() => handleOrder("BUY")} disabled={!live || createPosition.isPending}
         >
           <span className="font-bold text-sm tracking-widest">BUY</span>
