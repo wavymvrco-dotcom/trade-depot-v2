@@ -12,6 +12,7 @@ import { bootstrapEnvelope, deflatedSharpe, maxDrawdown, moments, sharpe } from 
 import { rng } from "./rng";
 import { hunt } from "./hunter";
 import { simulateProp } from "./prop";
+import { runGenome } from "./episode";
 
 export const GRADING = { minTrades: 30, minProfitFactor: 1.1, minDsr: 0.95 } as const;
 
@@ -48,6 +49,8 @@ export interface VaultReport {
   sequence: { rs: number[]; tradesPerDay: number };
   /** Phase 2: the vault sequence run through the Blueprint's prop rules (if any). */
   prop: { status: "passed" | "failed" | "open"; reason: string | null; days: number; returnPct: number } | null;
+  /** Rewind (§10.3): the champion in the user's worst drawdown periods. Gated only when out-of-sample. */
+  rewind: { symbol: string; from: string; to: string; trades: number; totalR: number; maxDD: number; inSample: boolean; breached: boolean }[];
   /** Hunter on the vault trades: total R under attack and the share of results kept. */
   hunter: { totalR: number; keptPct: number | null; attacks: number };
   grade: Grade;
@@ -63,6 +66,8 @@ export function vaultExam(args: {
   envs: Env[]; vault: Segment[]; vaultHashes: Record<string, string>;
   spec: BlueprintSpec; champion: Genome; baselineWeights: number[]; defaultStop: number; defaultRr: number;
   validationTrades: number[]; candidateSharpes: number[]; trials: number; seed: number;
+  /** User drawdown windows (from Rewind) and the first row of the locked segment per env, for the in-sample label. */
+  rewindWindows?: { symbol: string; fromMs: number; toMs: number }[];
 }): VaultReport {
   const { envs, vault, spec } = args;
   const base = evalSegments(envs, args.champion, vault, spec, 1);
@@ -99,6 +104,20 @@ export function vaultExam(args: {
   if (ds.totalR <= 0 && bs.totalR > 0) reasons.push("cost_fragile");
   if (dsr < GRADING.minDsr) reasons.push("likely_luck");
   if (bs.totalR <= bl.totalR) reasons.push("no_better_than_default");
+  const envelopeFor = bootstrapEnvelope(base.all, rng(args.seed ^ 0x5eed), 10_000);
+  const rewindRes = (args.rewindWindows ?? []).flatMap(w => {
+    const k = envs.findIndex(e => e.symbol === w.symbol); if (k < 0) return [];
+    const env = envs[k];
+    let from = -1, to = -1;
+    for (let r = 0; r < env.n; r++) { const t = env.timeMs(r); if (t >= w.fromMs && from < 0) from = r; if (t <= w.toMs) to = r + 1; }
+    if (from < 0 || to <= from) return [];
+    const trades = runGenome(env, args.champion, { from, to, limit: env.n + 1, costMult: 1, constraints: spec.constraints }).trades.map(t => t.r);
+    const inSample = from < vault[k].from;          // overlaps data the Arena trained or validated on
+    const dd = maxDrawdown(trades);
+    return [{ symbol: w.symbol, from: env.candles[from].time, to: env.candles[Math.min(to, env.n)].time, trades: trades.length,
+      totalR: r3(trades.reduce((s, x) => s + x, 0)), maxDD: r3(dd), inSample, breached: !inSample && dd > envelopeFor.ddP95 }];
+  });
+  if (rewindRes.some(x => x.breached)) reasons.push("rewind_drawdown");
 
   return {
     version: 1,
@@ -109,7 +128,8 @@ export function vaultExam(args: {
       return { symbol: e.symbol, trades: ps.trades, totalR: ps.totalR, profitFactor: ps.profitFactor, maxDD: ps.maxDD };
     }),
     luck: { dsr: r4(dsr), sr0: r4(sr0), sharpe: r4(sr), trials: args.trials, observations: vr.length, skew: r3(m.skew), kurt: r3(m.kurt), varianceOfSharpes: r4(varianceOfSharpes) },
-    envelope: roundEnvelope(bootstrapEnvelope(base.all, rng(args.seed ^ 0x5eed), 10_000)),
+    envelope: roundEnvelope(envelopeFor),
+    rewind: rewindRes,
     sequence: { rs: merged.map(m => r4(m.t.r)), tradesPerDay: r3(tradesPerDay) },
     prop: propResult ? { status: propResult.status, reason: propResult.reason, days: propResult.days, returnPct: r3(propResult.equityPct) } : null,
     hunter: { totalR: r3(huntedR), keptPct: bs.totalR > 0 ? r3(Math.max(0, huntedR) / bs.totalR) : null, attacks },

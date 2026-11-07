@@ -34,6 +34,8 @@ export interface TrainConfig {
   calibrationWeights?: number[] | null;
   userThreshold?: number | null;
   hallOfFamePerGeneration?: number;
+  /** Extra Gen Zero members, e.g. the "you" genome fitted to the user's own entries (Rewind). */
+  extraSeeds?: Genome[];
   /** Mirror cost model per env (Phase 2), or null to use the uniform cost multiplier. */
   mirror?: (MirrorEnvModel | null)[];
 }
@@ -102,6 +104,7 @@ function genZero(cfg: TrainConfig, rand: Rng): Genome[] {
   pop.push({ w: [...cfg.defaultWeights], threshold: 60, ...base });
   if (cfg.calibrationWeights?.some(v => v !== 0)) pop.push({ w: [...cfg.calibrationWeights], threshold: 60, ...base });
   if (cfg.userThreshold != null) pop.push({ w: [...cfg.defaultWeights], threshold: cfg.userThreshold, ...base });
+  for (const s of cfg.extraSeeds ?? []) if (s.w.length === cfg.defaultWeights.length && pop.length < cfg.population) pop.push(s);
   while (pop.length < cfg.population) {
     pop.push({
       w: cfg.defaultWeights.map(v => v + rand.normal(0, 0.3)),

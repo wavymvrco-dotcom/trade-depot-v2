@@ -10,7 +10,7 @@
     "build": "tsx script/build.ts",
     "start": "NODE_ENV=production node dist/index.cjs",
     "check": "tsc",
-    "test": "tsx --test tests/money.test.ts tests/tdci.test.ts tests/password.test.ts tests/candle-cache.test.ts tests/lab-engine.test.ts tests/sessions.test.ts tests/mirror.test.ts tests/hunter.test.ts tests/prop.test.ts",
+    "test": "tsx --test tests/money.test.ts tests/tdci.test.ts tests/password.test.ts tests/candle-cache.test.ts tests/lab-engine.test.ts tests/sessions.test.ts tests/mirror.test.ts tests/hunter.test.ts tests/prop.test.ts tests/rewind.test.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",

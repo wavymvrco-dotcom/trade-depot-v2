@@ -17,6 +17,7 @@ import { createRun, getRun, listRuns, cancelRun, LabError } from "../lab/service
 import { feasibility } from "../lab/service/feasibility";
 import { getLicense, listLicenses, licenseHistory, transition } from "../lab/service/licenses";
 import { shadowEvidence } from "../lab/service/shadow";
+import { userRewind } from "../lab/service/rewind";
 import { TIERS, tierOf, monthKey } from "../lab/service/tiers";
 import { FAILURE_TEXT } from "../lab/engine/types";
 import type { BlueprintSpec } from "../lab/engine/types";
@@ -188,6 +189,15 @@ export function register(app: Express) {
 
   app.post("/api/lab/licenses/:id/retire", async (req: Request, res: Response) => {
     try { const lic = await owned(req); res.json(await transition(lic.id, "retire", "Retired by the user", null, { liveSince: null })); } catch (e) { fail(res, e); }
+  });
+
+  /** Rewind (§10.3): the user's own trades replayed with one change at a time (Pro). */
+  app.get("/api/performance/rewind", async (req: Request, res: Response) => {
+    try {
+      const { tier } = await tierFor(uid(req));
+      if (tier !== "pro") throw new LabError("Rewind is part of the Pro plan.", 402);
+      res.json(await userRewind(uid(req)));
+    } catch (e) { fail(res, e); }
   });
 
   app.get("/api/lab/prop-templates", (_req: Request, res: Response) => res.json(PROP_TEMPLATES));

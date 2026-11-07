@@ -167,3 +167,20 @@ Newest at the bottom. Format: date — decision — why.
   cached outcome; hunted stops use 4× base slippage until Mirror has real stop fills. Hunter results are reported
   ("keeps X% of its results under attack") but do not gate the grade — the sheet does not ask for a gate.
   Co-evolving Hunter's budget allocation (optional in the sheet) is not built.
+
+## 2026-11-07 — Phase 2: prop rules, Challenge Odds, Rewind
+
+- **Prop rules:** loss limits are % of the starting account (the common convention); daily limit measured from the
+  day's starting equity, resetting at a user-set UTC hour. In the Arena only daily-loss and drawdown breaches kill
+  (targets and time limits belong to a whole challenge, not one episode window). News restrictions are recorded but
+  not simulated (no historical news calendar). No firm's rules are hard-coded — two editable templates only.
+- **Challenge Odds interval:** Wilson 90% interval using the number of *real* trades as the sample size, not the
+  10,000 simulated paths — the uncertainty is in the evidence. Fewer than 10 real trades → no estimate at all.
+- **Rewind** replays on 15-minute candles (~7 months); older trades are counted as skipped. Each change keeps the
+  user's own exit. Size changes are shown but never offered as "the" fix (they scale wins and losses alike).
+  Journal entries are included unless they duplicate a position (same pair, opened within a minute).
+- **Rewind in the Gauntlet:** the champion is run over the user's two worst drawdown periods *inside* the one Vault
+  Exam (so the Vault still opens once). Periods overlapping training/validation are labelled in-sample and not
+  graded; out-of-sample breaches of the Vault's 95th-percentile drawdown fail with `rewind_drawdown`.
+- **Gen Zero "you":** logistic regression of the user's entry bars vs. 5× random bars on |layer value| (entries are
+  side-agnostic); only layers that made entries more likely get weight; needs ≥ 20 entries.

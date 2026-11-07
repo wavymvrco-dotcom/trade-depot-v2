@@ -16,6 +16,7 @@ export interface VaultReport {
   envelope: { ddP50: number; ddP95: number; ddP99: number; meanR: number; meanP05: number; meanP95: number };
   hunter?: { totalR: number; keptPct: number | null; attacks: number };
   prop?: { status: "passed" | "failed" | "open"; reason: string | null; days: number; returnPct: number } | null;
+  rewind?: { symbol: string; from: string; to: string; trades: number; totalR: number; maxDD: number; inSample: boolean; breached: boolean }[];
   grade: Grade; failureReasons: string[]; vaultHashes: Record<string, string>;
 }
 export interface LabResult {

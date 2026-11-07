@@ -46,7 +46,7 @@ export interface Trade { t: number; side: 1 | -1; r: number; exit: number }
 
 export type FailureReason =
   | "too_few_trades" | "vault_negative" | "weak_profit_factor" | "cost_fragile"
-  | "likely_luck" | "no_better_than_default" | "no_champion";
+  | "likely_luck" | "no_better_than_default" | "no_champion" | "rewind_drawdown";
 
 export const FAILURE_TEXT: Record<FailureReason, string> = {
   too_few_trades: "Too few trades in the locked data to judge it (needs at least 30).",
@@ -56,4 +56,5 @@ export const FAILURE_TEXT: Record<FailureReason, string> = {
   likely_luck: "After accounting for how many versions were tried, the result is likely luck.",
   no_better_than_default: "It did no better than the default TDCI settings on the same data.",
   no_champion: "No version made at least 30 trades on the validation data, so there was nothing to examine.",
+  rewind_drawdown: "In the periods when your own trading had its worst drawdowns, it lost more than its Vault said it should.",
 };

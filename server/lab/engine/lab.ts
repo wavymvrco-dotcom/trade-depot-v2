@@ -7,7 +7,7 @@ import { makeEnv, sliceEnvData, type EnvData } from "./env";
 import { makeSplits, vaultHash, trainingCut, type Splits } from "./splits";
 import { trainSteps, genomeHash, LIMITS, type Progress, type TrainResult } from "./evolve";
 import { vaultExam, type VaultReport } from "./vault";
-import type { BlueprintSpec, FailureReason, Grade } from "./types";
+import type { BlueprintSpec, FailureReason, Genome, Grade } from "./types";
 import type { MirrorEnvModel } from "./worlds";
 
 export const ENGINE_VERSION = 1;
@@ -20,6 +20,9 @@ export interface LabInput {
   defaultWeights: number[]; defaultStop: number; defaultRr: number;
   calibrationWeights?: number[] | null;
   userThreshold?: number | null;
+  /** Phase 2 (Rewind): Gen Zero genome fitted to the user's entries, and their worst drawdown windows. */
+  userGenome?: Genome | null;
+  rewindWindows?: { symbol: string; fromMs: number; toMs: number }[];
   /** Phase 2: Mirror cost model per env (same order as envData). */
   mirror?: (MirrorEnvModel | null)[];
   /** Called once before the vault opens; must return false if this (genome, vault) was already examined. */
@@ -59,6 +62,7 @@ function prepareLab(input: LabInput) {
     spec: input.spec, population, generations, episodes, seed: input.seed, successiveHalving,
     defaultWeights: input.defaultWeights, defaultStop: input.defaultStop, defaultRr: input.defaultRr,
     calibrationWeights: input.calibrationWeights, userThreshold: input.userThreshold, mirror: input.mirror,
+    extraSeeds: input.userGenome ? [input.userGenome] : [],
   });
   return { config: { population, generations, episodes, seed: input.seed, successiveHalving }, splits, vaultHashes, steps };
 }
@@ -88,6 +92,7 @@ function examine(input: LabInput, prep: ReturnType<typeof prepareLab>, tr: Train
     envs: input.envData.map(makeEnv), vault: prep.splits.map(s => s.vault), vaultHashes: prep.vaultHashes, spec: input.spec, champion: tr.champion!.genome,
     baselineWeights: input.defaultWeights, defaultStop: input.defaultStop, defaultRr: input.defaultRr,
     validationTrades: tr.champion!.validationTrades, candidateSharpes: tr.candidateSharpes, trials: tr.trials, seed: input.seed,
+    rewindWindows: input.rewindWindows,
   });
 }
 

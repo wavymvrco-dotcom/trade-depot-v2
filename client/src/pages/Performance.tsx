@@ -2,6 +2,7 @@
 // Performance hub: analytics, journal and AI trade reviews in one place.
 import { lazy } from "react";
 import { HubTabs } from "@/components/layout/HubTabs";
+import { RewindTab } from "@/components/performance/RewindTab";
 
 const Analytics = lazy(() => import("./Analytics"));
 const Journal = lazy(() => import("./Journal"));
@@ -13,6 +14,7 @@ export default function Performance() {
       { id: "analytics", label: "Analytics", render: () => <Analytics /> },
       { id: "journal", label: "Journal", render: () => <Journal /> },
       { id: "reviews", label: "AI trade reviews", render: () => <div className="flex-1 overflow-y-auto p-4 md:p-6"><Reviews /></div> },
+      { id: "rewind", label: "Rewind", render: () => <RewindTab /> },
     ]} />
   );
 }

@@ -116,6 +116,17 @@ export function ReportTab() {
                       sub={v.hunter.keptPct != null ? `Keeps ${Math.round(v.hunter.keptPct * 100)}% of its results · ${v.hunter.attacks} attacks` : `${v.hunter.attacks} attacks`} />
                   )}
                 </dl>
+                {!!v.rewind?.length && (
+                  <div className="text-sm bg-secondary rounded-lg px-4 py-3">
+                    <p className="font-medium m-0 mb-1">In your own worst drawdown periods (Rewind)</p>
+                    <ul className="m-0 pl-5 space-y-0.5">
+                      {v.rewind.map((w, i) => (
+                        <li key={i}><span className="font-mono">{w.symbol} {w.from.slice(0, 10)} → {w.to.slice(0, 10)}</span>: {w.trades} trades, {fmtR(w.totalR)}, drawdown {w.maxDD}R
+                          {w.inSample ? " · in-sample (it trained on this period), not graded" : w.breached ? " · beyond its Vault's 95th percentile" : " · within its Vault's range"}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[480px] text-sm">
                     <caption className="text-left text-sm font-medium mb-2">By pair (vault)</caption>
