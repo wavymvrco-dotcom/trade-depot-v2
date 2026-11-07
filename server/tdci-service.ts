@@ -6,12 +6,12 @@ import { and, desc, eq, inArray } from "drizzle-orm";
 import { fetchCandles, defaultSpreadPips } from "./backtest";
 import { getPairCot } from "./cot";
 import { getPairRates } from "./rates";
-import { toWeekly } from "./indicators";
+import { toWeekly, type Candle } from "./indicators";
 import { getBoss, QUEUES } from "./jobs";
 import { simulateTrade } from "./lab/engine/outcomes";
 import { getSymbolConfig } from "@shared/pips";
 import {
-  prepare, warmup, layerValues, combine, computeAt, lastClosedIndex, PROFILES, STYLES,
+  prepare, warmup, layerValues, combine, computeAt, lastClosedIndex, parseTime, PROFILES, STYLES,
   type StyleKey, type Weights, type LayerKey, type TdciResult, type TdciContext, type Profile,
 } from "./tdci";
 
@@ -50,15 +50,17 @@ export function costFor(symbol: string, style: StyleKey): TradeCost {
 }
 
 /** Candles + COT + rates for a symbol, prepared for TDCI scoring. Shared by calibration, live scoring and the Lab. */
-export async function loadContext(symbol: string, profile: Profile, bars: number): Promise<TdciContext> {
+export async function loadContext(symbol: string, profile: Profile, bars: number, opts: { endBefore?: number } = {}): Promise<TdciContext> {
   const key = apiKey();
-  const p = await fetchCandles(symbol, profile.interval, bars, key);
+  // endBefore (ms): drop bars that open at or after it, so a run can pin its data to a fixed cut-off
+  const cut = (cs: Candle[]) => (opts.endBefore == null ? cs : cs.filter(c => parseTime(c.time) < opts.endBefore!));
+  const p = cut(await fetchCandles(symbol, profile.interval, bars, key));
   let h;
   if (profile.htf === "1week") {
     h = toWeekly(p);
   } else {
     const ratio = HTF_PER_PRIMARY[`${profile.interval}→${profile.htf}`] ?? 1 / 6;
-    h = await fetchCandles(symbol, profile.htf, Math.min(20000, Math.ceil(bars * ratio) + 120), key);
+    h = cut(await fetchCandles(symbol, profile.htf, Math.min(20000, Math.ceil(bars * ratio) + 120), key));
   }
   const needCot = profile.layers.includes("positioning");
   const needRates = profile.layers.includes("carry");

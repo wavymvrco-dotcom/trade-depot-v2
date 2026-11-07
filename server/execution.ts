@@ -42,6 +42,8 @@ export async function openTrade(params: {
   takeProfit?: number | null;
   aiSignal?: boolean;
   signalId?: string | null;
+  /** Strategy Lab license that placed this order (live trades are traceable to it). */
+  licenseId?: string | null;
 }): Promise<OpenResult> {
   const { userId, symbol, side } = params;
   const lots = roundLots(params.lots);
@@ -87,6 +89,9 @@ export async function openTrade(params: {
     entryPrice: fillPrice, currentPrice: fillPrice,
     stopLoss: sl, takeProfit: tp, profit: 0, status: "open",
     aiSignal: !!params.aiSignal, brokerTradeId, signalId: params.signalId ?? null,
+    licenseId: params.licenseId ?? null,
+    // Money at risk at the stop, so results can be measured in R
+    riskAmount: sl != null ? Math.abs(calcProfit(side, fillPrice, sl, symbol, lots)) : null,
   });
   return { ok: true, position, brokerNote };
 }

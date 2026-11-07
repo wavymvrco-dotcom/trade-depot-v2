@@ -9,8 +9,19 @@ import { openTrade, closeTrade, normalizeSide, sizeForRisk } from "./execution";
 import { recordLessonOutcome } from "./ai-knowledge";
 import type { Position, AiSignal } from "@shared/schema";
 import { latestCalibration, styleFor, type CalibrationResult } from "./tdci-service";
+import { db } from "./db";
+import { strategyLicenses } from "@shared/schema";
+import { and, eq } from "drizzle-orm";
 
 let running = false;
+const notLicensedLogged = new Set<string>();
+
+/** True when the user has a strategy of this kind that is Licensed and Live. */
+async function hasLiveLicense(userId: string, kind: string) {
+  const rows = await db.select({ id: strategyLicenses.id }).from(strategyLicenses)
+    .where(and(eq(strategyLicenses.userId, userId), eq(strategyLicenses.kind, kind), eq(strategyLicenses.grade, "licensed"), eq(strategyLicenses.stage, "live")));
+  return rows.length > 0;
+}
 const SIGNAL_INTERVAL_MS = 15 * 60_000;
 
 /** Reason a generated signal may not be auto-executed, or null if it may. */
@@ -223,6 +234,18 @@ async function runAutoTradePass() {
         // Signals older than 15 minutes are stale — the market has moved on
         if (pending.createdAt && Date.now() - new Date(pending.createdAt).getTime() > 15 * 60_000) {
           await storage.updateSignalStatus(pending.id, "expired");
+          continue;
+        }
+
+        // Live requires Licensed (invariant 9): auto-execution needs a strategy of this
+        // signal source that passed the Vault Exam and Shadow Run and is set Live.
+        // Otherwise the signal stays for the user to act on manually.
+        const kind = pending.source === "tradingview" ? "tradingview" : "ai_signals";
+        if (!(await hasLiveLicense(user.id, kind))) {
+          if (!notLicensedLogged.has(pending.id)) {
+            notLicensedLogged.add(pending.id);
+            console.log(`[AutoTrade] signal ${pending.id} not auto-traded: no Licensed+Live ${kind} strategy`);
+          }
           continue;
         }
 

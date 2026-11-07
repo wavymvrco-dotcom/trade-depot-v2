@@ -57,3 +57,38 @@ export function closeAtBarR(
   const d = stopAtr * atrAtSignal;
   return (side * (exit - entry)) / d - commissionInR(symbol, entry, d, cost.commission);
 }
+
+/**
+ * Resolve a trade on live data where only bars up to `lastClosed` exist.
+ * Same rules as simulateTrade. `final` is false while the trade is still open
+ * (no stop/target hit yet and max hold not reached).
+ */
+export function resolveTrade(
+  p: readonly Candle[], atrAtSignal: number, symbol: string, i: number, side: 1 | -1,
+  model: TradeModel, cost: TradeCost, lastClosed: number,
+): (SimResult & { final: boolean; entry: number; sl: number; tp: number; exitPrice: number | null }) | null {
+  if (i + 1 > lastClosed) return null; // entry bar not open yet
+  const { stopAtr, rr, maxHold } = model;
+  const a = atrAtSignal;
+  const mid = p[i + 1].open;
+  const entry = side > 0 ? mid + cost.half + cost.slip : mid - cost.half - cost.slip;
+  const sl = entry - side * stopAtr * a, tp = entry + side * rr * stopAtr * a;
+  const commissionR = commissionInR(symbol, entry, stopAtr * a, cost.commission);
+  const costR = (2 * cost.half + 2 * cost.slip) / (stopAtr * a) + commissionR;
+  const horizon = Math.min(i + maxHold, lastClosed);
+  for (let j = i + 1; j <= horizon; j++) {
+    const b = p[j];
+    const slHit = side > 0 ? b.low - cost.half <= sl : b.high + cost.half >= sl;
+    const tpHit = side > 0 ? b.high - cost.half >= tp : b.low + cost.half <= tp;
+    if (slHit || tpHit) {
+      const exit = slHit ? sl - side * cost.slip : tp;
+      return { r: (side * (exit - entry)) / (stopAtr * a) - commissionR, exitIdx: j, costR, final: true, entry, sl, tp, exitPrice: exit };
+    }
+  }
+  if (i + maxHold <= lastClosed) {
+    const k = i + maxHold;
+    const exit = side > 0 ? p[k].close - cost.half : p[k].close + cost.half;
+    return { r: (side * (exit - entry)) / (stopAtr * a) - commissionR, exitIdx: k, costR, final: true, entry, sl, tp, exitPrice: exit };
+  }
+  return { r: 0, exitIdx: -1, costR, final: false, entry, sl, tp, exitPrice: null };
+}

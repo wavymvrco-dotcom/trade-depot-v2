@@ -148,10 +148,28 @@ const equity = (rs: number[]) => { let s = 0; return rs.map(r => r3((s += r))); 
 
 // ─── Training loop ────────────────────────────────────────────────────────────
 
+/** Run the whole Arena synchronously. */
 export function train(
   envs: Env[], train: Segment[], validation: Segment[], cfg: TrainConfig,
   hooks: { onProgress?: (p: Progress) => void; isCancelled?: () => boolean } = {},
 ): TrainResult {
+  const it = trainSteps(envs, train, validation, cfg);
+  let step = it.next(false);
+  while (!step.done) {
+    hooks.onProgress?.(step.value);
+    step = it.next(!!hooks.isCancelled?.());
+  }
+  return step.value;
+}
+
+/**
+ * The Arena as a generator: yields progress after every generation so callers
+ * can save it, yield to the event loop, or stop: pass `true` to next() and the
+ * Arena ends after that generation, returning the result so far (cancelled).
+ */
+export function* trainSteps(
+  envs: Env[], train: Segment[], validation: Segment[], cfg: TrainConfig,
+): Generator<Progress, TrainResult, boolean> {
   const { spec } = cfg;
   const rand = rng(cfg.seed);
   const hard = envs.map(hardnessIndex);
@@ -166,7 +184,6 @@ export function train(
   let champion: HallEntry | null = null;
 
   for (let gen = 0; gen < cfg.generations; gen++) {
-    if (hooks.isCancelled?.()) { cancelled = true; break; }
     const worldRand = rand.fork();
     const episodes = sampleEpisodes(envs, train, hard, level, cfg.episodes, worldRand);
     const P = pop.length;
@@ -212,7 +229,9 @@ export function train(
       };
       hof.push(entry);
       valTradesByHash.set(h, vs);
-      if (vs.length >= 2) candidateSharpes.push(sharpe(vs));
+      // Only candidates with as many validation trades as a champion needs: a Sharpe from a handful of
+      // trades is noise and would inflate the variance the luck adjustment uses. (All of them still count as trials.)
+      if (vs.length >= 30) candidateSharpes.push(sharpe(vs));
       if (vs.length >= 30 && (!champion || entry.validation.V > champion.validation.V)) champion = entry;
     }
 
@@ -225,12 +244,12 @@ export function train(
     generationsRun = gen + 1;
 
     const sortedF = [...F].sort((a, b) => a - b);
-    hooks.onProgress?.({
+    const progress: Progress = {
       generation: gen + 1, generations: cfg.generations, level,
       fitness: F.map(v => (Number.isFinite(v) ? Math.round(v * 100) / 100 : -99)),
       elites, best: r3(sortedF[sortedF.length - 1]), median: r3(quantile(sortedF, 0.5)), deaths, trials,
-      championCurve: champion ? downsample(equity(valTradesByHash.get(champion.hash) ?? [])) : [],
-    });
+      championCurve: champion ? downsample(equity(valTradesByHash.get((champion as HallEntry).hash) ?? [])) : [],
+    };
 
     // Next generation: elites carry over; the rest are children of tournament selection (k = 3)
     const tournament = () => {
@@ -244,6 +263,8 @@ export function train(
     const next: Genome[] = elites.map(i => pop[i]);
     while (next.length < P) next.push(normalizeGenome(mutate(crossover(tournament(), tournament(), rand), rand), spec));
     pop = next;
+    const stop = yield progress;
+    if (stop && gen + 1 < cfg.generations) { cancelled = true; break; }
   }
 
   return {

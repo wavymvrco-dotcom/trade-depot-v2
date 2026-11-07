@@ -5,6 +5,9 @@ import type { Express } from "express";
 import type { Request, Response } from "express";
 import bcrypt from "bcrypt";
 import { storage } from "../storage";
+import { db } from "../db";
+import { userSettings } from "@shared/schema";
+import { eq } from "drizzle-orm";
 import { BCRYPT_ROUNDS } from "../password";
 import { uid } from "./_shared";
 import { dailyUsage, sessionUsage } from "../lab/service/data";
@@ -110,6 +113,17 @@ export function register(app: Express) {
       if (req.params.id === adminUser.id) return res.status(400).json({ message: "Cannot delete your own account" });
       await storage.deleteUser(req.params.id);
       res.json({ ok: true });
+    } catch (err: any) { res.status(500).json({ message: err.message }); }
+  });
+
+  // ─── Admin: Strategy Lab plan (until billing sets it) ──────────────────────────
+  app.patch("/api/admin/users/:id/lab-tier", requireAdmin as any, async (req: Request, res: Response) => {
+    try {
+      const tier = req.body?.tier === "pro" ? "pro" : req.body?.tier === "free" ? "free" : null;
+      if (!tier) return res.status(400).json({ message: "tier must be free or pro" });
+      await storage.getUserSettings(req.params.id); // creates the settings row if missing
+      await db.update(userSettings).set({ labTier: tier }).where(eq(userSettings.userId, req.params.id));
+      res.json({ ok: true, tier });
     } catch (err: any) { res.status(500).json({ message: err.message }); }
   });
 

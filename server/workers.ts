@@ -6,6 +6,8 @@
 import { startAutoTradeWorker, startAlertWatcher, startSignalOutcomeWatcher } from "./autotrade";
 import { startPushDigest } from "./push";
 import { startCalibrationWorker } from "./tdci-service";
+import { startLabRunWorker } from "./lab/service/runs";
+import { startShadowWorker } from "./lab/service/shadow";
 
 export function workersEnabledInWeb(): boolean {
   return (process.env.RUN_WORKERS ?? "true").toLowerCase() !== "false";
@@ -17,5 +19,7 @@ export async function startBackgroundWorkers() {
   startSignalOutcomeWatcher();
   startPushDigest();
   await startCalibrationWorker();
-  console.log("[workers] background workers started (auto-trade, alerts, signal outcomes, push digest, job queue)");
+  await startLabRunWorker();
+  startShadowWorker();
+  console.log("[workers] background workers started (auto-trade, alerts, signal outcomes, push digest, job queue, Lab runs, Shadow Run/Tripwire)");
 }

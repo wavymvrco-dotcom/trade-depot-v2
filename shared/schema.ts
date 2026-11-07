@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, real, boolean, timestamp, index, jsonb, doublePrecision, primaryKey, date, bigint, bigserial } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, real, boolean, timestamp, index, jsonb, doublePrecision, primaryKey, date, bigint, bigserial, uniqueIndex, customType } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -66,7 +66,9 @@ export const positions = pgTable("positions", {
   aiSignal: boolean("ai_signal").notNull().default(false),
   brokerTradeId: text("broker_trade_id"),
   signalId: varchar("signal_id"),
-}, (t) => [index("positions_user_status_idx").on(t.userId, t.status)]);
+  licenseId: varchar("license_id"), // Strategy Lab license that opened this position (live trades)
+  riskAmount: real("risk_amount"),  // account currency at risk at the stop when opened (for R-multiples)
+}, (t) => [index("positions_user_status_idx").on(t.userId, t.status), index("positions_license_idx").on(t.licenseId)]);
 
 export const insertPositionSchema = createInsertSchema(positions).omit({
   id: true,
@@ -169,6 +171,10 @@ export const userSettings = pgTable("user_settings", {
   offHoursBehavior: text("off_hours_behavior").default("pause"),
   offHoursRiskReduction: integer("off_hours_risk_reduction").default(50),
   tdciMinScore: integer("tdci_min_score").default(60), // auto-trade only at or above this TDCI
+  labTier: text("lab_tier").notNull().default("free"),         // free | pro (Strategy Lab limits)
+  labCreditsUsed: integer("lab_credits_used").notNull().default(0),
+  labCreditsMonth: text("lab_credits_month"),                  // YYYY-MM the credit count belongs to
+  contributeExecutionData: boolean("contribute_execution_data").notNull().default(true), // Mirror (Phase 2)
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
@@ -415,3 +421,113 @@ export const apiUsage = pgTable("api_usage", {
   cachedBars: bigint("cached_bars", { mode: "number" }).notNull().default(0),
   fetchedBars: bigint("fetched_bars", { mode: "number" }).notNull().default(0),
 }, (t) => [primaryKey({ columns: [t.day, t.provider] })]);
+
+// ─── Strategy Lab (Phase 1) ───────────────────────────────────────────────────
+// JSON columns are validated with the zod schemas in shared/lab-schemas.ts.
+
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({ dataType: () => "bytea" });
+
+/** Shared, precomputed layer matrices per (symbol, style, data version, TDCI version). */
+export const envCache = pgTable("env_cache", {
+  symbol: text("symbol").notNull(),
+  style: text("style").notNull(),
+  dataVersion: text("data_version").notNull(),
+  tdciVersion: integer("tdci_version").notNull(),
+  payload: bytea("payload").notNull(),
+  builtAt: timestamp("built_at").notNull().defaultNow(),
+}, (t) => [primaryKey({ columns: [t.symbol, t.style, t.dataVersion, t.tdciVersion] })]);
+
+export const blueprints = pgTable("blueprints", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  name: text("name").notNull(),
+  prompt: text("prompt"),
+  spec: jsonb("spec").notNull(),
+  specVersion: integer("spec_version").notNull().default(1),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => [index("blueprints_user_idx").on(t.userId, t.createdAt)]);
+
+export const labRuns = pgTable("lab_runs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  blueprintId: varchar("blueprint_id").notNull(),
+  style: text("style").notNull(),
+  symbols: jsonb("symbols").notNull(),
+  config: jsonb("config").notNull(),
+  seed: integer("seed").notNull(),
+  status: text("status").notNull().default("queued"), // queued | running | done | failed | cancelled
+  cancelRequested: boolean("cancel_requested").notNull().default(false),
+  progress: jsonb("progress"),
+  result: jsonb("result"),
+  trials: integer("trials").notNull().default(0),
+  error: text("error"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  startedAt: timestamp("started_at"),
+  finishedAt: timestamp("finished_at"),
+}, (t) => [index("lab_runs_user_idx").on(t.userId, t.createdAt), index("lab_runs_status_idx").on(t.status)]);
+
+/** One row per examined (run, champion). Its existence is the "vault opened" record (invariant 2). */
+export const vaultOpenings = pgTable("vault_openings", {
+  runId: varchar("run_id").notNull(),
+  genomeHash: text("genome_hash").notNull(),
+  vaultHash: text("vault_hash").notNull(),
+  openedAt: timestamp("opened_at").notNull().defaultNow(),
+}, (t) => [primaryKey({ columns: [t.runId, t.genomeHash] })]);
+
+export const strategyLicenses = pgTable("strategy_licenses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  runId: varchar("run_id"),
+  kind: text("kind").notNull().default("lab"),    // lab | ai_signals
+  name: text("name").notNull(),
+  style: text("style").notNull(),
+  symbols: jsonb("symbols").notNull(),             // shadow/live symbols (up to 3 best vault pairs)
+  genome: jsonb("genome").notNull(),
+  genomeHash: text("genome_hash").notNull(),
+  layers: jsonb("layers").notNull(),               // layer keys, in genome weight order
+  grade: text("grade").notNull(),                  // licensed | probation | scrapped
+  stage: text("stage").notNull(),                  // vault | shadow | live | retired
+  vault: jsonb("vault"),                           // immutable Vault Exam report
+  evidence: jsonb("evidence"),                     // latest Shadow / Tripwire evidence
+  vaultHash: text("vault_hash"),
+  incumbentId: varchar("incumbent_id"),
+  shadowStartedAt: timestamp("shadow_started_at"),
+  liveSince: timestamp("live_since"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (t) => [
+  index("strategy_licenses_user_idx").on(t.userId, t.stage),
+  uniqueIndex("strategy_licenses_run_genome_uq").on(t.runId, t.genomeHash),
+]);
+
+/** Immutable audit log of every grade/stage change. */
+export const licenseEvents = pgTable("license_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  licenseId: varchar("license_id").notNull(),
+  fromGrade: text("from_grade"), fromStage: text("from_stage"),
+  toGrade: text("to_grade").notNull(), toStage: text("to_stage").notNull(),
+  reason: text("reason").notNull(),
+  data: jsonb("data"),
+  at: timestamp("at").notNull().defaultNow(),
+}, (t) => [index("license_events_license_idx").on(t.licenseId, t.at)]);
+
+/** Shadow Run decisions, written at decision time (append-only; exits filled in when they happen). */
+export const shadowTrades = pgTable("shadow_trades", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  licenseId: varchar("license_id").notNull(),
+  symbol: text("symbol").notNull(),
+  side: text("side"),                     // LONG | SHORT | null when the candidate stayed flat
+  signalTime: text("signal_time").notNull(),
+  score: integer("score"),
+  entry: doublePrecision("entry"), sl: doublePrecision("sl"), tp: doublePrecision("tp"),
+  exit: doublePrecision("exit"), exitTime: text("exit_time"),
+  r: doublePrecision("r"),
+  status: text("status").notNull(),      // pending | open | closed | flat
+  incumbentAction: text("incumbent_action").notNull(), // LONG | SHORT | FLAT
+  incumbentR: doublePrecision("incumbent_r"),
+  attribution: jsonb("attribution"),
+  decidedAt: timestamp("decided_at").notNull().defaultNow(),
+}, (t) => [
+  index("shadow_trades_license_idx").on(t.licenseId, t.signalTime),
+  uniqueIndex("shadow_trades_decision_uq").on(t.licenseId, t.symbol, t.signalTime),
+]);

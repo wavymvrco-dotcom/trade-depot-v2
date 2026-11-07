@@ -8,7 +8,8 @@ import { join } from "node:path";
 import { normCdf, normInv, deflatedSharpe, cusumTrips, maxDrawdown, moments } from "../server/lab/engine/stats";
 import { rng } from "../server/lab/engine/rng";
 import { scoreRow, weightNorm, attribution } from "../server/lab/engine/combine";
-import { simulateTrade } from "../server/lab/engine/outcomes";
+import { simulateTrade, resolveTrade } from "../server/lab/engine/outcomes";
+import { nextState, mayTradeLive, IllegalTransition } from "../server/lab/engine/license-rules";
 import { buildEnvData, makeEnv, sliceEnvData } from "../server/lab/engine/env";
 import { makeSplits } from "../server/lab/engine/splits";
 import { runGenome } from "../server/lab/engine/episode";
@@ -267,3 +268,43 @@ test("engine code never imports the database, HTTP server, or service layer", ()
 });
 
 test("max drawdown helper", () => assert.equal(maxDrawdown([1, -2, 1, -3, 5]), 4));
+
+test("live trade resolution matches the simulator once the trade is final", () => {
+  const d = syntheticEnv({ seed: 60, rows: 800 });
+  const model = { stopAtr: 1.5, rr: 2, maxHold: 30 };
+  for (let i = 10; i < 700; i += 13) for (const side of [1, -1] as const) {
+    const sim = simulateTrade(d.candles, d.atr[i], d.symbol, i, side, model, d.cost);
+    // Before the exit bar has closed the trade is still open; once it has, results match exactly
+    const early = resolveTrade(d.candles, d.atr[i], d.symbol, i, side, model, d.cost, sim.exitIdx - 1);
+    if (sim.exitIdx - 1 > i) assert.equal(early!.final, false);
+    const done = resolveTrade(d.candles, d.atr[i], d.symbol, i, side, model, d.cost, sim.exitIdx);
+    assert.equal(done!.final, true);
+    assert.equal(done!.exitIdx, sim.exitIdx);
+    assert.equal(done!.r, sim.r);
+  }
+});
+
+test("license transitions: legal moves work, illegal ones throw", () => {
+  let s = nextState(null, "exam_passed");
+  assert.deepEqual(s, { grade: "probation", stage: "vault" });
+  s = nextState(s, "start_shadow"); s = nextState(s, "graduate"); s = nextState(s, "go_live");
+  assert.ok(mayTradeLive(s));
+  assert.deepEqual(nextState(s, "tripwire"), { grade: "probation", stage: "shadow" });
+  assert.throws(() => nextState({ grade: "probation", stage: "vault" }, "go_live"), IllegalTransition);
+  assert.throws(() => nextState({ grade: "scrapped", stage: "vault" }, "start_shadow"), IllegalTransition);
+  assert.throws(() => nextState({ grade: "probation", stage: "shadow" }, "go_live"), IllegalTransition);
+  assert.throws(() => nextState(null, "graduate"), IllegalTransition);
+  assert.ok(!mayTradeLive({ grade: "probation", stage: "live" as any }));
+});
+
+test("grades change only through server/lab/service/licenses.ts", () => {
+  const files: string[] = [];
+  const walk = (d: string) => { for (const e of readdirSync(d, { withFileTypes: true })) { const p = join(d, e.name); if (e.isDirectory()) walk(p); else if (p.endsWith(".ts")) files.push(p); } };
+  walk(join(process.cwd(), "server"));
+  for (const f of files) {
+    if (f.split("\\").join("/").endsWith("server/lab/service/licenses.ts")) continue;
+    const src = readFileSync(f, "utf8");
+    assert.ok(!/update\(\s*strategyLicenses\s*\)/.test(src), `${f} updates strategy_licenses directly`);
+    assert.ok(!/insert\(\s*strategyLicenses\s*\)/.test(src), `${f} inserts strategy_licenses directly`);
+  }
+});

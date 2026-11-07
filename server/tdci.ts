@@ -15,6 +15,9 @@ import { rateAt, RATE_STALE_MS, type RatePoint } from "./rates";
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 export type StyleKey = "scalp" | "day" | "swing" | "position";
+
+/** Bump whenever any layer or regime calculation changes, so cached Lab environments are rebuilt. */
+export const TDCI_VERSION = 1;
 export type LayerKey =
   | "trend" | "momentum" | "structure" | "liquidity" | "value" | "fibonacci"
   | "positioning" | "carry" | "adx" | "prevDay" | "pivots" | "sessionRange" | "sessionMean";

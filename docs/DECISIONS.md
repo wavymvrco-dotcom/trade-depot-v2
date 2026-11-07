@@ -106,3 +106,25 @@ Newest at the bottom. Format: date — decision — why.
   toward more pairs, and single-pair Blueprints on short histories will mostly be Scrapped. This is the honest answer.
 - **Measured performance:** population 128 × 40 generations × 8 episodes on 5,000 bars × 8 layers: 0.62 s with
   successive halving (19,200 agent-episodes) vs 0.89 s without (40,960). Sheet target: < 60 s.
+
+## 2026-11-06 — Phase 1 service layer
+
+- **Data is pinned per day.** Lab runs use bars up to 00:00 UTC of the current day, so every run that day sees the
+  same data and shares one `env_cache` entry per (symbol, style, data version, TDCI version) across all users.
+- **No worker threads (yet).** The Arena yields to the event loop after every generation (~15–50 ms of work), which
+  keeps the worker responsive and lets progress be saved and Stop be honoured. A full 128×40 run on real data took
+  about a minute end to end, mostly data loading on first use. Revisit if runs grow large.
+- **Vault-once record:** `vault_openings` (run, genome). A crash-retry may repeat the same deterministic exam only if no
+  result was ever stored for that run — it reveals nothing new.
+- **Luck adjustment variance** uses only hall-of-fame candidates with ≥ 30 validation trades (same bar as a champion).
+  A real run showed one candidate with a handful of trades producing a variance of 15,182 and SR₀ = 320. Every
+  candidate still counts toward N (trials).
+- **Live requires Licensed, for every auto-executed signal.** AI-generated signals and TradingView alerts are their own
+  strategy kinds (`ai_signals`, `tradingview`). Until those kinds can go through Shadow Run, auto-execution of them is
+  paused; signals are still generated and notified for manual action.
+- **Tiers:** Free cannot start Shadow Run or go Live (sheet §14). Admins can set a user's Lab plan
+  (`PATCH /api/admin/users/:id/lab-tier`) until billing exists. Pro run and Shadow limits are env-configurable
+  (`LAB_PRO_RUNS_PER_MONTH`, default 10; `LAB_PRO_SHADOW_SLOTS`, default 5) until Marco sets them.
+- **Shadow decisions** are recorded only when the candidate or the incumbent acts (both flat = nothing to compare).
+  Market data is fetched once per (symbol, style) per bar for all strategies; on weekends the check repeats each minute
+  but the candle cache makes it a no-op request at most every few minutes.
