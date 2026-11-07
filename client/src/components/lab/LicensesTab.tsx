@@ -6,6 +6,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { StatusBadge, type Status } from "./StatusBadge";
+import { ChallengeOdds } from "./ChallengeOdds";
 import { fmtR, useLabMe, useLabNav, useLicense, useLicenseAction, useLicenses, type License } from "./api";
 
 const statusOf = (l: License): Status =>
@@ -62,6 +63,7 @@ export function LicensesTab() {
                       {l.stage !== "retired" && <Button variant="ghost" className="min-h-[44px]" onClick={() => setConfirm({ id: l.id, action: "retire" })}>Retire</Button>}
                       {l.runId && <Button variant="ghost" className="min-h-[44px]" onClick={() => go("report", { run: l.runId })}>Vault report</Button>}
                     </div>
+                    {l.grade !== "scrapped" && me.data?.tier === "pro" && <ChallengeOdds licenseId={l.id} />}
                     <div>
                       <h4 className="text-sm font-medium m-0 mb-2">History</h4>
                       <ol className="m-0 pl-0 list-none flex flex-col gap-1.5 text-sm">

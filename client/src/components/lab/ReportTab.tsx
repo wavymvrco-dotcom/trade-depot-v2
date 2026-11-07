@@ -93,6 +93,15 @@ export function ReportTab() {
                   <Stat label="Luck-adjusted confidence" value={`${Math.round(v.luck.dsr * 100)}%`} sub={`Deflated Sharpe over ${v.luck.trials} trials · needs 95%`} />
                   <Stat label="Default TDCI, same vault" value={fmtR(v.baseline.totalR)} sub={v.base.totalR > v.baseline.totalR ? "Beaten" : "Not beaten"} />
                 </dl>
+                {v.prop && (
+                  <p className="m-0 text-sm bg-secondary rounded-lg px-4 py-3">
+                    <span className="font-medium">Your prop rules on the locked data: </span>
+                    {v.prop.status === "passed" ? `passed in ${v.prop.days} trading days (${v.prop.returnPct.toFixed(1)}%).`
+                      : v.prop.status === "failed" ? `failed after ${v.prop.days} trading days — ${({ daily_loss: "daily loss limit", max_drawdown: "maximum drawdown", time_limit: "time limit", consistency: "consistency rule" } as Record<string, string>)[v.prop.reason ?? ""] ?? v.prop.reason}.`
+                      : `neither passed nor failed (${v.prop.returnPct.toFixed(1)}% after ${v.prop.days} trading days).`}
+                    <span className="text-muted-foreground"> One historical path — see Challenge Odds on the strategy for a range.</span>
+                  </p>
+                )}
                 <div>
                   <p className="text-sm font-medium m-0 mb-2">Vault equity (R)</p>
                   <EquityLine values={v.base.equity} label="Vault equity in R" />

@@ -15,6 +15,7 @@ export interface VaultReport {
   luck: { dsr: number; sr0: number; sharpe: number; trials: number; observations: number };
   envelope: { ddP50: number; ddP95: number; ddP99: number; meanR: number; meanP05: number; meanP95: number };
   hunter?: { totalR: number; keptPct: number | null; attacks: number };
+  prop?: { status: "passed" | "failed" | "open"; reason: string | null; days: number; returnPct: number } | null;
   grade: Grade; failureReasons: string[]; vaultHashes: Record<string, string>;
 }
 export interface LabResult {

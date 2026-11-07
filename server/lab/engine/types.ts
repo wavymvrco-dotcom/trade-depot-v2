@@ -3,6 +3,7 @@
 // plain JSON with stable shapes (future Depot Engine API).
 
 import type { StyleKey } from "../../tdci";
+import type { PropRules } from "./prop";
 
 export const STOP_GRID = [1, 1.5, 2, 3] as const;          // stop distance in ATRs
 export const RR_GRID = [1, 1.5, 2, 2.5, 3] as const;       // target in R
@@ -26,6 +27,8 @@ export interface BlueprintSpec {
     minRr?: number;
   };
   risk: { riskPercentPerTrade: number; maxOpenPositions: number };
+  /** Phase 2: the user's prop-firm rules; breaking one kills the agent in that world. */
+  prop?: PropRules;
 }
 
 /** An agent's DNA. */

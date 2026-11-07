@@ -4,7 +4,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { describeBlueprint, GOAL_PRESETS, LAB_SYMBOLS, blueprintSpecSchema, type BlueprintSpecInput } from "@shared/lab-schemas";
+import { describeBlueprint, GOAL_PRESETS, LAB_SYMBOLS, blueprintSpecSchema, type BlueprintSpecInput, type PropRulesInput } from "@shared/lab-schemas";
+import { PropRulesFields, EMPTY_PROP } from "./PropRulesFields";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -42,6 +43,8 @@ export function BlueprintTab() {
   const [minRr, setMinRr] = useState<string>("");
   const [minWeek, setMinWeek] = useState<string>("");
   const [maxWeek, setMaxWeek] = useState<string>("");
+  const [propOn, setPropOn] = useState(false);
+  const [prop, setProp] = useState<PropRulesInput>(EMPTY_PROP);
   const [feas, setFeas] = useState<Feasibility | null>(null);
   const [busy, setBusy] = useState<"" | "check" | "train">("");
   const [error, setError] = useState<string | null>(null);
@@ -60,8 +63,9 @@ export function BlueprintTab() {
         ...(num(minRr) ? { minRr: num(minRr) } : {}),
       },
       risk: { riskPercentPerTrade: risk, maxOpenPositions: maxPos },
+      ...(propOn ? { prop } : {}),
     };
-  }, [style, symbols, goal, risk, maxPos, maxLosses, noWeekend, sessionOn, sess, maxStop, minRr, minWeek, maxWeek]);
+  }, [style, symbols, goal, risk, maxPos, maxLosses, noWeekend, sessionOn, sess, maxStop, minRr, minWeek, maxWeek, propOn, prop]);
   const parsed = blueprintSpecSchema.safeParse(spec);
   const summary = parsed.success ? describeBlueprint(parsed.data) : null;
 
@@ -106,6 +110,7 @@ export function BlueprintTab() {
     setSessionOn(!!s.constraints.sessionHoursUtc); if (s.constraints.sessionHoursUtc) setSess(s.constraints.sessionHoursUtc as [number, number]);
     setMaxStop(s.constraints.maxStopAtr?.toString() ?? ""); setMinRr(s.constraints.minRr?.toString() ?? "");
     setMinWeek(s.objective.tradeFrequency?.minPerWeek?.toString() ?? ""); setMaxWeek(s.objective.tradeFrequency?.maxPerWeek?.toString() ?? "");
+    setPropOn(!!s.prop); if (s.prop) setProp(s.prop);
   };
 
   return (
@@ -202,6 +207,17 @@ export function BlueprintTab() {
               )}
             </div>
           </div>
+        </section>
+
+        <section className={card} aria-labelledby="bp-prop">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h3 id="bp-prop" className="font-display text-xl m-0">Prop-firm challenge</h3>
+              <p className="text-sm text-muted-foreground m-0 mt-1">Optional. A candidate that would break your firm's daily-loss or drawdown rule in a world is eliminated there.</p>
+            </div>
+            <Switch checked={propOn} onCheckedChange={setPropOn} aria-label="Use prop-firm rules" />
+          </div>
+          {propOn && <div className="mt-4"><PropRulesFields value={prop} onChange={setProp} /></div>}
         </section>
 
         <section className={`${card} bg-secondary`} aria-live="polite">

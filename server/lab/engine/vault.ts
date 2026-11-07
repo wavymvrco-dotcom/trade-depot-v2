@@ -11,6 +11,7 @@ import { evalSegments } from "./evolve";
 import { bootstrapEnvelope, deflatedSharpe, maxDrawdown, moments, sharpe } from "./stats";
 import { rng } from "./rng";
 import { hunt } from "./hunter";
+import { simulateProp } from "./prop";
 
 export const GRADING = { minTrades: 30, minProfitFactor: 1.1, minDsr: 0.95 } as const;
 
@@ -43,6 +44,10 @@ export interface VaultReport {
   baseline: PeriodStats;
   luck: { dsr: number; sr0: number; sharpe: number; trials: number; observations: number; skew: number; kurt: number; varianceOfSharpes: number };
   envelope: ReturnType<typeof bootstrapEnvelope>;
+  /** The vault trades in time order (R), and their pace, for Challenge Odds and Tripwire. */
+  sequence: { rs: number[]; tradesPerDay: number };
+  /** Phase 2: the vault sequence run through the Blueprint's prop rules (if any). */
+  prop: { status: "passed" | "failed" | "open"; reason: string | null; days: number; returnPct: number } | null;
   /** Hunter on the vault trades: total R under attack and the share of results kept. */
   hunter: { totalR: number; keptPct: number | null; attacks: number };
   grade: Grade;
@@ -74,6 +79,14 @@ export function vaultExam(args: {
   const { dsr, sr0 } = deflatedSharpe({ sharpe: sr, observations: vr.length, skew: m.skew, kurt: m.kurt, trials: Math.max(1, args.trials), varianceOfSharpes });
 
   const bs = periodStats(base.all), ds = periodStats(dbl.all), bl = periodStats(baseline.all);
+  // All vault trades across pairs, in the order they closed
+  const merged = envs.flatMap((env, k) => base.perEnv[k].map(t => ({ t, env, ms: env.timeMs(t.exit) }))).sort((a, b) => a.ms - b.ms);
+  const spanDays = merged.length > 1 ? (merged[merged.length - 1].ms - merged[0].ms) / 86_400_000 : 1;
+  const tradesPerDay = merged.length / Math.max(1, spanDays * 5 / 7);
+  const reset = spec.prop?.dailyResetHourUtc ?? 0;
+  const propResult = spec.prop
+    ? simulateProp(merged.map(m => ({ r: m.t.r, day: Math.floor((m.ms + m.env.barMs - reset * 3_600_000) / 86_400_000) })), spec.prop, spec.risk.riskPercentPerTrade)
+    : null;
   let huntedR = 0, attacks = 0;
   envs.forEach((env, k) => {
     const h = hunt(env, base.perEnv[k], args.champion.stopIdx, args.champion.rrIdx);
@@ -97,6 +110,8 @@ export function vaultExam(args: {
     }),
     luck: { dsr: r4(dsr), sr0: r4(sr0), sharpe: r4(sr), trials: args.trials, observations: vr.length, skew: r3(m.skew), kurt: r3(m.kurt), varianceOfSharpes: r4(varianceOfSharpes) },
     envelope: roundEnvelope(bootstrapEnvelope(base.all, rng(args.seed ^ 0x5eed), 10_000)),
+    sequence: { rs: merged.map(m => r4(m.t.r)), tradesPerDay: r3(tradesPerDay) },
+    prop: propResult ? { status: propResult.status, reason: propResult.reason, days: propResult.days, returnPct: r3(propResult.equityPct) } : null,
     hunter: { totalR: r3(huntedR), keptPct: bs.totalR > 0 ? r3(Math.max(0, huntedR) / bs.totalR) : null, attacks },
     grade: reasons.length ? "scrapped" : "probation",
     failureReasons: reasons,

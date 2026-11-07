@@ -8,6 +8,23 @@ export const LAB_STYLES = ["scalp", "day", "swing", "position"] as const;
 
 const hour = z.number().int().min(0).max(24);
 
+export const propRulesSchema = z.object({
+  firmLabel: z.string().trim().min(1).max(80),
+  accountSize: z.number().min(100).max(10_000_000),
+  dailyLossLimitPct: z.number().min(0.1).max(50),
+  maxDrawdownPct: z.number().min(0.1).max(100),
+  drawdownType: z.enum(["static", "trailing"]),
+  drawdownMeasure: z.enum(["intraday", "end_of_day"]).optional(),
+  profitTargetPct: z.number().min(0.1).max(200).optional(),
+  minTradingDays: z.number().int().min(0).max(365).optional(),
+  consistencyRulePct: z.number().min(1).max(100).optional(),
+  newsRestrictionMin: z.number().int().min(0).max(240).optional(),
+  weekendHoldingAllowed: z.boolean(),
+  timeLimitDays: z.number().int().min(1).max(365).optional(),
+  dailyResetHourUtc: z.number().int().min(0).max(23).optional(),
+}).strict();
+export type PropRulesInput = z.infer<typeof propRulesSchema>;
+
 export const blueprintSpecSchema = z.object({
   version: z.literal(1),
   style: z.enum(LAB_STYLES),
@@ -32,6 +49,7 @@ export const blueprintSpecSchema = z.object({
     riskPercentPerTrade: z.number().min(0.05).max(5),
     maxOpenPositions: z.number().int().min(1).max(20),
   }).strict(),
+  prop: propRulesSchema.optional(),
 }).strict();
 export type BlueprintSpecInput = z.infer<typeof blueprintSpecSchema>;
 
@@ -88,6 +106,7 @@ export function describeBlueprint(s: BlueprintSpecInput): string {
   const tf = s.objective.tradeFrequency;
   if (tf?.minPerWeek != null || tf?.maxPerWeek != null) parts.push(`about ${tf?.minPerWeek ?? 0}–${tf?.maxPerWeek ?? "any"} trades a week`);
   const dd = s.objective.drawdownPenalty >= 1 ? "strongly avoids drawdowns" : s.objective.drawdownPenalty >= 0.5 ? "balances return and drawdown" : "accepts deeper drawdowns for return";
+  if (s.prop) parts.push(`passing "${s.prop.firmLabel}" rules: ${s.prop.dailyLossLimitPct}% daily loss limit, ${s.prop.maxDrawdownPct}% ${s.prop.drawdownType} drawdown${s.prop.profitTargetPct ? `, ${s.prop.profitTargetPct}% target` : ""}`);
   parts.push(`${dd}, risking ${s.risk.riskPercentPerTrade}% per trade with at most ${s.risk.maxOpenPositions} open`);
   return `You want: ${parts.join("; ")}.`;
 }

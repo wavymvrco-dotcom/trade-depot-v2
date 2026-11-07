@@ -16,6 +16,7 @@ import { aggregateFitness, episodeScore, validationScore, type EpisodeScore } fr
 import { hardnessIndex, sampleEpisodes, MAX_LEVEL, type Episode, type MirrorEnvModel } from "./worlds";
 import { mean, sharpe, maxDrawdown, quantile } from "./stats";
 import { hunt, withHunterPenalty } from "./hunter";
+import { simulateProp } from "./prop";
 
 export const LIMITS = { population: { default: 128, max: 256 }, generations: { default: 40, max: 80 }, episodes: 8 };
 
@@ -138,9 +139,23 @@ function evalEpisode(envs: Env[], g: Genome, ep: Episode, spec: BlueprintSpec): 
   const env = envs[ep.envIdx];
   const res = runGenome(env, g, { from: ep.from, to: ep.to, limit: ep.limit, costMult: ep.costMult, costRows: ep.costRows, miss: ep.miss, constraints: spec.constraints });
   const spanMs = env.timeMs(Math.min(ep.to, env.n)) - env.timeMs(ep.from);
-  const s = episodeScore(spec, res.trades, res.died, spanMs);
+  const died = res.died || (spec.prop ? propBreached(env, res.trades, spec) : false);
+  const s = episodeScore(spec, res.trades, died, spanMs);
   if (!ep.hunter) return { s, h: s };
-  return { s, h: episodeScore(spec, hunt(env, res.trades, g.stopIdx, g.rrIdx).trades, res.died, spanMs) };
+  const hunted = hunt(env, res.trades, g.stopIdx, g.rrIdx).trades;
+  return { s, h: episodeScore(spec, hunted, res.died || (spec.prop ? propBreached(env, hunted, spec) : false), spanMs) };
+}
+
+/** Trading-day index of each trade (UTC day, shifted by the rule's reset hour). */
+export function propDays(env: Env, trades: Trade[], resetHourUtc = 0) {
+  return trades.map(t => Math.floor((env.timeMs(t.exit) + env.barMs - resetHourUtc * 3_600_000) / 86_400_000));
+}
+
+/** Did this sequence break a prop rule (daily loss or max drawdown)? */
+export function propBreached(env: Env, trades: Trade[], spec: BlueprintSpec) {
+  const days = propDays(env, trades, spec.prop!.dailyResetHourUtc ?? 0);
+  const o = simulateProp(trades.map((t, i) => ({ r: t.r, day: days[i] })), { ...spec.prop!, timeLimitDays: undefined, profitTargetPct: undefined }, spec.risk.riskPercentPerTrade);
+  return o.status === "failed";
 }
 
 /** Fitness from normal and hunted episode scores: F − β·max(0, F − F_hunter). */
