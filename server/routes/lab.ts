@@ -19,6 +19,7 @@ import { getLicense, listLicenses, licenseHistory, transition } from "../lab/ser
 import { shadowEvidence } from "../lab/service/shadow";
 import { userRewind } from "../lab/service/rewind";
 import { parseBlueprint, reflectOnRun } from "../lab/service/blueprint";
+import { publishLicense, unpublishLicense } from "../lab/service/license-pages";
 import { TIERS, tierOf, monthKey } from "../lab/service/tiers";
 import { FAILURE_TEXT } from "../lab/engine/types";
 import type { BlueprintSpec } from "../lab/engine/types";
@@ -242,6 +243,19 @@ export function register(app: Express) {
       if (!odds) throw new LabError("Not enough real trades yet to estimate the odds (needs at least 10).", 409);
       res.json({ ...odds, rules, riskPct: risk, sources: { vault: vault.sequence.rs.length, shadow: shadow.length, live: live.length }, failureText: PROP_FAILURE_TEXT });
     } catch (e) { fail(res, e); }
+  });
+
+  /** License Page (opt-in): publish or rename, and unpublish. */
+  app.post("/api/lab/licenses/:id/publish", async (req: Request, res: Response) => {
+    try {
+      const name = typeof req.body?.publicName === "string" ? req.body.publicName : null;
+      const slug = await publishLicense(uid(req), req.params.id, name).catch((e: any) => { throw new LabError(e.message, 409); });
+      if (!slug) throw new LabError("Strategy not found", 404);
+      res.json({ slug, path: `/l/${slug}` });
+    } catch (e) { fail(res, e); }
+  });
+  app.post("/api/lab/licenses/:id/unpublish", async (req: Request, res: Response) => {
+    try { if (!(await unpublishLicense(uid(req), req.params.id))) throw new LabError("Strategy not found", 404); res.json({ ok: true }); } catch (e) { fail(res, e); }
   });
 
   /** One tap: close every open position this strategy opened (Tripwire never does this on its own). */

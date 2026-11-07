@@ -197,3 +197,14 @@ Newest at the bottom. Format: date — decision — why.
 - **Trials across runs (invariant 3):** every earlier finished run by the same user on the same pairs, style and data
   day adds its trials to the luck adjustment — not only Blueprint versions. Re-running until something looks lucky
   makes the bar higher, as it should.
+
+## 2026-11-07 — Phase 2: License Pages
+
+- Server-rendered HTML at `/l/:slug` (not the React app): fast, cacheable (5 min), readable without JavaScript, and
+  impossible to alter from the browser. The slug is random (64 bits). Only strategies that passed the Vault can be
+  published; unpublishing removes the page immediately (after the 5-minute cache).
+- The share image is a PNG (most platforms ignore SVG), drawn from SVG with `@resvg/resvg-js` (MPL-2.0); it falls
+  back to SVG if the renderer is unavailable. On the VPS, install a basic font package (e.g. `fonts-dejavu-core`) so
+  its text renders.
+- Publish/unpublish only touches the page fields, through `licenses.ts` (`setPublicPage`), never grade or stage.
+- The "Verify" button and timestamping are Proof of Process (§11.10, Phase 3).

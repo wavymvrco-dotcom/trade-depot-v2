@@ -3,11 +3,12 @@
 // Tripwire), and the actions allowed from where it is.
 
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { StatusBadge, type Status } from "./StatusBadge";
 import { ChallengeOdds } from "./ChallengeOdds";
-import { fmtR, useLabMe, useLabNav, useLicense, useLicenseAction, useLicenses, type License } from "./api";
+import { lab, fmtR, useLabMe, useLabNav, useLicense, useLicenseAction, useLicenses, type License } from "./api";
 
 const statusOf = (l: License): Status =>
   l.stage === "retired" ? "arena" : l.stage === "live" ? "live" : l.grade === "licensed" ? "licensed" : l.grade === "scrapped" ? "scrapped" : l.stage === "shadow" ? "shadow" : "probation";
@@ -64,6 +65,7 @@ export function LicensesTab() {
                       {l.runId && <Button variant="ghost" className="min-h-[44px]" onClick={() => go("report", { run: l.runId })}>Vault report</Button>}
                     </div>
                     {l.grade !== "scrapped" && me.data?.tier === "pro" && <ChallengeOdds licenseId={l.id} />}
+                    {l.grade !== "scrapped" && <PublicPage license={l} />}
                     <div>
                       <h4 className="text-sm font-medium m-0 mb-2">History</h4>
                       <ol className="m-0 pl-0 list-none flex flex-col gap-1.5 text-sm">
@@ -101,5 +103,34 @@ export function LicensesTab() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+
+/** Opt-in public License Page: anyone with the link sees the verified record — never settings, sizes or account. */
+function PublicPage({ license }: { license: License }) {
+  const qc = useQueryClient();
+  const [name, setName] = useState(license.publicName ?? "");
+  const [err, setErr] = useState<string | null>(null);
+  const url = license.publicSlug ? `${window.location.origin}/l/${license.publicSlug}` : null;
+  const call = async (path: string, body?: unknown) => {
+    setErr(null);
+    try { await lab("POST", `/api/lab/licenses/${license.id}/${path}`, body); qc.invalidateQueries({ queryKey: ["/api/lab/licenses"] }); }
+    catch (e: any) { setErr(e.message); }
+  };
+  return (
+    <section className="border border-border rounded-xl p-4 md:p-5 flex flex-col gap-3" aria-labelledby={`pub-${license.id}`}>
+      <h4 id={`pub-${license.id}`} className="font-display text-lg m-0">Public page</h4>
+      <p className="text-sm text-muted-foreground m-0">Share a read-only page with this strategy's Vault, Shadow and live record and its full history. It never shows its settings, position sizes, your account or who you are — only the display name you choose.</p>
+      <label className="flex flex-col gap-1.5 text-sm sm:w-80">
+        <span className="font-medium">Display name (optional)</span>
+        <input className="min-h-[44px] rounded-md border border-border bg-card px-3" maxLength={60} value={name} onChange={e => setName(e.target.value)} placeholder="Anonymous" />
+      </label>
+      <div className="flex flex-wrap gap-2 items-center">
+        <Button className="min-h-[44px]" onClick={() => call("publish", { publicName: name || null })}>{url ? "Update" : "Publish page"}</Button>
+        {url && <Button variant="outline" className="min-h-[44px]" onClick={() => call("unpublish")}>Stop sharing</Button>}
+        {url && <a href={url} target="_blank" rel="noreferrer" className="underline text-sm break-all">{url}</a>}
+      </div>
+      {err && <p role="alert" className="text-destructive m-0 text-sm">{err}</p>}
+    </section>
   );
 }

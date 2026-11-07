@@ -493,11 +493,15 @@ export const strategyLicenses = pgTable("strategy_licenses", {
   incumbentId: varchar("incumbent_id"),
   shadowStartedAt: timestamp("shadow_started_at"),
   liveSince: timestamp("live_since"),
+  publicSlug: text("public_slug"),                 // License Page (opt-in); null = not shared
+  publicName: text("public_name"),                 // optional display name shown on the page (otherwise anonymous)
+  publicSince: timestamp("public_since"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (t) => [
   index("strategy_licenses_user_idx").on(t.userId, t.stage),
   uniqueIndex("strategy_licenses_run_genome_uq").on(t.runId, t.genomeHash),
+  uniqueIndex("strategy_licenses_public_slug_uq").on(t.publicSlug),
 ]);
 
 /** Immutable audit log of every grade/stage change. */

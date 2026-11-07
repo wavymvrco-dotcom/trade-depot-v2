@@ -18,6 +18,7 @@ import { register as marketplaceRoutes } from "./marketplace";
 import { register as journalRoutes } from "./journal";
 import { register as aiRoutes } from "./ai";
 import { register as labRoutes } from "./lab";
+import { register as publicPagesRoutes } from "./publicPages";
 
 export { isSafeOutboundHost } from "./_shared";
 
@@ -53,6 +54,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   journalRoutes(app);
   aiRoutes(app);
   labRoutes(app);
+  publicPagesRoutes(app);
 
   return httpServer;
 }

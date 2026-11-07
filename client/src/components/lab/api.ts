@@ -41,6 +41,7 @@ export interface License {
   vault: VaultReport | null;
   evidence: (Record<string, any> & { kind?: "shadow" | "live"; checks?: ShadowCheck[]; verdict?: string; reasons?: string[] }) | null;
   createdAt: string; updatedAt: string; shadowStartedAt: string | null; liveSince: string | null;
+  publicSlug?: string | null; publicName?: string | null;
   events?: { id: string; fromGrade: string | null; fromStage: string | null; toGrade: string; toStage: string; reason: string; at: string }[];
 }
 export interface ShadowTrade {

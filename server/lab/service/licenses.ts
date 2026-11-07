@@ -56,3 +56,8 @@ export async function saveEvidence(licenseId: string, evidence: unknown) {
   await db.update(strategyLicenses).set({ evidence: evidence as any, updatedAt: new Date() }).where(eq(strategyLicenses.id, licenseId));
 }
 
+
+/** License Page fields only (never grade or stage): publish, rename or unpublish a strategy's public page. */
+export async function setPublicPage(licenseId: string, v: { publicSlug: string | null; publicName: string | null; publicSince: Date | null }) {
+  await db.update(strategyLicenses).set({ ...v, updatedAt: new Date() }).where(eq(strategyLicenses.id, licenseId));
+}

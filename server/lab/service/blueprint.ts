@@ -44,7 +44,11 @@ export async function parseBlueprint(userId: string, prompt: string) {
     const ask = attempt === 0
       ? `Trader's description:\n"""${prompt}"""`
       : `Trader's description:\n"""${prompt}"""\n\nYour previous answer was invalid: ${lastError}\nReturn a corrected JSON object.`;
-    const out = await callAiProviderJson(provider, settings, SYSTEM, ask).catch((e: any) => { lastError = e.message; return null; });
+    const out = await callAiProviderJson(provider, settings, SYSTEM, ask).catch((e: any) => {
+      // A missing key is a setup problem, not a parsing failure: say so plainly
+      if (/No AI provider connected|No API key saved/i.test(e.message)) throw new LabError("Connect an AI provider and save its key in Settings to describe strategies in plain English, or use the form.", 409);
+      lastError = e.message; return null;
+    });
     const a = acceptAiSpec(out);
     if (a.ok) return { spec: a.spec, notes: a.notes, summary: describeBlueprint(a.spec), provider };
     lastError = out == null && lastError ? lastError : a.error;
