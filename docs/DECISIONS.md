@@ -246,3 +246,51 @@ Newest at the bottom. Format: date — decision — why.
   if it beats v1 out of sample on ≥ 6 of 8 pairs, and v1 has no proven edge to beat yet.
 - Core is not yet the default for new users' live TDCI score: that would change what every new user sees, and the
   pooled ICs come from calibrations that predate the weekend-bar fix. Re-run calibrations first, then decide.
+
+## 2026-11-07 — Phase 3: Hive, Shelf Life, Fleet
+
+- **Hive** (Terminal → News & calendar panel): each Licensed strategy states P(up over its IC horizon) per closed bar,
+  from an isotonic calibration of its Vault scores. Probabilities are scored with log loss once the horizon passes
+  and combined by Hedge weights on cumulative log score. Shown only with **≥ 5 scored contributors**; never names a
+  strategy or user. Labelled "context, not a signal" — it does not trade.
+- **Shelf Life** (Licenses tab): Kaplan–Meier over "first Licensed → first Tripwire trip or retirement", per style,
+  censored if still running. No estimate until **≥ 30 Licensed strategies with ≥ 10 endings**; until then it says so.
+- **Fleet** (Pro, ≥ 2 Licensed): daily R per strategy (Vault + Shadow + Live), min-CVaR(95%) weights by a hand-written
+  two-phase simplex (no LP dependency), cap 60% per strategy. Fitted on the first 70% of shared days, **checked on
+  the last 30%**: it must beat equal weights' CVaR there, or it is shown but not used for Live.
+
+## 2026-11-07 — Phase 3: Proof of Process (§11.10)
+
+- **What is chained:** per run, a `vault_commit` (genome hash + vault data hash) written *before* the Vault Exam runs
+  — the exam does not open if the write fails. Per strategy: `born` (points at the vault commitment), every grade or
+  stage `event` (same transaction as the change), every Shadow `decision` when it is made and its `outcome` when it
+  closes. SHA-256 over canonical JSON (sorted keys), each entry covering the previous hash.
+- **Append-only in the database:** a trigger rejects UPDATE and DELETE on `proof_entries`. That means test entries
+  can't be cleaned up, so the integration check ran inside a rolled-back transaction.
+- **Daily seal:** after 00:10 UTC, each day's entries (global insert order) fold into one Merkle root, saved with a
+  small text file whose SHA-256 is what gets timestamped. **OpenTimestamps anchoring is off** (`PROOF_ANCHOR=1` turns
+  it on; calendar via `PROOF_OTS_CALENDAR`). The stored .ots is the calendar's *pending* proof; `ots upgrade` completes
+  it after Bitcoin confirmation — not done server-side.
+- **Verify** on License Pages runs in the visitor's browser (Web Crypto only): chain links and hashes, vault
+  commitment before the strategy, every outcome preceded by its decision, the page's Shadow numbers recomputed from
+  the record, and Merkle membership in sealed days. The same verifier source is run in the tests.
+- **Not chained, on purpose:** entry/stop/target prices (they reveal the stop and reward settings the page promises
+  not to show) and live trades (broker-confirmed; chaining them is a follow-up). Decision and outcome writes are
+  "soft" — a failure is logged, never blocks trading — and a gap would show as a failed check, not be hidden.
+
+## 2026-11-07 — Phase 3: Layer Kit (§11.6)
+
+- `packages/layer-kit`: the grammar and interpreter are **generated copies** of the platform's
+  (`scripts/sync-layer-kit.cjs`; a test fails if they drift), plus a CLI: `grammar`, `validate`, `run` (evaluate,
+  look-ahead fuzz, an unofficial local IC), `sample` (synthetic candles — no market data ships with the kit).
+  Submissions still go through the app (Lab → Forge) and the same acceptance test.
+- Marked `private` with a LICENSE placeholder: **Marco chooses the license** before it is published.
+- **Bug found by the kit:** an `if` whose selected branch was still warming up ended warmup too early, then threw
+  "non-finite" and wrongly rejected a valid layer. `if` now waits for all its inputs, like every other op. No layer had
+  been accepted, so no stored result changes; earlier rejections with that reason were real trials and stay counted.
+
+## 2026-11-07 — Phase 3: Forecast layer deferred
+
+- The sheet's foundation-model forecast layer needs a Python sidecar (model weights, GPU/CPU budget on a cheap VPS)
+  and a check of the model's license for commercial use. Not built. When built, it enters as one more candidate layer
+  through the same Forge acceptance test — no special path.

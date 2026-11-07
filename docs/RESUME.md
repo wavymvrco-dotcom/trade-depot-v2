@@ -1,23 +1,25 @@
 # Where the build stands (2026-11-07)
 
-Branch: `phase0-foundation` (PR #1). `npm test` passes (75 tests).
+Branch: `phase0-foundation` (PR #1). `npm test` passes (108 tests).
 
 ## Phase 0 — complete
 ## Phase 1 — complete (one live-market observation pending: a Live order through the trade guard)
 ## Phase 2 — complete except multi-asset
-- Mirror (fills → pooled cost model → Arena costs; Settings opt-out), Hunter (Level 4, fragility penalty),
-  prop-firm rules + Challenge Odds, Rewind (Performance hub, Gen Zero "you", drawdown windows in the Vault),
-  Blueprint AI (parse + confirm + refine), License Pages (`/l/:slug` + PNG share image). Verified end to end on the
-  running app with test data (deleted afterwards).
+## Phase 3 — complete except the Forecast layer (deferred, see DECISIONS)
+- Forge (layer DSL, acceptance with a rising bar, MAP-Elites archive, Lab → Forge tab) and Layer Kit
+  (`packages/layer-kit`), Storm Mode, Playbook + regime-gated genomes, Core v1, Hive (Terminal panel), Shelf Life and
+  Fleet (Licenses tab), Proof of Process (hash chains, daily Merkle seals, Verify on License Pages).
+- Real data so far: every Lab run Scrapped; Forge 0 accepted of 109. Both reported as is.
 
-## Waiting on Marco — multi-asset (§11A, "with Phase 2")
-Needs decisions before building: market data for stocks/crypto (Twelve Data plan coverage, or a second provider),
-the broker for stocks/crypto (e.g. Alpaca) and an account to test with, and legal review per asset class before
-live trading (§11A.10). The Instrument model and broker-adapter interface (§11A.1, §11A.6) can be built as
-groundwork first.
+## Waiting on Marco
+- Multi-asset (§11A): market data for stocks/crypto, broker (e.g. Alpaca) + test account, legal review per asset class.
+- VPS, owner entity name (`[OWNER ENTITY]` placeholders), Pro limits, Layer Kit license.
+- Turn on OpenTimestamps anchoring (`PROOF_ANCHOR=1`) once on the VPS, if wanted.
 
 ## Also pending
 - Re-run TDCI "calibrate all" at /admin/tdci (old calibrations include weekend bars).
-- From Marco: VPS, owner entity name, Pro limits.
+- Watch one real Live order go through the trade guard on a weekday.
 
-## Next: Phase 3 (build sheet §11)
+## Next
+- Assessment: should the engine "learn" the 47-book list? (docs/BOOKS.md)
+- Explainer films for each system, built in Blender (docs/FILMS.md, `client/src/content/films.ts`).
