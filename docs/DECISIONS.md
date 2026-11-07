@@ -82,3 +82,27 @@ Newest at the bottom. Format: date — decision — why.
   the labeled placeholder frame from the design.
 - The 14% prop-challenge statistic is cited as the sheet gives it (FPFX Technology via Finance Magnates, 2026);
   it has not been independently checked here.
+
+## 2026-11-06 — Phase 1 engine
+
+- **Engine is pure** (`server/lab/engine/`): no database, HTTP or service imports (enforced by a test). Calibration's
+  trade simulator moved into `engine/outcomes.ts` and both use it; a parity test keeps a verbatim copy of the old one.
+- **Layer matrix stored as Float32 always** (fresh or cached), so cached and freshly built environments give
+  byte-identical results.
+- **Vault isolation is structural:** training code receives environments with every vault candle removed. A test
+  changes vault candles and confirms training output is identical.
+- **Constraints the genome can't control are rules, not deaths.** `sessionHoursUtc` filters entries;
+  `noWeekendHolding` closes positions at the last bar of the entry week. `maxConsecutiveLosses` is a death
+  (the agent's choices cause it). `maxStopAtr` / `minRr` bound the genome's grid. *Why:* killing every agent for a
+  rule none of them can affect would make those Blueprints unusable.
+- **Tripwire CUSUM uses h = 6, not 5.** Measured over 1,000 runs × 1,000 trades (k = 0.5):
+  h = 5 falsely trips 66.6% of runs on normal returns and 11.6% on trade-shaped (+2R/−1R) returns;
+  h = 6: 31.7% / 2.7%; h = 8: 4.2% / 0.0%. Median trades to catch a win-rate drop 40% → 20%: 91 (h=5), 131 (h=6),
+  326 (h=8). Trade results are two-point, so h = 6 meets the sheet's "< 5% false trips over 1,000 trades" on the
+  realistic distribution while still reacting in ~130 trades; the drawdown-breach rule is the fast backstop.
+- **Luck adjustment is strict, as designed.** The Deflated Sharpe uses the champion's validation trades. On a single
+  pair a real but modest edge (per-trade Sharpe ≈ 0.3) needs roughly 400 validation trades to reach 0.95, so it is
+  usually graded "likely luck". With 3–4 pairs the same edge passes. Consequence: the Feasibility check steers users
+  toward more pairs, and single-pair Blueprints on short histories will mostly be Scrapped. This is the honest answer.
+- **Measured performance:** population 128 × 40 generations × 8 episodes on 5,000 bars × 8 layers: 0.62 s with
+  successive halving (19,200 agent-episodes) vs 0.89 s without (40,960). Sheet target: < 60 s.

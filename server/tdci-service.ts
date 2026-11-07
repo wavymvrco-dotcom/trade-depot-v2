@@ -8,7 +8,8 @@ import { getPairCot } from "./cot";
 import { getPairRates } from "./rates";
 import { toWeekly } from "./indicators";
 import { getBoss, QUEUES } from "./jobs";
-import { calcProfit, getSymbolConfig } from "@shared/pips";
+import { simulateTrade } from "./lab/engine/outcomes";
+import { getSymbolConfig } from "@shared/pips";
 import {
   prepare, warmup, layerValues, combine, computeAt, lastClosedIndex, PROFILES, STYLES,
   type StyleKey, type Weights, type LayerKey, type TdciResult, type TdciContext, type Profile,
@@ -158,27 +159,9 @@ interface BarSample {
   costR: number;
 }
 
+/** One trade from bar i under the style's trade model. Shared with the Lab (server/lab/engine/outcomes.ts). */
 function simulate(ctx: TdciContext, i: number, side: 1 | -1, cost: { half: number; slip: number; commission: number }) {
-  const { stopAtr, rr, maxHold } = ctx.profile.model;
-  const p = ctx.p, a = ctx.pAtr[i];
-  const mid = p[i + 1].open;
-  const entry = side > 0 ? mid + cost.half + cost.slip : mid - cost.half - cost.slip;
-  const sl = entry - side * stopAtr * a, tp = entry + side * rr * stopAtr * a;
-  let exit = NaN, exitIdx = Math.min(i + maxHold, p.length - 1);
-  for (let j = i + 1; j <= exitIdx; j++) {
-    const b = p[j];
-    // Longs exit on the bid, shorts on the ask; a bar touching both counts as the stop (conservative)
-    const slHit = side > 0 ? b.low - cost.half <= sl : b.high + cost.half >= sl;
-    const tpHit = side > 0 ? b.high - cost.half >= tp : b.low + cost.half <= tp;
-    if (slHit) { exit = sl - side * cost.slip; exitIdx = j; break; }
-    if (tpHit) { exit = tp; exitIdx = j; break; }
-  }
-  if (!Number.isFinite(exit)) exit = side > 0 ? p[exitIdx].close - cost.half : p[exitIdx].close + cost.half;
-  const riskPerLot = Math.abs(calcProfit("BUY", entry, entry - stopAtr * a, ctx.symbol, 1));
-  const commissionR = riskPerLot > 0 ? cost.commission / riskPerLot : 0;
-  const r = (side * (exit - entry)) / (stopAtr * a) - commissionR;
-  const costR = (2 * cost.half + 2 * cost.slip) / (stopAtr * a) + commissionR;
-  return { r, exitIdx, costR };
+  return simulateTrade(ctx.p, ctx.pAtr[i], ctx.symbol, i, side, ctx.profile.model, cost);
 }
 
 function ranks(v: number[]) {
